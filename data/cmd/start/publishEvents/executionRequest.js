@@ -1,4 +1,4 @@
-import { create as createBasicSubject } from '@liquid-bricks/shared-providers/subject/create/basic'
+import { create as createBasicSubject } from '@liquid-bricks/lib-nats-subject/create/basic'
 
 export async function executionRequest({ scope: { instanceId, componentHash, name, deps }, rootCtx: { natsContext } }) {
   const subject = createBasicSubject()

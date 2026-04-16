@@ -9,7 +9,7 @@ export async function attachComponentImports({
 
   const uniqueImportNamesSet = new Set()
   for (const importItem of imports) {
-    const { name: importName, hash: importHash } = importItem
+    const { name: importName, hash: importHash, waitFor } = importItem
 
     handlerDiagnostics.require(
       typeof importName === 'string' && importName.length,
@@ -29,6 +29,12 @@ export async function attachComponentImports({
       `Duplicate import name: ${importName}`,
       { component: compName, hash, importName },
     )
+    handlerDiagnostics.require(
+      waitFor === undefined || Array.isArray(waitFor),
+      Errors.PRECONDITION_INVALID,
+      'import waitFor must be an array',
+      { field: 'import.waitFor', component: compName, hash, importName },
+    )
     uniqueImportNamesSet.add(importName)
 
     const [importedComponentId] = await g
@@ -44,8 +50,14 @@ export async function attachComponentImports({
       { component: compName, hash, importName, importHash },
     )
 
-    await dataMapper.edge.has_import.component_component.create({
-      fromId: componentVID, toId: importedComponentId, alias: importName
+    const { id: importRefId } = await dataMapper.vertex.importRef.create({ alias: importName })
+    await dataMapper.edge.has_import.component_importRef.create({
+      fromId: componentVID,
+      toId: importRefId,
+    })
+    await dataMapper.edge.import_of.importRef_component.create({
+      fromId: importRefId,
+      toId: importedComponentId,
     })
   }
 }

@@ -15,9 +15,9 @@ export function validatePayload({ scope: { handlerDiagnostics, instanceId, state
     { field: 'stateEdgeId' }
   )
   handlerDiagnostics.require(
-    typeof type === 'string' && ['data', 'task', 'service'].includes(type),
+    typeof type === 'string' && ['data', 'task'].includes(type),
     Errors.PRECONDITION_INVALID,
-    'type must be data, task, or service for start_dependants',
+    'type must be data or task for start_dependants',
     { field: 'type', type }
   )
 

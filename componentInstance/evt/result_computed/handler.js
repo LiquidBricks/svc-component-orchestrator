@@ -1,6 +1,6 @@
-import { Errors } from '../../../errors.js'
-
 export async function handler({ rootCtx: { g }, scope: { handlerDiagnostics, instanceId, type, name, result, stateEdgeId, stateEdgeStatus } }) {
+  if (type === 'gate') return { instanceId }
+
   const now = new Date().toISOString()
   const resultValue = result != null ? JSON.stringify(result) : ''
 

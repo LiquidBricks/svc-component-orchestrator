@@ -14,8 +14,9 @@ export function validatePayload({ scope: { handlerDiagnostics, instanceId, type,
     'type required for result_computed',
     { field: 'type' }
   )
+  const allowedTypes = ['data', 'task', 'gate']
   handlerDiagnostics.require(
-    !!STATE_EDGE_LABEL_BY_TYPE[type],
+    allowedTypes.includes(type),
     Errors.PRECONDITION_INVALID,
     `unknown type ${type} for result_computed`,
     { field: 'type', type }

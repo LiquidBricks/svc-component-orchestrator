@@ -39,20 +39,29 @@ function parseInjectionPath({ handlerDiagnostics, injection, compName, hash, dep
 async function resolveImportedComponent({ g, handlerDiagnostics, startComponentId, importPath, compName, hash, dependencyType, dependencyName, pathType, pathValue }) {
   let componentId = startComponentId
   for (const alias of importPath) {
-    const [edgeId] = await g
+    const [importRefId] = await g
       .V(componentId)
-      .outE(domain.edge.has_import.component_component.constants.LABEL)
+      .out(domain.edge.has_import.component_importRef.constants.LABEL)
+      .has('alias', alias)
+      .id()
+
+    const [gateRefId] = importRefId ? [] : await g
+      .V(componentId)
+      .out(domain.edge.has_gate.component_gateRef.constants.LABEL)
       .has('alias', alias)
       .id()
 
     handlerDiagnostics.require(
-      edgeId,
+      importRefId || gateRefId,
       Errors.PRECONDITION_INVALID,
       `Import not found for component(${compName})#${hash} ${dependencyType}:${dependencyName} ${pathType}[${pathValue}]`,
       { component: compName, hash, dependencyType, dependencyName, pathType, pathValue, alias },
     )
 
-    const [nextComponentId] = await g.E(edgeId).inV().id()
+    const [nextComponentId] = await g
+      .V(importRefId ?? gateRefId)
+      .out(importRefId ? domain.edge.import_of.importRef_component.constants.LABEL : domain.edge.gate_of.gateRef_component.constants.LABEL)
+      .id()
     handlerDiagnostics.require(
       nextComponentId,
       Errors.PRECONDITION_INVALID,

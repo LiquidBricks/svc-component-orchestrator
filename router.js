@@ -1,10 +1,11 @@
-import router from "@liquid-bricks/shared-providers/subject/router";
+import router from "@liquid-bricks/lib-nats-subject/router";
 import { Errors } from "./errors.js";
 import * as component from './component/index.js'
 import * as componentInstance from './componentInstance/index.js'
 import * as data from './data/index.js'
+import * as gate from './gate/index.js'
+import * as importEntity from './import/index.js'
 import * as task from './task/index.js'
-import * as service from './service/index.js'
 import { dataMapper as createDataMapper } from '@liquid-bricks/spec-domain/domain'
 
 export function createComponentServiceRouter({
@@ -37,8 +38,9 @@ export function createComponentServiceRouter({
     .route(componentInstance.cmd.start.path, componentInstance.cmd.start.spec)
     .route(componentInstance.cmd.start_dependants.path, componentInstance.cmd.start_dependants.spec)
     .route(data.cmd.start.path, data.cmd.start.spec)
+    .route(gate.cmd.start.path, gate.cmd.start.spec)
+    .route(importEntity.cmd.start.path, importEntity.cmd.start.spec)
     .route(task.cmd.start.path, task.cmd.start.spec)
-    .route(service.cmd.start.path, service.cmd.start.spec)
     .route(componentInstance.evt.created.path, componentInstance.evt.created.spec)
     .route(componentInstance.evt.result_computed.path, componentInstance.evt.result_computed.spec)
     .route(componentInstance.evt.state_machine_completed.path, componentInstance.evt.state_machine_completed.spec)
@@ -53,14 +55,14 @@ export function createComponentServiceRouter({
         )
       }
     })
-    .error(({ error, rootCtx: { diagnostics } }) => {
+    .error(({ error, rootCtx: { diagnostics } }, ...rest) => {
       if (error instanceof diagnostics.DiagnosticError) {
         return //we already have an error diagnosed, dont throw another one.
       }
       throw diagnostics.error(
         Errors.ROUTER_HANDLER_ERROR,
         'component service router error',
-        { error, stage, index, fn },
+        { error, rest },
       )
     })
     .abort(({ reason, stage, message, rootCtx: { diagnostics } }) => {

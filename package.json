@@ -1,0 +1,28 @@
+{
+  "name": "@liquid-bricks/svc-component-orchestrator",
+  "version": "1.0.0",
+  "description": "Component orchestrator consumer and hooks",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./consumer": "./index.js"
+  },
+  "private": true,
+  "scripts": {
+    "test": "clear && node test/run.js"
+  },
+  "dependencies": {
+    "@liquid-bricks/lib-nats-context": "github:LiquidBricks/lib-nats-context#345a6a5d748e253bee39e3dd1ca33719a35f9ad3",
+    "@liquid-bricks/lib-component-builder": "github:LiquidBricks/lib-component-builder#d6d44f20a6a3589f0245574f61a4548af3b10d5b",
+    "@liquid-bricks/lib-nats-subject": "github:LiquidBricks/lib-nats-subject#5958dab01e5934267773f47aa280337547f52474",
+    "@liquid-bricks/lib-diagnostics": "github:LiquidBricks/lib-diagnostics#61b706dfa029f0682faa97a2836685a84cd45809",
+    "@liquid-bricks/spec-domain": "github:LiquidBricks/spec-domain#d579ea8f20d0fce79e62daf728da9e21bdc2470a",
+    "@liquid-bricks/lib-nats-graph": "github:LiquidBricks/lib-nats-graph#0d71894775c221f2b8a5f841a5f380b21ac0768d",
+    "@nats-io/jetstream": "^3.0.2",
+    "@nats-io/kv": "^3.0.2",
+    "@nats-io/transport-node": "^3.0.2",
+    "dotenv": "^16.4.5",
+    "ulid": "^3.0.0"
+  }
+}

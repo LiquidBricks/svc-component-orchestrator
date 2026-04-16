@@ -1,7 +1,7 @@
 import { Errors } from '../../../../errors.js'
 
 function validateTaskPayload(diagnostics, task) {
-  const { name, fnc, codeRef, deps, inject } = task
+  const { name, fnc, codeRef, deps, waitFor, inject } = task
   diagnostics.require(
     typeof name === 'string' && name.length,
     Errors.PRECONDITION_REQUIRED,
@@ -27,6 +27,12 @@ function validateTaskPayload(diagnostics, task) {
     { field: 'task.deps' },
   )
   diagnostics.require(
+    waitFor === undefined || Array.isArray(waitFor),
+    Errors.PRECONDITION_INVALID,
+    'task waitFor must be an array',
+    { field: 'task.waitFor' },
+  )
+  diagnostics.require(
     inject === undefined || Array.isArray(inject),
     Errors.PRECONDITION_INVALID,
     'task inject must be an array',
@@ -35,7 +41,7 @@ function validateTaskPayload(diagnostics, task) {
 }
 
 function validateDataPayload(diagnostics, dataItem) {
-  const { name, codeRef, deps, inject } = dataItem
+  const { name, codeRef, deps, waitFor, inject } = dataItem
   diagnostics.require(
     typeof name === 'string' && name.length,
     Errors.PRECONDITION_REQUIRED,
@@ -47,6 +53,12 @@ function validateDataPayload(diagnostics, dataItem) {
     Errors.PRECONDITION_INVALID,
     'data deps must be an array',
     { field: 'data.deps' },
+  )
+  diagnostics.require(
+    waitFor === undefined || Array.isArray(waitFor),
+    Errors.PRECONDITION_INVALID,
+    'data waitFor must be an array',
+    { field: 'data.waitFor' },
   )
   diagnostics.require(
     typeof codeRef === 'object',
@@ -62,60 +74,29 @@ function validateDataPayload(diagnostics, dataItem) {
   )
 }
 
-function validateServicePayload(diagnostics, service) {
-  const { name, codeRef, deps, inject } = service
-  diagnostics.require(
-    typeof name === 'string' && name.length,
-    Errors.PRECONDITION_REQUIRED,
-    'service name required',
-    { field: 'service.name' },
-  )
-  diagnostics.require(
-    Array.isArray(deps),
-    Errors.PRECONDITION_INVALID,
-    'service deps must be an array',
-    { field: 'service.deps' },
-  )
-  diagnostics.require(
-    typeof codeRef === 'object',
-    Errors.PRECONDITION_INVALID,
-    'service codeRef required',
-    { field: 'service.codeRef' },
-  )
-  diagnostics.require(
-    inject === undefined || Array.isArray(inject),
-    Errors.PRECONDITION_INVALID,
-    'service inject must be an array',
-    { field: 'service.inject' },
-  )
-}
-
 export async function buildDependencyList({
   rootCtx: { dataMapper },
   scope: { handlerDiagnostics, component, componentVID },
 }) {
-  const { data = [], tasks = [], services = [] } = component
+  const { data = [], tasks = [] } = component
   const dependencyList = new Map()
 
   for (const task of tasks) {
     validateTaskPayload(handlerDiagnostics, task)
+    const deps = Array.isArray(task.deps) ? task.deps : []
+    const waitFor = Array.isArray(task.waitFor) ? task.waitFor : []
     const { id: taskVID } = await dataMapper.vertex.task.create(task)
     await dataMapper.edge.has_task.component_task.create({ fromId: componentVID, toId: taskVID })
-    dependencyList.set(`task.${task.name}`, { id: taskVID, deps: task.deps, inject: task.inject })
-  }
-
-  for (const service of services) {
-    validateServicePayload(handlerDiagnostics, service)
-    const { id: serviceVID } = await dataMapper.vertex.service.create(service)
-    await dataMapper.edge.has_service.component_service.create({ fromId: componentVID, toId: serviceVID })
-    dependencyList.set(`service.${service.name}`, { id: serviceVID, deps: service.deps, inject: service.inject })
+    dependencyList.set(`task.${task.name}`, { id: taskVID, deps, waitFor, inject: task.inject })
   }
 
   for (const dataItem of data) {
     validateDataPayload(handlerDiagnostics, dataItem)
+    const deps = Array.isArray(dataItem.deps) ? dataItem.deps : []
+    const waitFor = Array.isArray(dataItem.waitFor) ? dataItem.waitFor : []
     const { id: dataVID } = await dataMapper.vertex.data.create(dataItem)
     await dataMapper.edge.has_data.component_data.create({ fromId: componentVID, toId: dataVID })
-    dependencyList.set(`data.${dataItem.name}`, { id: dataVID, deps: dataItem.deps, inject: dataItem.inject })
+    dependencyList.set(`data.${dataItem.name}`, { id: dataVID, deps, waitFor, inject: dataItem.inject })
   }
 
   const { id: deferredVID } = await dataMapper.vertex.deferred.create({ name: 'deferred' })

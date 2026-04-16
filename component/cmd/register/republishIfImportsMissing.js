@@ -1,4 +1,4 @@
-import { s } from '@liquid-bricks/shared-providers/subject/router'
+import { s } from '@liquid-bricks/lib-nats-subject/router'
 
 import { Errors } from '../../../errors.js'
 import { domain } from '@liquid-bricks/spec-domain/domain'

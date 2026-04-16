@@ -10,29 +10,18 @@ export async function createComponentInstance({ g, dataMapper, componentId, inst
   const dataNodeIds = await g.V(componentId)
     .out(domain.edge.has_data.component_data.constants.LABEL)
     .id()
-  await Promise.all(
-    dataNodeIds.map(nodeId =>
-      dataMapper.edge.has_data_state.stateMachine_data.create({ fromId: stateMachineId, toId: nodeId })
-    )
-  )
+  for (const nodeId of dataNodeIds ?? []) {
+    if (!nodeId) continue
+    await dataMapper.edge.has_data_state.stateMachine_data.create({ fromId: stateMachineId, toId: nodeId })
+  }
 
   const taskNodeIds = await g.V(componentId)
     .out(domain.edge.has_task.component_task.constants.LABEL)
     .id()
-  await Promise.all(
-    taskNodeIds.map(taskId =>
-      dataMapper.edge.has_task_state.stateMachine_task.create({ fromId: stateMachineId, toId: taskId })
-    )
-  )
-
-  const serviceNodeIds = await g.V(componentId)
-    .out(domain.edge.has_service.component_service.constants.LABEL)
-    .id()
-  await Promise.all(
-    serviceNodeIds.map(serviceId =>
-      dataMapper.edge.has_service_state.stateMachine_service.create({ fromId: stateMachineId, toId: serviceId })
-    )
-  )
+  for (const taskId of taskNodeIds ?? []) {
+    if (!taskId) continue
+    await dataMapper.edge.has_task_state.stateMachine_task.create({ fromId: stateMachineId, toId: taskId })
+  }
 
   return { instanceVertexId, stateMachineId }
 }

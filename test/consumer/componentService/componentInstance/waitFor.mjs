@@ -1,0 +1,264 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+
+import { component as componentBuilder } from '@liquid-bricks/lib-component-builder'
+
+import { Graph } from '@liquid-bricks/lib-nats-graph/graph'
+import { diagnostics as makeDiagnostics } from '@liquid-bricks/lib-diagnostics'
+import { create as createBasicSubject } from '@liquid-bricks/lib-nats-subject/create/basic'
+import { dataMapper as createDataMapper, domain } from '@liquid-bricks/spec-domain/domain'
+
+import { handler as registerHandler } from '../../../../component/cmd/register/handler/index.js'
+import { handler as createInstanceHandler } from '../../../../componentInstance/cmd/create/handler/index.js'
+import { componentImports } from '../../../../componentInstance/cmd/create/loadData/componentImports.js'
+import { findDependencyFreeStates } from '../../../../componentInstance/cmd/start/findDependencyFreeStates.js'
+import { handler as startDependantsHandler } from '../../../../componentInstance/cmd/start_dependants/handler.js'
+import { publishStartCommands } from '../../../../componentInstance/cmd/start_dependants/publishEvents/publishStartCommands.js'
+import { usesImportInstances } from '../../../../componentInstance/cmd/start/loadData/usesImportInstances.js'
+import { startImports } from '../../../../componentInstance/cmd/start/publishEvents/startImports.js'
+import { handler as startImportHandler } from '../../../../import/cmd/start/handler.js'
+import { runHandler } from '../../../util/runHandler.js'
+
+const noop = console.log
+function makeDiagnosticsInstance() {
+  return makeDiagnostics({
+    logger: { info: noop, warn: noop, error: noop, debug: noop },
+    metrics: { timing: noop, count: noop },
+    sample: () => true,
+    rateLimit: () => true,
+  })
+}
+
+function createHandlerDiagnostics(diagnostics, scope = {}) {
+  return diagnostics.child
+    ? diagnostics.child({ router: { stage: 'unit-test' }, scope })
+    : diagnostics
+}
+
+function createMemoryContext() {
+  const diagnostics = makeDiagnosticsInstance()
+  const graph = Graph({ kv: 'memory', diagnostics })
+  const g = graph.g
+  const dataMapper = createDataMapper({ g, diagnostics })
+  return { diagnostics, graph, g, dataMapper }
+}
+
+async function getComponentId({ g, diagnostics, componentHash }) {
+  const [componentId] = await g
+    .V()
+    .has('label', domain.vertex.component.constants.LABEL)
+    .has('hash', componentHash)
+    .id()
+  diagnostics.require(
+    componentId,
+    diagnostics.DiagnosticError,
+    `component not found for componentHash ${componentHash}`,
+  )
+  return componentId
+}
+
+async function getInstanceContext({ g, diagnostics, instanceId }) {
+  const [instanceVertexId] = await g
+    .V()
+    .has('label', domain.vertex.componentInstance.constants.LABEL)
+    .has('instanceId', instanceId)
+    .id()
+  diagnostics.require(
+    instanceVertexId,
+    diagnostics.DiagnosticError,
+    `componentInstance ${instanceId} not found`,
+  )
+
+  const [stateMachineId] = await g
+    .V(instanceVertexId)
+    .out(domain.edge.has_stateMachine.componentInstance_stateMachine.constants.LABEL)
+    .id()
+
+  return { instanceVertexId, stateMachineId }
+}
+
+async function getStateEdgeIdByName({ g, stateMachineId, edgeLabel, nodeName }) {
+  const [edgeId] = await g
+    .V(stateMachineId)
+    .outE(edgeLabel)
+    .filter(_ => _.inV().has('name', nodeName))
+    .id()
+  return edgeId
+}
+
+async function edgeNames({ g, edgeIds }) {
+  const names = []
+  for (const edgeId of edgeIds ?? []) {
+    const [row] = await g.E(edgeId).inV().valueMap('name')
+    const value = row?.name ?? row
+    names.push(Array.isArray(value) ? value[0] : value)
+  }
+  return names
+}
+
+test('task waitFor behaves like a dependency', async () => {
+  const ctx = createMemoryContext()
+  try {
+    const handlerDiagnostics = createHandlerDiagnostics(ctx.diagnostics)
+    const component = componentBuilder('WaitForTasks')
+      .task('first', {})
+      .task('second', { waitFor: ({ task }) => task.first })
+      .toJSON()
+
+    await runHandler(registerHandler, { rootCtx: ctx, scope: { handlerDiagnostics, component } })
+    const componentId = await getComponentId({ g: ctx.g, diagnostics: ctx.diagnostics, componentHash: component.hash })
+    const { imports } = await componentImports({ rootCtx: { g: ctx.g }, scope: { componentId } })
+
+    const instanceId = 'instance-wait-for-task'
+    await runHandler(createInstanceHandler, {
+      rootCtx: ctx,
+      scope: { handlerDiagnostics, componentHash: component.hash, componentId, instanceId, imports },
+    })
+
+    const { instanceVertexId, stateMachineId } = await getInstanceContext({ g: ctx.g, diagnostics: ctx.diagnostics, instanceId })
+    const { taskStateIds } = await findDependencyFreeStates({ rootCtx: { g: ctx.g }, scope: { stateMachineId } })
+    const readyTaskNames = await edgeNames({ g: ctx.g, edgeIds: taskStateIds })
+    assert.deepEqual(readyTaskNames, ['first'])
+
+    const firstEdgeId = await getStateEdgeIdByName({
+      g: ctx.g,
+      stateMachineId,
+      edgeLabel: domain.edge.has_task_state.stateMachine_task.constants.LABEL,
+      nodeName: 'first',
+    })
+    const [providedNodeId] = await ctx.g.E(firstEdgeId).inV().id()
+    await ctx.g
+      .E(firstEdgeId)
+      .property('status', domain.edge.has_task_state.stateMachine_task.constants.Status.PROVIDED)
+      .property('result', '"done"')
+
+    const { starters } = await startDependantsHandler({
+      rootCtx: { g: ctx.g },
+      scope: { instanceId, instanceVertexId, stateMachineId, providedNodeId, type: 'task' },
+    })
+    const readyAfterNames = await edgeNames({ g: ctx.g, edgeIds: starters[0].taskStateIds })
+    assert.deepEqual(readyAfterNames, ['second'])
+  } finally {
+    try { await ctx.graph?.close?.() } catch { }
+  }
+})
+
+test('import waitFor prevents starting child until dependency provided', async () => {
+  const ctx = createMemoryContext()
+  try {
+    const handlerDiagnostics = createHandlerDiagnostics(ctx.diagnostics)
+    const childComponent = componentBuilder('WaitForChild')
+      .data('child', { deps: () => { } })
+      .toJSON()
+    const parentComponent = componentBuilder('WaitForParent')
+      .import('child', { hash: childComponent.hash, waitFor: ({ data }) => data.gate })
+      .data('gate', { deps: () => { } })
+      .toJSON()
+
+    await runHandler(registerHandler, { rootCtx: ctx, scope: { handlerDiagnostics, component: childComponent } })
+    await runHandler(registerHandler, { rootCtx: ctx, scope: { handlerDiagnostics, component: parentComponent } })
+
+    const componentId = await getComponentId({ g: ctx.g, diagnostics: ctx.diagnostics, componentHash: parentComponent.hash })
+    const { imports } = await componentImports({ rootCtx: { g: ctx.g }, scope: { componentId } })
+
+    const instanceId = 'instance-wait-for-import'
+    const createResult = await runHandler(createInstanceHandler, {
+      rootCtx: ctx,
+      scope: { handlerDiagnostics, componentHash: parentComponent.hash, componentId, instanceId, imports },
+    })
+    const childInstanceId = createResult.importedInstances?.[0]?.instanceId
+    assert.ok(childInstanceId, 'child instance missing')
+
+    const { instanceVertexId, stateMachineId } = await getInstanceContext({ g: ctx.g, diagnostics: ctx.diagnostics, instanceId })
+    const { usesImportInstances: importInstances } = await usesImportInstances({
+      rootCtx: { g: ctx.g },
+      scope: { instanceVertexId },
+    })
+    assert.ok(importInstances.length > 0, 'expected an import instance')
+    assert.equal(importInstances[0]?.waitFor?.length, 1)
+
+    const initialPublishes = []
+    const natsContext = { publish: async (subject, payload) => initialPublishes.push({ subject, payload: JSON.parse(payload) }) }
+    const startImportSubject = createBasicSubject()
+      .env('prod')
+      .ns('component-service')
+      .entity('import')
+      .channel('cmd')
+      .action('start')
+      .version('v1')
+      .build()
+    const startComponentInstanceSubject = createBasicSubject()
+      .env('prod')
+      .ns('component-service')
+      .entity('componentInstance')
+      .channel('cmd')
+      .action('start')
+      .version('v1')
+      .build()
+    await startImports({
+      rootCtx: { natsContext },
+      scope: { instanceId, instanceVertexId, usesImportInstances: importInstances },
+    })
+    assert.equal(initialPublishes.length, 1)
+    assert.equal(initialPublishes[0].subject, startImportSubject)
+    assert.equal(initialPublishes[0].payload?.data?.instanceId, childInstanceId)
+    assert.equal(initialPublishes[0].payload?.data?.parentInstanceId, instanceId)
+
+    const preGateImportStartPublishes = []
+    const preGateImportStartContext = {
+      publish: async (subject, payload) => preGateImportStartPublishes.push({ subject, payload: JSON.parse(payload) }),
+    }
+    await runHandler(startImportHandler, {
+      rootCtx: { natsContext: preGateImportStartContext, g: ctx.g },
+      scope: initialPublishes[0].payload.data,
+    })
+    assert.equal(preGateImportStartPublishes.filter(({ subject }) => subject === startComponentInstanceSubject).length, 0)
+
+    const gateEdgeId = await getStateEdgeIdByName({
+      g: ctx.g,
+      stateMachineId,
+      edgeLabel: domain.edge.has_data_state.stateMachine_data.constants.LABEL,
+      nodeName: 'gate',
+    })
+    const [gateNodeId] = await ctx.g.E(gateEdgeId).inV().id()
+    await ctx.g
+      .E(gateEdgeId)
+      .property('status', domain.edge.has_data_state.stateMachine_data.constants.Status.PROVIDED)
+
+    const dependants = await startDependantsHandler({
+      rootCtx: { g: ctx.g },
+      scope: { instanceId, instanceVertexId, stateMachineId, providedNodeId: gateNodeId, type: 'data' },
+    })
+
+    assert.ok(dependants.starters[0].importInstanceIds.includes(childInstanceId))
+
+    const published = []
+    const startContext = { publish: async (subject, payload) => published.push({ subject, payload: JSON.parse(payload) }) }
+    await publishStartCommands({
+      rootCtx: { natsContext: startContext },
+      scope: dependants,
+    })
+    assert.ok(published.some(({ subject, payload }) =>
+      subject === startImportSubject
+      && payload.data.instanceId === childInstanceId
+      && payload.data.parentInstanceId === instanceId
+    ))
+
+    const postGateImportStartPublishes = []
+    const postGateImportStartContext = {
+      publish: async (subject, payload) => postGateImportStartPublishes.push({ subject, payload: JSON.parse(payload) }),
+    }
+    for (const importStartCommand of published.filter(({ subject }) => subject === startImportSubject)) {
+      await runHandler(startImportHandler, {
+        rootCtx: { natsContext: postGateImportStartContext, g: ctx.g },
+        scope: importStartCommand.payload.data,
+      })
+    }
+    assert.ok(postGateImportStartPublishes.some(({ subject, payload }) =>
+      subject === startComponentInstanceSubject
+      && payload.data.instanceId === childInstanceId
+    ))
+  } finally {
+    try { await ctx.graph?.close?.() } catch { }
+  }
+})

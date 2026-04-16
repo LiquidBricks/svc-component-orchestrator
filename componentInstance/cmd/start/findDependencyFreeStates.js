@@ -9,7 +9,8 @@ export async function findDependencyFreeStates({ rootCtx: { g }, scope: { stateM
         domain.edge.has_dependency.data_task.constants.LABEL,
         domain.edge.has_dependency.data_data.constants.LABEL,
         domain.edge.has_dependency.data_deferred.constants.LABEL,
-        domain.edge.has_dependency.data_service.constants.LABEL,
+        domain.edge.wait_for.data_task.constants.LABEL,
+        domain.edge.wait_for.data_data.constants.LABEL,
       )))
       .id(),
     taskStateIds: await g
@@ -19,16 +20,8 @@ export async function findDependencyFreeStates({ rootCtx: { g }, scope: { stateM
         domain.edge.has_dependency.task_task.constants.LABEL,
         domain.edge.has_dependency.task_data.constants.LABEL,
         domain.edge.has_dependency.task_deferred.constants.LABEL,
-        domain.edge.has_dependency.task_service.constants.LABEL,
-      )))
-      .id(),
-    serviceStateIds: await g
-      .V(stateMachineId)
-      .outE(domain.edge.has_service_state.stateMachine_service.constants.LABEL)
-      .filter(_ => _.inV().not(__ => __.out(
-        domain.edge.has_dependency.service_task.constants.LABEL,
-        domain.edge.has_dependency.service_data.constants.LABEL,
-        domain.edge.has_dependency.service_service.constants.LABEL,
+        domain.edge.wait_for.task_task.constants.LABEL,
+        domain.edge.wait_for.task_data.constants.LABEL,
       )))
       .id(),
   }

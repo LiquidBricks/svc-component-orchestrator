@@ -2,7 +2,7 @@ import { AckPolicy, DeliverPolicy } from "@nats-io/jetstream";
 import { createComponentServiceRouter } from './router.js'
 
 const consumerName = 'componentServiceConsumer'
-export async function componentServiceConsumer({ streamName, natsContext, g, diagnostics: d }) {
+export async function Consumer({ streamName, natsContext, g, diagnostics: d }) {
   const diagnostics = d.child({ consumerName })
 
   const jetstream = await natsContext.jetstream();
@@ -30,7 +30,6 @@ export async function componentServiceConsumer({ streamName, natsContext, g, dia
 
   new Promise(async () => {
     for await (const m of iter) {
-      console.log({ subject: m.subject })
       await r.request({
         subject: m.subject,
         message: m

@@ -5,7 +5,6 @@ const DEPENDENCY_EDGE_LABELS = Object.freeze([
   domain.edge.has_dependency.task_task.constants.LABEL,
   domain.edge.has_dependency.task_data.constants.LABEL,
   domain.edge.has_dependency.task_deferred.constants.LABEL,
-  domain.edge.has_dependency.task_service.constants.LABEL,
 ])
 
 export async function taskDependencyResults({ rootCtx: { g }, scope: { instanceVertexId, taskNodeId } }) {
@@ -47,8 +46,6 @@ export async function taskDependencyResults({ rootCtx: { g }, scope: { instanceV
       [depComponentId] = await g.V(depNodeId).in(domain.edge.has_task.component_task.constants.LABEL).id()
     } else if (depLabel === 'data') {
       [depComponentId] = await g.V(depNodeId).in(domain.edge.has_data.component_data.constants.LABEL).id()
-    } else if (depLabel === 'service') {
-      [depComponentId] = await g.V(depNodeId).in(domain.edge.has_service.component_service.constants.LABEL).id()
     } else {
       [depComponentId] = await g.V(depNodeId).in(domain.edge.has_deferred.component_deferred.constants.LABEL).id()
     }
