@@ -7,7 +7,7 @@ function ensureArray(value) {
   return Array.isArray(value) ? value : [value]
 }
 
-export async function attachComponentGates({
+async function attachComponentGatesHandler({
   rootCtx: { g, dataMapper },
   scope: { handlerDiagnostics, component, dependencyList, componentVID },
 }) {
@@ -155,3 +155,5 @@ export async function attachComponentGates({
     }
   }
 }
+
+export const attachComponentGates = [attachComponentGatesHandler]

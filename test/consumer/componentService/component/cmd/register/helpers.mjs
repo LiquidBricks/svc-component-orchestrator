@@ -1,13 +1,15 @@
 import assert from 'node:assert/strict'
 
+import router from '@liquid-bricks/lib-nats-subject/router'
 import { Graph } from '@liquid-bricks/lib-nats-graph/graph'
 import { diagnostics as makeDiagnostics } from '@liquid-bricks/lib-diagnostics'
 import { ulid } from 'ulid'
 
 import { createComponentServiceRouter } from '../../../../../../router.js'
+import { path as registerPath } from '../../../../../../component/cmd/register/index.js'
 import { dataMapper as createDataMapper, domain } from '@liquid-bricks/spec-domain/domain'
 import { serviceConfiguration } from '../../../../../provider/serviceConfiguration/dotenv/index.js'
-import { runHandler } from '../../../../../util/runHandler.js'
+import { createRouteMessage, invokeRoute } from '../../../../../util/invokeRoute.js'
 
 const { NATS_IP_ADDRESS } = serviceConfiguration()
 assert.ok(NATS_IP_ADDRESS, 'NATS_IP_ADDRESS missing; set in .env or .env.local')
@@ -68,10 +70,30 @@ export function getRegisterSpec() {
 
 export const registerSpec = getRegisterSpec()
 
-export async function registerComponent(context, component) {
+async function invokeHandlerList(handler, { rootCtx, scope } = {}) {
+  const stageRouter = router({
+    tokens: ['stage'],
+    context: rootCtx,
+  })
+    .before(() => ({ ...(scope ?? {}) }))
+    .route({ stage: 'handler' }, { handler })
+
+  const message = createRouteMessage({ subject: 'handler' })
+  const { scope: resultScope } = await stageRouter.request({ subject: 'handler', message })
+  return resultScope
+}
+
+export async function registerHandlerComponent(context, component) {
   const { diagnostics, dataMapper, g } = context
   const handlerDiagnostics = createHandlerDiagnostics(diagnostics, { component })
-  await runHandler(registerSpec.handler, { rootCtx: { diagnostics, dataMapper, g }, scope: { handlerDiagnostics, component } })
+  return invokeHandlerList(registerSpec.handler, {
+    rootCtx: { diagnostics, dataMapper, g },
+    scope: { handlerDiagnostics, component },
+  })
+}
+
+export async function registerComponent(context, component, options = {}) {
+  return invokeRoute(context, { path: registerPath, data: component, ...options })
 }
 
 export { domain }

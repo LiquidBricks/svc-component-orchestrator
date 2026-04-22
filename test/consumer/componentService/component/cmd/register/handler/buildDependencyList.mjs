@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 
 import { component as componentBuilder } from '@liquid-bricks/lib-component-builder'
 
-import { domain, registerComponent, withGraphContext } from '../helpers.mjs'
+import { domain, registerHandlerComponent, withGraphContext } from '../helpers.mjs'
 
 test('handler allows data entries without fnc', async () => {
   await withGraphContext(async ({ diagnostics, dataMapper, g }) => {
@@ -12,7 +12,7 @@ test('handler allows data entries without fnc', async () => {
       .toJSON()
     delete component.data[0].fnc
 
-    await registerComponent({ diagnostics, dataMapper, g }, component)
+    await registerHandlerComponent({ diagnostics, dataMapper, g }, component)
 
     const [dataId] = await g
       .V()
@@ -98,7 +98,7 @@ for (const { title, component } of failureCases) {
   test(`handler rejects when ${title}`, async () => {
     await withGraphContext(async ({ diagnostics, dataMapper, g }) => {
       await assert.rejects(
-        registerComponent({ diagnostics, dataMapper, g }, component),
+        registerHandlerComponent({ diagnostics, dataMapper, g }, component),
         diagnostics.DiagnosticError,
       )
     })

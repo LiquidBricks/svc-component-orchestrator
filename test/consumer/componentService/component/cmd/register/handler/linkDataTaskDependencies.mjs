@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 
 import { component as componentBuilder } from '@liquid-bricks/lib-component-builder'
 
-import { domain, registerComponent, withGraphContext } from '../helpers.mjs'
+import { domain, registerHandlerComponent, withGraphContext } from '../helpers.mjs'
 
 test('handler builds component graph and dependency edges', async () => {
   await withGraphContext(async ({ diagnostics, dataMapper, g }) => {
@@ -13,7 +13,7 @@ test('handler builds component graph and dependency edges', async () => {
       .task('task1', { deps: ({ data, deferred }) => { data.data1; deferred.deferred } })
       .toJSON()
 
-    await registerComponent({ diagnostics, dataMapper, g }, component)
+    await registerHandlerComponent({ diagnostics, dataMapper, g }, component)
 
     const [componentId] = await g
       .V()
@@ -75,10 +75,10 @@ test('handler resolves namespaced dependency paths through imports', async () =>
       .task('main', { deps: ({ words }) => { words.task.process; words.engine.first.task.init; words.data.vocab } })
       .toJSON()
 
-    await registerComponent({ diagnostics, dataMapper, g }, componentFirst)
-    await registerComponent({ diagnostics, dataMapper, g }, componentEngine)
-    await registerComponent({ diagnostics, dataMapper, g }, componentWords)
-    await registerComponent({ diagnostics, dataMapper, g }, componentRoot)
+    await registerHandlerComponent({ diagnostics, dataMapper, g }, componentFirst)
+    await registerHandlerComponent({ diagnostics, dataMapper, g }, componentEngine)
+    await registerHandlerComponent({ diagnostics, dataMapper, g }, componentWords)
+    await registerHandlerComponent({ diagnostics, dataMapper, g }, componentRoot)
 
     const [rootComponentId] = await g.V().has('label', domain.vertex.component.constants.LABEL).has('hash', componentRoot.hash).id()
     const [mainTaskId] = await g.V(rootComponentId).out(domain.edge.has_task.component_task.constants.LABEL).has('name', 'main').id()
@@ -112,7 +112,7 @@ test('handler rejects unknown dependency types', async () => {
       .toJSON()
 
     await assert.rejects(
-      registerComponent({ diagnostics, dataMapper, g }, component),
+      registerHandlerComponent({ diagnostics, dataMapper, g }, component),
       diagnostics.DiagnosticError,
     )
   })

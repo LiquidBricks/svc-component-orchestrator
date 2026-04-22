@@ -8,7 +8,7 @@ import { diagnostics as makeDiagnostics } from '@liquid-bricks/lib-diagnostics'
 import { create as createBasicSubject } from '@liquid-bricks/lib-nats-subject/create/basic'
 import { dataMapper as createDataMapper, domain } from '@liquid-bricks/spec-domain/domain'
 
-import { handler as registerHandler } from '../../../../component/cmd/register/handler/index.js'
+import { path as registerPath } from '../../../../component/cmd/register/index.js'
 import { handler as createInstanceHandler } from '../../../../componentInstance/cmd/create/handler/index.js'
 import { componentImports } from '../../../../componentInstance/cmd/create/loadData/componentImports.js'
 import { findDependencyFreeStates } from '../../../../componentInstance/cmd/start/findDependencyFreeStates.js'
@@ -17,7 +17,7 @@ import { publishStartCommands } from '../../../../componentInstance/cmd/start_de
 import { usesImportInstances } from '../../../../componentInstance/cmd/start/loadData/usesImportInstances.js'
 import { startImports } from '../../../../componentInstance/cmd/start/publishEvents/startImports.js'
 import { handler as startImportHandler } from '../../../../import/cmd/start/handler.js'
-import { runHandler } from '../../../util/runHandler.js'
+import { invokeRoute } from '../../../util/invokeRoute.js'
 
 const noop = console.log
 function makeDiagnosticsInstance() {
@@ -105,12 +105,12 @@ test('task waitFor behaves like a dependency', async () => {
       .task('second', { waitFor: ({ task }) => task.first })
       .toJSON()
 
-    await runHandler(registerHandler, { rootCtx: ctx, scope: { handlerDiagnostics, component } })
+    await invokeRoute(ctx, { path: registerPath, data: component })
     const componentId = await getComponentId({ g: ctx.g, diagnostics: ctx.diagnostics, componentHash: component.hash })
     const { imports } = await componentImports({ rootCtx: { g: ctx.g }, scope: { componentId } })
 
     const instanceId = 'instance-wait-for-task'
-    await runHandler(createInstanceHandler, {
+    await createInstanceHandler({
       rootCtx: ctx,
       scope: { handlerDiagnostics, componentHash: component.hash, componentId, instanceId, imports },
     })
@@ -155,14 +155,14 @@ test('import waitFor prevents starting child until dependency provided', async (
       .data('gate', { deps: () => { } })
       .toJSON()
 
-    await runHandler(registerHandler, { rootCtx: ctx, scope: { handlerDiagnostics, component: childComponent } })
-    await runHandler(registerHandler, { rootCtx: ctx, scope: { handlerDiagnostics, component: parentComponent } })
+    await invokeRoute(ctx, { path: registerPath, data: childComponent })
+    await invokeRoute(ctx, { path: registerPath, data: parentComponent })
 
     const componentId = await getComponentId({ g: ctx.g, diagnostics: ctx.diagnostics, componentHash: parentComponent.hash })
     const { imports } = await componentImports({ rootCtx: { g: ctx.g }, scope: { componentId } })
 
     const instanceId = 'instance-wait-for-import'
-    const createResult = await runHandler(createInstanceHandler, {
+    const createResult = await createInstanceHandler({
       rootCtx: ctx,
       scope: { handlerDiagnostics, componentHash: parentComponent.hash, componentId, instanceId, imports },
     })
@@ -208,7 +208,7 @@ test('import waitFor prevents starting child until dependency provided', async (
     const preGateImportStartContext = {
       publish: async (subject, payload) => preGateImportStartPublishes.push({ subject, payload: JSON.parse(payload) }),
     }
-    await runHandler(startImportHandler, {
+    await startImportHandler({
       rootCtx: { natsContext: preGateImportStartContext, g: ctx.g },
       scope: initialPublishes[0].payload.data,
     })
@@ -249,7 +249,7 @@ test('import waitFor prevents starting child until dependency provided', async (
       publish: async (subject, payload) => postGateImportStartPublishes.push({ subject, payload: JSON.parse(payload) }),
     }
     for (const importStartCommand of published.filter(({ subject }) => subject === startImportSubject)) {
-      await runHandler(startImportHandler, {
+      await startImportHandler({
         rootCtx: { natsContext: postGateImportStartContext, g: ctx.g },
         scope: importStartCommand.payload.data,
       })

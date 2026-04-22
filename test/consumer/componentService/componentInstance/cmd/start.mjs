@@ -9,6 +9,7 @@ import { create as createBasicSubject } from '@liquid-bricks/lib-nats-subject/cr
 import { ulid } from 'ulid'
 
 import { createComponentServiceRouter } from '../../../../../router.js'
+import { path as registerPath } from '../../../../../component/cmd/register/index.js'
 import { dataMapper as createDataMapper, domain } from '@liquid-bricks/spec-domain/domain'
 import { findDependencyFreeStates } from '../../../../../componentInstance/cmd/start/findDependencyFreeStates.js'
 import { publishEvents as publishStartInstanceEvents }
@@ -21,7 +22,7 @@ import { componentImports } from '../../../../../componentInstance/cmd/create/lo
 import { componentGates } from '../../../../../componentInstance/cmd/create/loadData/componentGates.js'
 import { handler as startGateHandler } from '../../../../../gate/cmd/start/handler.js'
 import { serviceConfiguration } from '../../../../provider/serviceConfiguration/dotenv/index.js'
-import { runHandler } from '../../../../util/runHandler.js'
+import { invokeRoute } from '../../../../util/invokeRoute.js'
 
 const { NATS_IP_ADDRESS } = serviceConfiguration()
 assert.ok(NATS_IP_ADDRESS, 'NATS_IP_ADDRESS missing; set in .env or .env.local')
@@ -57,7 +58,6 @@ async function withGraphContext(run) {
   }
 }
 
-const registerSpec = getRegisterSpec()
 const createInstanceSpec = getCreateInstanceSpec()
 const startInstanceSpec = getStartInstanceSpec()
 
@@ -65,22 +65,6 @@ function createHandlerDiagnostics(diagnostics, scope = {}, message) {
   return diagnostics.child
     ? diagnostics.child({ router: { stage: 'unit-test' }, scope, message })
     : diagnostics
-}
-
-function getRegisterSpec() {
-  const router = createComponentServiceRouter({
-    natsContext: {},
-    g: {},
-    diagnostics: makeDiagnosticsInstance(),
-    dataMapper: {},
-  })
-  const route = router.routes.find(({ values }) =>
-    values.channel === 'cmd'
-    && values.entity === 'component'
-    && values.action === 'register'
-  )
-  assert.ok(route, 'register route not found')
-  return route.config
 }
 
 function getCreateInstanceSpec() {
@@ -116,8 +100,7 @@ function getStartInstanceSpec() {
 }
 
 async function registerComponent(component, ctx) {
-  const handlerDiagnostics = createHandlerDiagnostics(ctx.diagnostics, { component })
-  await runHandler(registerSpec.handler, { rootCtx: ctx, scope: { handlerDiagnostics, component } })
+  await invokeRoute(ctx, { path: registerPath, data: component })
 }
 
 async function createInstance(ctx, scope) {

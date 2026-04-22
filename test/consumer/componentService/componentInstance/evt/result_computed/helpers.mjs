@@ -6,12 +6,13 @@ import { create as createBasicSubject } from '@liquid-bricks/lib-nats-subject/cr
 import { ulid } from 'ulid'
 
 import { createComponentServiceRouter } from '../../../../../../router.js'
+import { path as registerPath } from '../../../../../../component/cmd/register/index.js'
 import { STATE_EDGE_LABEL_BY_TYPE, STATE_EDGE_STATUS_BY_TYPE } from '../../../../../../componentInstance/evt/result_computed/constants.js'
 import { validatePayload } from '../../../../../../componentInstance/evt/result_computed/validatePayload.js'
 import { componentImports } from '../../../../../../componentInstance/cmd/create/loadData/componentImports.js'
 import { dataMapper as createDataMapper, domain } from '@liquid-bricks/spec-domain/domain'
 import { serviceConfiguration } from '../../../../../provider/serviceConfiguration/dotenv/index.js'
-import { runHandler } from '../../../../../util/runHandler.js'
+import { invokeRoute } from '../../../../../util/invokeRoute.js'
 
 const { NATS_IP_ADDRESS } = serviceConfiguration()
 assert.ok(NATS_IP_ADDRESS, 'NATS_IP_ADDRESS missing; set in .env or .env.local')
@@ -47,29 +48,12 @@ export async function withGraphContext(run) {
   }
 }
 
-const registerSpec = getRegisterSpec()
 const createInstanceSpec = getCreateInstanceSpec()
 const startInstanceSpec = getStartInstanceSpec()
 const resultComputedSpec = getResultComputedSpec()
 const stateMachineCompletedSpec = getStateMachineCompletedSpec()
 const startDependantsSpec = getStartDependantsSpec()
 const dataStartSpec = getDataStartSpec()
-
-function getRegisterSpec() {
-  const router = createComponentServiceRouter({
-    natsContext: {},
-    g: {},
-    diagnostics: makeDiagnosticsInstance(),
-    dataMapper: {},
-  })
-  const route = router.routes.find(({ values }) =>
-    values.channel === 'cmd'
-    && values.entity === 'component'
-    && values.action === 'register'
-  )
-  assert.ok(route, 'register route not found')
-  return route.config
-}
 
 function getCreateInstanceSpec() {
   const router = createComponentServiceRouter({
@@ -174,8 +158,7 @@ export function createHandlerDiagnostics(diagnostics, scope = {}, message) {
 }
 
 export async function registerComponent(component, ctx) {
-  const handlerDiagnostics = createHandlerDiagnostics(ctx.diagnostics, { component })
-  await runHandler(registerSpec.handler, { rootCtx: ctx, scope: { handlerDiagnostics, component } })
+  await invokeRoute(ctx, { path: registerPath, data: component })
 }
 
 export async function createInstance(ctx, scope) {
@@ -298,7 +281,6 @@ export {
   STATE_EDGE_LABEL_BY_TYPE,
   STATE_EDGE_STATUS_BY_TYPE,
   validatePayload,
-  registerSpec,
   createInstanceSpec,
   startInstanceSpec,
   resultComputedSpec,

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 
 import { component as componentBuilder } from '@liquid-bricks/lib-component-builder'
 
-import { domain, registerComponent, withGraphContext } from '../helpers.mjs'
+import { domain, registerHandlerComponent, withGraphContext } from '../helpers.mjs'
 
 test('handler links gates to existing components and records waitFor/deps', async () => {
   await withGraphContext(async ({ diagnostics, dataMapper, g }) => {
@@ -20,7 +20,7 @@ test('handler links gates to existing components and records waitFor/deps', asyn
 
     const { id: sharedComponentId } = await dataMapper.vertex.component.create({ hash: 'shared-hash', name: 'SharedComponent' })
 
-    await registerComponent({ diagnostics, dataMapper, g }, component)
+    await registerHandlerComponent({ diagnostics, dataMapper, g }, component)
 
     const [componentId] = await g
       .V()
@@ -61,7 +61,7 @@ test('handler rejects missing gated components', async () => {
       .toJSON()
 
     await assert.rejects(
-      registerComponent({ diagnostics, dataMapper, g }, component),
+      registerHandlerComponent({ diagnostics, dataMapper, g }, component),
       diagnostics.DiagnosticError,
     )
   })

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 
 import { component as componentBuilder } from '@liquid-bricks/lib-component-builder'
 
-import { domain, registerComponent, withGraphContext } from '../helpers.mjs'
+import { domain, registerHandlerComponent, withGraphContext } from '../helpers.mjs'
 
 test('handler builds inject edges from import inject mappings', async () => {
   await withGraphContext(async ({ diagnostics, dataMapper, g }) => {
@@ -28,9 +28,9 @@ test('handler builds inject edges from import inject mappings', async () => {
       .data('rootData', { deps: () => { } })
       .toJSON()
 
-    await registerComponent({ diagnostics, dataMapper, g }, providerComponent)
-    await registerComponent({ diagnostics, dataMapper, g }, targetComponent)
-    await registerComponent({ diagnostics, dataMapper, g }, rootComponent)
+    await registerHandlerComponent({ diagnostics, dataMapper, g }, providerComponent)
+    await registerHandlerComponent({ diagnostics, dataMapper, g }, targetComponent)
+    await registerHandlerComponent({ diagnostics, dataMapper, g }, rootComponent)
 
     const [providerComponentId] = await g.V()
       .has('label', domain.vertex.component.constants.LABEL)
@@ -82,10 +82,10 @@ test('handler rejects import inject when not an object', async () => {
       .toJSON()
     rootComponent.imports[0].inject = []
 
-    await registerComponent({ diagnostics, dataMapper, g }, importedComponent)
+    await registerHandlerComponent({ diagnostics, dataMapper, g }, importedComponent)
 
     await assert.rejects(
-      registerComponent({ diagnostics, dataMapper, g }, rootComponent),
+      registerHandlerComponent({ diagnostics, dataMapper, g }, rootComponent),
       diagnostics.DiagnosticError,
     )
   })
@@ -101,10 +101,10 @@ test('handler rejects import inject targets when not an array', async () => {
       'imported.task.taskA': 'not-an-array',
     }
 
-    await registerComponent({ diagnostics, dataMapper, g }, importedComponent)
+    await registerHandlerComponent({ diagnostics, dataMapper, g }, importedComponent)
 
     await assert.rejects(
-      registerComponent({ diagnostics, dataMapper, g }, rootComponent),
+      registerHandlerComponent({ diagnostics, dataMapper, g }, rootComponent),
       diagnostics.DiagnosticError,
     )
   })

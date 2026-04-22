@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 
 import { component as componentBuilder } from '@liquid-bricks/lib-component-builder'
 
-import { domain, registerComponent, withGraphContext } from '../helpers.mjs'
+import { domain, registerHandlerComponent, withGraphContext } from '../helpers.mjs'
 
 test('handler links imports to existing components', async () => {
   await withGraphContext(async ({ diagnostics, dataMapper, g }) => {
@@ -13,7 +13,7 @@ test('handler links imports to existing components', async () => {
 
     const { id: sharedComponentId } = await dataMapper.vertex.component.create({ hash: 'shared-hash', name: 'SharedComponent' })
 
-    await registerComponent({ diagnostics, dataMapper, g }, component)
+    await registerHandlerComponent({ diagnostics, dataMapper, g }, component)
 
     const [componentId] = await g
       .V()
@@ -46,7 +46,7 @@ test('handler rejects missing imported components', async () => {
       .toJSON()
 
     await assert.rejects(
-      registerComponent({ diagnostics, dataMapper, g }, component),
+      registerHandlerComponent({ diagnostics, dataMapper, g }, component),
       diagnostics.DiagnosticError,
     )
   })
@@ -63,7 +63,7 @@ test('handler rejects duplicate import names', async () => {
     ]
 
     await assert.rejects(
-      registerComponent({ diagnostics, dataMapper, g }, component),
+      registerHandlerComponent({ diagnostics, dataMapper, g }, component),
       diagnostics.DiagnosticError,
     )
   })
@@ -77,7 +77,7 @@ test('handler rejects missing import name', async () => {
     component.imports = [{ hash: 'shared-hash' }]
 
     await assert.rejects(
-      registerComponent({ diagnostics, dataMapper, g }, component),
+      registerHandlerComponent({ diagnostics, dataMapper, g }, component),
       diagnostics.DiagnosticError,
     )
   })
@@ -91,7 +91,7 @@ test('handler rejects missing import hash', async () => {
     component.imports = [{ name: 'SharedComponent' }]
 
     await assert.rejects(
-      registerComponent({ diagnostics, dataMapper, g }, component),
+      registerHandlerComponent({ diagnostics, dataMapper, g }, component),
       diagnostics.DiagnosticError,
     )
   })

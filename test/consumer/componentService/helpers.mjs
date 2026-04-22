@@ -5,9 +5,10 @@ import { diagnostics as makeDiagnostics } from '@liquid-bricks/lib-diagnostics'
 import { ulid } from 'ulid'
 
 import { createComponentServiceRouter } from '../../../router.js'
+import { path as registerPath } from '../../../component/cmd/register/index.js'
 import { dataMapper as createDataMapper, domain } from '@liquid-bricks/spec-domain/domain'
 import { serviceConfiguration } from '../../provider/serviceConfiguration/dotenv/index.js'
-import { runHandler } from '../../util/runHandler.js'
+import { invokeRoute } from '../../util/invokeRoute.js'
 
 const { NATS_IP_ADDRESS } = serviceConfiguration()
 assert.ok(NATS_IP_ADDRESS, 'NATS_IP_ADDRESS missing; set in .env or .env.local')
@@ -67,15 +68,10 @@ export function getRouteSpec({ channel, entity, action }) {
   return route.config
 }
 
-const registerSpec = getRouteSpec({ channel: 'cmd', entity: 'component', action: 'register' })
 const createInstanceSpec = getRouteSpec({ channel: 'cmd', entity: 'componentInstance', action: 'create' })
 
 export async function registerComponent(context, component) {
-  const handlerDiagnostics = createHandlerDiagnostics(context.diagnostics, { component })
-  return runHandler(registerSpec.handler, {
-    rootCtx: context,
-    scope: { handlerDiagnostics, component },
-  })
+  return invokeRoute(context, { path: registerPath, data: component })
 }
 
 export async function createInstance(context, scope) {
