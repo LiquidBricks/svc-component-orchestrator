@@ -3,8 +3,8 @@ import assert from 'node:assert/strict'
 
 import { component as componentBuilder } from '@liquid-bricks/lib-component-builder'
 
-import { componentGates } from '../../../../../../componentInstance/cmd/create/loadData/componentGates.js'
-import { hasInstanceStarted } from '../../../../../../componentInstance/cmd/dependencyUtils.js'
+import { componentGates } from '../../../../../../core/componentInstance/cmd/create/loadData/componentGates.js'
+import { hasInstanceStarted } from '../../../../../../core/componentInstance/cmd/dependencyUtils.js'
 import {
   createBasicSubject,
   withGraphContext,

@@ -5,8 +5,8 @@ import { component as componentBuilder } from '@liquid-bricks/lib-component-buil
 import { create as createBasicSubject } from '@liquid-bricks/lib-nats-subject/create/basic'
 import { JetStreamApiCodes, JetStreamApiError } from '@nats-io/jetstream'
 
-import { componentImports } from '../../../../../../componentInstance/cmd/create/loadData/componentImports.js'
-import { path as taskStartPath } from '../../../../../../task/cmd/start/index.js'
+import { componentImports } from '../../../../../../core/componentInstance/cmd/create/loadData/componentImports.js'
+import { path as taskStartPath } from '../../../../../../core/task/cmd/start/index.js'
 import {
   withGraphContext,
   registerComponent,

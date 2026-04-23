@@ -4,9 +4,10 @@ import assert from 'node:assert/strict'
 import { diagnostics as makeDiagnostics } from '@liquid-bricks/lib-diagnostics'
 import {
   ackMessage,
+  createLockKey,
   decodeData,
   stopDiagnosticsTimer,
-} from '../../../middleware.js'
+} from '../../../middleware/index.js'
 
 const noop = () => { }
 const baseDiagnostics = makeDiagnostics({
@@ -70,6 +71,25 @@ test('ackMessage: calls ack on message', () => {
   ackMessage({ message })
 
   assert.equal(message.acked, true)
+})
+
+test('createLockKey: prefixes matched route path and encodes selected scope values', () => {
+  const lockKey = createLockKey({
+    info: {
+      tokens: ['env', 'ns', 'tenant', 'context', 'channel', 'entity', 'action', 'version', 'id'],
+      values: { channel: 'cmd', entity: 'task', action: 'start' },
+    },
+    scope: {
+      instanceId: 'instance-task-lock',
+      stateId: 'state-task-lock',
+    },
+    lockKeys: ['instanceId', 'stateId'],
+  })
+
+  assert.equal(
+    lockKey,
+    'cmd.task.start.aW5zdGFuY2UtdGFzay1sb2Nr.c3RhdGUtdGFzay1sb2Nr'
+  )
 })
 
 test('diagnostics timer helpers: stop returns timer output', () => {

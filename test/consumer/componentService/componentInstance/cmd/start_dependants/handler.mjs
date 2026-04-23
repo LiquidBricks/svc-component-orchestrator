@@ -3,10 +3,10 @@ import assert from 'node:assert/strict'
 
 import { component as componentBuilder } from '@liquid-bricks/lib-component-builder'
 
-import { handler } from '../../../../../../componentInstance/cmd/start_dependants/handler.js'
-import { componentImports } from '../../../../../../componentInstance/cmd/create/loadData/componentImports.js'
-import { componentGates } from '../../../../../../componentInstance/cmd/create/loadData/componentGates.js'
-import { STATE_EDGE_LABEL_BY_TYPE } from '../../../../../../componentInstance/cmd/start_dependants/constants.js'
+import { handler } from '../../../../../../core/componentInstance/cmd/start_dependants/handler.js'
+import { componentImports } from '../../../../../../core/componentInstance/cmd/create/loadData/componentImports.js'
+import { componentGates } from '../../../../../../core/componentInstance/cmd/create/loadData/componentGates.js'
+import { STATE_EDGE_LABEL_BY_TYPE } from '../../../../../../core/componentInstance/cmd/start_dependants/constants.js'
 import {
   withGraphContext,
   registerComponent,

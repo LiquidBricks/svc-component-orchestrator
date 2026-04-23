@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 
 import { component as componentBuilder } from '@liquid-bricks/lib-component-builder'
 
-import { createComponentVertex } from '../../../../../../../component/cmd/register/handler/createComponentVertex.js'
+import { createComponentVertex } from '../../../../../../../core/component/cmd/register/handler/createComponentVertex.js'
 import { domain, withGraphContext } from '../helpers.mjs'
 
 test('createComponentVertex creates component vertex', async () => {

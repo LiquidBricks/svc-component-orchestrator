@@ -3,8 +3,8 @@ import assert from 'node:assert/strict'
 
 import { component as componentBuilder } from '@liquid-bricks/lib-component-builder'
 
-import { handler } from '../../../../../../componentInstance/evt/state_machine_completed/handler.js'
-import { componentImports } from '../../../../../../componentInstance/cmd/create/loadData/componentImports.js'
+import { handler } from '../../../../../../core/componentInstance/evt/state_machine_completed/handler.js'
+import { componentImports } from '../../../../../../core/componentInstance/cmd/create/loadData/componentImports.js'
 import {
   withGraphContext,
   registerComponent,

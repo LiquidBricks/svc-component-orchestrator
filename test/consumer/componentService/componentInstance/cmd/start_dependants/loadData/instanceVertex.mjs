@@ -3,8 +3,8 @@ import assert from 'node:assert/strict'
 
 import { component as componentBuilder } from '@liquid-bricks/lib-component-builder'
 
-import { instanceVertex } from '../../../../../../../componentInstance/cmd/start_dependants/loadData/instanceVertex.js'
-import { componentImports } from '../../../../../../../componentInstance/cmd/create/loadData/componentImports.js'
+import { instanceVertex } from '../../../../../../../core/componentInstance/cmd/start_dependants/loadData/instanceVertex.js'
+import { componentImports } from '../../../../../../../core/componentInstance/cmd/create/loadData/componentImports.js'
 import {
   withGraphContext,
   registerComponent,

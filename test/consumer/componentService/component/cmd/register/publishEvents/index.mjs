@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 
 import { create as createBasicSubject } from '@liquid-bricks/lib-nats-subject/create/basic'
 
-import { publishEvents } from '../../../../../../../component/cmd/register/publishEvents/index.js'
+import { publishEvents } from '../../../../../../../core/component/cmd/register/publishEvents/index.js'
 
 test('publishEvents publishes component registered event', async () => {
   const calls = []

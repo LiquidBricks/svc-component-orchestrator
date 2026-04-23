@@ -4,8 +4,14 @@ import assert from 'node:assert/strict'
 import { JetStreamApiCodes, JetStreamApiError } from '@nats-io/jetstream'
 import { s } from '@liquid-bricks/lib-nats-subject/router'
 
-import { skipIfLocked, taskStartLockKey } from '../../../../../../task/cmd/start/skipIfLocked.js'
-import { getRouteSpec } from '../../../helpers.mjs'
+import { createLockKey, skipIfLocked } from '../../../../../../middleware/index.js'
+import { getRouteSpec, makeDiagnosticsInstance } from '../../../helpers.mjs'
+
+const routeInfo = {
+  tokens: ['env', 'ns', 'tenant', 'context', 'channel', 'entity', 'action', 'version', 'id'],
+  params: { channel: 'cmd', entity: 'task', action: 'start' },
+  values: { channel: 'cmd', entity: 'task', action: 'start' },
+}
 
 function createAbortCtl() {
   return {
@@ -67,15 +73,25 @@ test('skipIfLocked aborts duplicate task starts for the same task', async () => 
   const abortCtlB = createAbortCtl()
   const instanceId = 'instance-task-lock'
   const stateId = 'state-task-lock'
-  const lockKey = taskStartLockKey({ instanceId, stateId })
+  const diagnostics = makeDiagnosticsInstance()
+  const lock = skipIfLocked(['instanceId', 'stateId'])
+  const lockKey = createLockKey({
+    info: routeInfo,
+    scope: { instanceId, stateId },
+    lockKeys: ['instanceId', 'stateId'],
+  })
 
-  await skipIfLocked({
-    rootCtx: { natsContext: spy.natsContext },
+  await lock({
+    info: routeInfo,
+    message: { subject: 'prod.component-service._._.cmd.task.start.v1._' },
+    rootCtx: { diagnostics, natsContext: spy.natsContext },
     scope: { instanceId, stateId, [s.scope.ac]: abortCtlA },
   })
 
-  await skipIfLocked({
-    rootCtx: { natsContext: spy.natsContext },
+  await lock({
+    info: routeInfo,
+    message: { subject: 'prod.component-service._._.cmd.task.start.v1._' },
+    rootCtx: { diagnostics, natsContext: spy.natsContext },
     scope: { instanceId, stateId, [s.scope.ac]: abortCtlB },
   })
 
@@ -94,9 +110,13 @@ test('skipIfLocked allows different task start commands to proceed', async () =>
   const { natsContext } = createNatsContextSpy()
   const abortCtlA = createAbortCtl()
   const abortCtlB = createAbortCtl()
+  const diagnostics = makeDiagnosticsInstance()
+  const lock = skipIfLocked(['instanceId', 'stateId'])
 
-  await skipIfLocked({
-    rootCtx: { natsContext },
+  await lock({
+    info: routeInfo,
+    message: { subject: 'prod.component-service._._.cmd.task.start.v1._' },
+    rootCtx: { diagnostics, natsContext },
     scope: {
       instanceId: 'instance-task-lock',
       stateId: 'state-task-lock-a',
@@ -104,8 +124,10 @@ test('skipIfLocked allows different task start commands to proceed', async () =>
     },
   })
 
-  await skipIfLocked({
-    rootCtx: { natsContext },
+  await lock({
+    info: routeInfo,
+    message: { subject: 'prod.component-service._._.cmd.task.start.v1._' },
+    rootCtx: { diagnostics, natsContext },
     scope: {
       instanceId: 'instance-task-lock',
       stateId: 'state-task-lock-b',

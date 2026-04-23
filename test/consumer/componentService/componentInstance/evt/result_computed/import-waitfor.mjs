@@ -22,7 +22,7 @@ import {
   dataStartSpec,
   STATE_EDGE_STATUS_BY_TYPE,
 } from './helpers.mjs'
-import { handler as startImportHandler } from '../../../../../../import/cmd/start/handler.js'
+import { handler as startImportHandler } from '../../../../../../core/import/cmd/start/handler.js'
 
 test('import start preserves injected data when waitFor delays the import', async () => {
   await withGraphContext(async ({ diagnostics, dataMapper, g }) => {

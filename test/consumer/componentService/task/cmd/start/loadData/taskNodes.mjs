@@ -3,8 +3,8 @@ import assert from 'node:assert/strict'
 
 import { component as componentBuilder } from '@liquid-bricks/lib-component-builder'
 
-import { taskNodes } from '../../../../../../../task/cmd/start/loadData/taskNodes.js'
-import { componentImports } from '../../../../../../../componentInstance/cmd/create/loadData/componentImports.js'
+import { taskNodes } from '../../../../../../../core/task/cmd/start/loadData/taskNodes.js'
+import { componentImports } from '../../../../../../../core/componentInstance/cmd/create/loadData/componentImports.js'
 import {
   withGraphContext,
   registerComponent,

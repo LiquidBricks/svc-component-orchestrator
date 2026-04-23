@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 
 import { component as componentBuilder } from '@liquid-bricks/lib-component-builder'
 
-import { validatePayload } from '../../../../../../../component/cmd/register/validatePayload/index.js'
+import { validatePayload } from '../../../../../../../core/component/cmd/register/validatePayload/index.js'
 import { createHandlerDiagnostics, makeDiagnosticsInstance } from '../helpers.mjs'
 
 function makeArgs(component) {

@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { handler } from '../../../../../../componentInstance/evt/started/handler.js'
+import { handler } from '../../../../../../core/componentInstance/evt/started/handler.js'
 
 test('handler resolves without side effects', async () => {
   await assert.doesNotReject(async () =>

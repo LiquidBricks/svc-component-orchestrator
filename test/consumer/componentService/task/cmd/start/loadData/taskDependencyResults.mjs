@@ -3,8 +3,8 @@ import assert from 'node:assert/strict'
 
 import { component as componentBuilder } from '@liquid-bricks/lib-component-builder'
 
-import { taskDependencyResults } from '../../../../../../../task/cmd/start/loadData/taskDependencyResults.js'
-import { componentImports } from '../../../../../../../componentInstance/cmd/create/loadData/componentImports.js'
+import { taskDependencyResults } from '../../../../../../../core/task/cmd/start/loadData/taskDependencyResults.js'
+import { componentImports } from '../../../../../../../core/componentInstance/cmd/create/loadData/componentImports.js'
 import {
   withGraphContext,
   registerComponent,

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 
 import { component as componentBuilder } from '@liquid-bricks/lib-component-builder'
 
-import { component } from '../../../../../../../componentInstance/cmd/create/loadData/component.js'
+import { component } from '../../../../../../../core/componentInstance/cmd/create/loadData/component.js'
 import {
   withGraphContext,
   registerComponent,

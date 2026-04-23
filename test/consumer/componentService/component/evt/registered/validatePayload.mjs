@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 
 import { diagnostics as makeDiagnostics } from '@liquid-bricks/lib-diagnostics'
 
-import { validatePayload } from '../../../../../../component/evt/registered/validatePayload.js'
+import { validatePayload } from '../../../../../../core/component/evt/registered/validatePayload.js'
 
 const noop = () => {}
 function makeDiagnosticsInstance() {

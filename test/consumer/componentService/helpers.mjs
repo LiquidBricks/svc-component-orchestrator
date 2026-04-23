@@ -5,7 +5,7 @@ import { diagnostics as makeDiagnostics } from '@liquid-bricks/lib-diagnostics'
 import { ulid } from 'ulid'
 
 import { createComponentServiceRouter } from '../../../router.js'
-import { path as registerPath } from '../../../component/cmd/register/index.js'
+import { path as registerPath } from '../../../core/component/cmd/register/index.js'
 import { dataMapper as createDataMapper, domain } from '@liquid-bricks/spec-domain/domain'
 import { serviceConfiguration } from '../../provider/serviceConfiguration/dotenv/index.js'
 import { invokeRoute } from '../../util/invokeRoute.js'

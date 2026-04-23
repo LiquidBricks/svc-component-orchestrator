@@ -3,9 +3,9 @@ import assert from 'node:assert/strict'
 
 import { component as componentBuilder } from '@liquid-bricks/lib-component-builder'
 
-import { providedStateEdge } from '../../../../../../../componentInstance/cmd/start_dependants/loadData/providedStateEdge.js'
-import { componentImports } from '../../../../../../../componentInstance/cmd/create/loadData/componentImports.js'
-import { STATE_EDGE_LABEL_BY_TYPE } from '../../../../../../../componentInstance/cmd/start_dependants/constants.js'
+import { providedStateEdge } from '../../../../../../../core/componentInstance/cmd/start_dependants/loadData/providedStateEdge.js'
+import { componentImports } from '../../../../../../../core/componentInstance/cmd/create/loadData/componentImports.js'
+import { STATE_EDGE_LABEL_BY_TYPE } from '../../../../../../../core/componentInstance/cmd/start_dependants/constants.js'
 import {
   withGraphContext,
   registerComponent,

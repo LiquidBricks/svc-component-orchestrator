@@ -1,11 +1,11 @@
 import router from "@liquid-bricks/lib-nats-subject/router";
 import { Errors } from "./errors.js";
-import * as component from './component/index.js'
-import * as componentInstance from './componentInstance/index.js'
-import * as data from './data/index.js'
-import * as gate from './gate/index.js'
-import * as importEntity from './import/index.js'
-import * as task from './task/index.js'
+import * as component from './core/component/index.js'
+import * as componentInstance from './core/componentInstance/index.js'
+import * as data from './core/data/index.js'
+import * as gate from './core/gate/index.js'
+import * as importEntity from './core/import/index.js'
+import * as task from './core/task/index.js'
 import { dataMapper as createDataMapper } from '@liquid-bricks/spec-domain/domain'
 
 export function createComponentServiceRouter({
@@ -28,8 +28,13 @@ export function createComponentServiceRouter({
       // return timer.stop({})
     })
 
-    .beforeEach(({ rootCtx: { diagnostics }, info: { params, stage, index, fn }, scope, message }) => {
-      const handlerDiagnostics = diagnostics.child({ router: { params, stage, index, fn }, scope, message: message.json() })
+    .beforeEach(({ rootCtx: { diagnostics }, info: { params, values, stage, index, fn }, scope, message }) => {
+      const handlerDiagnostics = diagnostics.child({
+        router: { params, values, stage, index, fn },
+        scope,
+        message: message.json(),
+      })
+
       return { handlerDiagnostics }
     })
     .route(component.cmd.register.path, component.cmd.register.spec)

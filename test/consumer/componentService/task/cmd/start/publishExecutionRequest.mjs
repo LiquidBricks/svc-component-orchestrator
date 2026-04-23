@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 
 import { create as createBasicSubject } from '@liquid-bricks/lib-nats-subject/create/basic'
 
-import { publishExecutionRequest } from '../../../../../../task/cmd/start/publishExecutionRequest.js'
+import { publishExecutionRequest } from '../../../../../../core/task/cmd/start/publishExecutionRequest.js'
 
 test('publishExecutionRequest emits task execution request', async () => {
   const published = []

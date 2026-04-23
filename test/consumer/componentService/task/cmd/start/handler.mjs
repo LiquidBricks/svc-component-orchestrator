@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { handler } from '../../../../../../task/cmd/start/handler.js'
+import { handler } from '../../../../../../core/task/cmd/start/handler.js'
 
 function makeGraphSpy() {
   const calls = []
