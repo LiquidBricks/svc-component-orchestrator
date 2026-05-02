@@ -1,10 +1,36 @@
 import { domain } from '@liquid-bricks/spec-domain/domain'
 
+export const LIFECYCLE_WAIT_FOR_PROPERTY = 'lifecycleWaitFor'
+
 const STATE_EDGE_LABELS = Object.freeze([
   domain.edge.has_task_state.stateMachine_task.constants.LABEL,
   domain.edge.has_data_state.stateMachine_data.constants.LABEL,
 ])
 export const PROVIDED_STATUS = domain.edge.has_task_state.stateMachine_task.constants.Status.PROVIDED
+
+export function normalizeLifecycleWaitForValues(value) {
+  const values = Array.isArray(value) ? value : [value]
+  const normalized = []
+
+  for (const item of values) {
+    if (item === undefined || item === null || item === '') continue
+    let parsed = item
+    if (typeof item === 'string') {
+      try {
+        parsed = JSON.parse(item)
+      } catch {
+        parsed = item
+      }
+    }
+    if (Array.isArray(parsed)) {
+      normalized.push(...normalizeLifecycleWaitForValues(parsed))
+    } else if (parsed !== undefined && parsed !== null && parsed !== '') {
+      normalized.push(String(parsed))
+    }
+  }
+
+  return Array.from(new Set(normalized))
+}
 
 export function normalizeResult(value) {
   if (typeof value === 'string') {
@@ -58,6 +84,19 @@ function parseDependencyPath(path) {
   const importPath = parts.slice(0, parts.length - 2)
   if (!DEPENDENCY_NODE_EDGE_LABELS[targetType] || !targetName) return null
   return { importPath, targetType, targetName }
+}
+
+function parseLifecycleDependencyPath(targetPath) {
+  const parts = String(targetPath ?? '').split('.').filter(Boolean)
+  if (parts.length < 2) return null
+
+  const targetType = parts[parts.length - 2]
+  if (targetType !== 'lifecycle') return null
+
+  return {
+    importPath: parts.slice(0, parts.length - 2),
+    targetName: parts[parts.length - 1],
+  }
 }
 
 async function resolveDependencyPathTargetId({
@@ -251,6 +290,47 @@ export async function getStateEdgeStatus({ g, stateEdgeId }) {
   return Array.isArray(statusValuesMap) ? statusValuesMap[0] : statusValuesMap
 }
 
+async function resolveInstancePath({ g, rootInstanceVertexId, importPath = [] }) {
+  let currentInstanceVertexId = rootInstanceVertexId
+
+  for (const alias of importPath ?? []) {
+    const [importedInstanceVertexId] = await g
+      .V(currentInstanceVertexId)
+      .out(domain.edge.uses_import.componentInstance_importInstanceRef.constants.LABEL)
+      .filter(_ => _.out(domain.edge.uses_import.importInstanceRef_importRef.constants.LABEL).has('alias', alias))
+      .out(domain.edge.uses_import.importInstanceRef_componentInstance.constants.LABEL)
+      .id()
+
+    const [gatedInstanceVertexId] = importedInstanceVertexId ? [] : await g
+      .V(currentInstanceVertexId)
+      .out(domain.edge.uses_gate.componentInstance_gateInstanceRef.constants.LABEL)
+      .filter(_ => _.out(domain.edge.uses_gate.gateInstanceRef_gateRef.constants.LABEL).has('alias', alias))
+      .out(domain.edge.uses_gate.gateInstanceRef_componentInstance.constants.LABEL)
+      .id()
+
+    currentInstanceVertexId = importedInstanceVertexId ?? gatedInstanceVertexId
+    if (!currentInstanceVertexId) return null
+  }
+
+  return currentInstanceVertexId
+}
+
+async function isLifecycleProvided({ g, rootInstanceVertexId, targetPath }) {
+  const parsed = parseLifecycleDependencyPath(targetPath)
+  if (!parsed) return null
+  if (parsed.targetName !== 'done' || !parsed.importPath.length) return false
+
+  const instanceVertexId = await resolveInstancePath({
+    g,
+    rootInstanceVertexId,
+    importPath: parsed.importPath,
+  })
+  if (!instanceVertexId) return false
+
+  const state = await getInstanceState({ g, instanceVertexId })
+  return state === domain.vertex.stateMachine.constants.STATES.COMPLETE
+}
+
 export async function isNodeProvided({
   g,
   rootInstanceVertexId,
@@ -258,6 +338,15 @@ export async function isNodeProvided({
   stateEdgeCache,
   pathResolutionCache,
 }) {
+  if (typeof targetNodeId === 'string') {
+    const lifecycleProvided = await isLifecycleProvided({
+      g,
+      rootInstanceVertexId,
+      targetPath: targetNodeId,
+    })
+    if (lifecycleProvided !== null) return lifecycleProvided
+  }
+
   const resolvedTargetNodeId = (typeof targetNodeId === 'string' && targetNodeId.includes('.'))
     ? await resolveDependencyPathTargetId({
       g,

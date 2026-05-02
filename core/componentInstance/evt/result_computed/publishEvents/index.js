@@ -7,6 +7,7 @@ export async function publishEvents(args) {
   const { type } = args?.scope ?? {}
   if (type === 'gate') {
     await publishGateStartIfPassed(args)
+    await completeStateMachineIfFinished(args)
     return
   }
 

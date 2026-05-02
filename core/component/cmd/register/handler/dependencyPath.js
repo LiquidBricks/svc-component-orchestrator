@@ -1,6 +1,8 @@
 import { Errors } from '../../../../../errors.js'
 import { domain } from '@liquid-bricks/spec-domain/domain'
 
+const SUPPORTED_DEPENDENCY_TYPES = ['data', 'task', 'deferred', 'lifecycle']
+
 export function parseDependencyPath({ handlerDiagnostics, dep, compName, hash, dependencyType, dependencyName }) {
   const trimmedDep = String(dep ?? '').trim()
   const parts = trimmedDep.split('.').filter(Boolean)
@@ -17,7 +19,7 @@ export function parseDependencyPath({ handlerDiagnostics, dep, compName, hash, d
   const importPath = parts.slice(0, parts.length - 2)
 
   handlerDiagnostics.require(
-    ['data', 'task', 'deferred'].includes(targetType),
+    SUPPORTED_DEPENDENCY_TYPES.includes(targetType),
     Errors.PRECONDITION_INVALID,
     `Unknown dependency type:${targetType} for component(${compName})#${hash} ${dependencyType}:${dependencyName} dep[${trimmedDep}]`,
     { type: targetType, dep: trimmedDep, component: compName, hash },
@@ -27,6 +29,18 @@ export function parseDependencyPath({ handlerDiagnostics, dep, compName, hash, d
     Errors.PRECONDITION_REQUIRED,
     `Dependency name is required for component(${compName})#${hash} ${dependencyType}:${dependencyName} dep[${trimmedDep}]`,
     { component: compName, hash, dependencyType, dependencyName },
+  )
+  handlerDiagnostics.require(
+    targetType !== 'lifecycle' || targetName === 'done',
+    Errors.PRECONDITION_INVALID,
+    `Lifecycle dependency only supports done for component(${compName})#${hash} ${dependencyType}:${dependencyName} dep[${trimmedDep}]`,
+    { component: compName, hash, dependencyType, dependencyName, dep: trimmedDep, lifecycle: targetName },
+  )
+  handlerDiagnostics.require(
+    targetType !== 'lifecycle' || importPath.length > 0,
+    Errors.PRECONDITION_INVALID,
+    `Lifecycle dependency must reference an import for component(${compName})#${hash} ${dependencyType}:${dependencyName} dep[${trimmedDep}]`,
+    { component: compName, hash, dependencyType, dependencyName, dep: trimmedDep },
   )
   handlerDiagnostics.require(
     targetType !== 'deferred' || importPath.length === 0,
@@ -107,6 +121,30 @@ export async function resolveDependencyTargetId({
   dependencyName,
   dep,
 }) {
+  if (targetType === 'lifecycle') {
+    handlerDiagnostics.require(
+      g,
+      Errors.PRECONDITION_REQUIRED,
+      `Graph context required for component(${compName})#${hash} ${dependencyType}:${dependencyName} dep[${dep}]`,
+      { component: compName, hash, dependencyType, dependencyName, dep },
+    )
+
+    await resolveImportedComponent({
+      g,
+      handlerDiagnostics,
+      startComponentId: componentVID,
+      importPath,
+      compName,
+      hash,
+      dependencyType,
+      dependencyName,
+      pathType: 'dep',
+      pathValue: dep,
+    })
+
+    return dep
+  }
+
   const localKey = `${targetType}.${targetName}`
   if (!importPath.length) {
     const match = dependencyList.get(localKey)

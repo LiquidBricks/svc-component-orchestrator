@@ -96,6 +96,10 @@ async function edgeNames({ g, edgeIds }) {
   return names
 }
 
+function findImportByAlias(imports, alias) {
+  return imports.find(item => item.alias === alias)
+}
+
 test('task waitFor behaves like a dependency', async () => {
   const ctx = createMemoryContext()
   try {
@@ -138,6 +142,155 @@ test('task waitFor behaves like a dependency', async () => {
     })
     const readyAfterNames = await edgeNames({ g: ctx.g, edgeIds: starters[0].taskStateIds })
     assert.deepEqual(readyAfterNames, ['second'])
+  } finally {
+    try { await ctx.graph?.close?.() } catch { }
+  }
+})
+
+test('import waitFor can reference another import lifecycle.done', async () => {
+  const ctx = createMemoryContext()
+  try {
+    const handlerDiagnostics = createHandlerDiagnostics(ctx.diagnostics)
+    const controlPlaneComponent = componentBuilder('WaitForLifecycleControlPlane')
+      .task('configure', {})
+      .toJSON()
+    const corednsComponent = componentBuilder('WaitForLifecycleCoreDns')
+      .task('start', {})
+      .toJSON()
+    const rootComponent = componentBuilder('WaitForLifecycleRoot')
+      .import('controlplanepod', { hash: controlPlaneComponent.hash })
+      .import('corednsStart', {
+        hash: corednsComponent.hash,
+        waitFor: _ => [_.controlplanepod.lifecycle.done],
+      })
+      .toJSON()
+
+    await invokeRoute(ctx, { path: registerPath, data: controlPlaneComponent })
+    await invokeRoute(ctx, { path: registerPath, data: corednsComponent })
+    await invokeRoute(ctx, { path: registerPath, data: rootComponent })
+
+    const componentId = await getComponentId({ g: ctx.g, diagnostics: ctx.diagnostics, componentHash: rootComponent.hash })
+    const { imports } = await componentImports({ rootCtx: { g: ctx.g }, scope: { componentId } })
+
+    const instanceId = 'instance-wait-for-lifecycle-registration'
+    await createInstanceHandler({
+      rootCtx: ctx,
+      scope: { handlerDiagnostics, componentHash: rootComponent.hash, componentId, instanceId, imports },
+    })
+
+    const { instanceVertexId } = await getInstanceContext({ g: ctx.g, diagnostics: ctx.diagnostics, instanceId })
+    const { usesImportInstances: importInstances } = await usesImportInstances({
+      rootCtx: { g: ctx.g },
+      scope: { instanceVertexId },
+    })
+
+    const corednsImport = findImportByAlias(importInstances, 'corednsStart')
+    assert.ok(corednsImport, 'corednsStart import instance missing')
+    assert.equal(corednsImport.waitFor.length, 1, 'corednsStart should wait for controlplanepod lifecycle.done')
+  } finally {
+    try { await ctx.graph?.close?.() } catch { }
+  }
+})
+
+test('import waitFor lifecycle.done starts dependent import after referenced import completes', async () => {
+  const ctx = createMemoryContext()
+  try {
+    const handlerDiagnostics = createHandlerDiagnostics(ctx.diagnostics)
+    const controlPlaneComponent = componentBuilder('WaitForLifecycleCompletionControlPlane')
+      .task('configure', {})
+      .toJSON()
+    const corednsComponent = componentBuilder('WaitForLifecycleCompletionCoreDns')
+      .task('start', {})
+      .toJSON()
+    const rootComponent = componentBuilder('WaitForLifecycleCompletionRoot')
+      .import('controlplanepod', { hash: controlPlaneComponent.hash })
+      .import('corednsStart', {
+        hash: corednsComponent.hash,
+        waitFor: _ => [_.controlplanepod.lifecycle.done],
+      })
+      .toJSON()
+
+    await invokeRoute(ctx, { path: registerPath, data: controlPlaneComponent })
+    await invokeRoute(ctx, { path: registerPath, data: corednsComponent })
+    await invokeRoute(ctx, { path: registerPath, data: rootComponent })
+
+    const componentId = await getComponentId({ g: ctx.g, diagnostics: ctx.diagnostics, componentHash: rootComponent.hash })
+    const { imports } = await componentImports({ rootCtx: { g: ctx.g }, scope: { componentId } })
+
+    const rootInstanceId = 'instance-wait-for-lifecycle-completion'
+    await createInstanceHandler({
+      rootCtx: ctx,
+      scope: { handlerDiagnostics, componentHash: rootComponent.hash, componentId, instanceId: rootInstanceId, imports },
+    })
+
+    const { instanceVertexId: rootInstanceVertexId } = await getInstanceContext({
+      g: ctx.g,
+      diagnostics: ctx.diagnostics,
+      instanceId: rootInstanceId,
+    })
+    const { usesImportInstances: importInstances } = await usesImportInstances({
+      rootCtx: { g: ctx.g },
+      scope: { instanceVertexId: rootInstanceVertexId },
+    })
+    const controlPlaneImport = findImportByAlias(importInstances, 'controlplanepod')
+    const corednsImport = findImportByAlias(importInstances, 'corednsStart')
+    assert.ok(controlPlaneImport, 'controlplanepod import instance missing')
+    assert.ok(corednsImport, 'corednsStart import instance missing')
+
+    const startComponentInstanceSubject = createBasicSubject()
+      .env('prod')
+      .ns('component-service')
+      .entity('componentInstance')
+      .channel('cmd')
+      .action('start')
+      .version('v1')
+      .build()
+
+    const blockedPublishes = []
+    await startImportHandler({
+      rootCtx: {
+        g: ctx.g,
+        natsContext: { publish: async (subject, payload) => blockedPublishes.push({ subject, payload: JSON.parse(payload) }) },
+      },
+      scope: { instanceId: corednsImport.instanceId, parentInstanceId: rootInstanceId },
+    })
+    assert.equal(
+      blockedPublishes.filter(({ subject }) => subject === startComponentInstanceSubject).length,
+      0,
+      'corednsStart should not start before controlplanepod lifecycle.done',
+    )
+
+    const { stateMachineId: controlPlaneStateMachineId } = await getInstanceContext({
+      g: ctx.g,
+      diagnostics: ctx.diagnostics,
+      instanceId: controlPlaneImport.instanceId,
+    })
+    const configureEdgeId = await getStateEdgeIdByName({
+      g: ctx.g,
+      stateMachineId: controlPlaneStateMachineId,
+      edgeLabel: domain.edge.has_task_state.stateMachine_task.constants.LABEL,
+      nodeName: 'configure',
+    })
+    await ctx.g
+      .E(configureEdgeId)
+      .property('status', domain.edge.has_task_state.stateMachine_task.constants.Status.PROVIDED)
+      .property('result', JSON.stringify({ configured: true }))
+    await ctx.g
+      .V(controlPlaneStateMachineId)
+      .property('state', domain.vertex.stateMachine.constants.STATES.COMPLETE)
+
+    const readyPublishes = []
+    await startImportHandler({
+      rootCtx: {
+        g: ctx.g,
+        natsContext: { publish: async (subject, payload) => readyPublishes.push({ subject, payload: JSON.parse(payload) }) },
+      },
+      scope: { instanceId: corednsImport.instanceId, parentInstanceId: rootInstanceId },
+    })
+    assert.ok(readyPublishes.some(({ subject, payload }) =>
+      subject === startComponentInstanceSubject
+      && payload.data.instanceId === corednsImport.instanceId
+    ))
   } finally {
     try { await ctx.graph?.close?.() } catch { }
   }

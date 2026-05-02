@@ -1,6 +1,11 @@
 import { create as createBasicSubject } from '@liquid-bricks/lib-nats-subject/create/basic'
 import { domain } from '@liquid-bricks/spec-domain/domain'
-import { hasInstanceStarted, isNodeProvided } from '../../../componentInstance/cmd/dependencyUtils.js'
+import {
+  hasInstanceStarted,
+  isNodeProvided,
+  LIFECYCLE_WAIT_FOR_PROPERTY,
+  normalizeLifecycleWaitForValues,
+} from '../../../componentInstance/cmd/dependencyUtils.js'
 
 function normalizeWaitForValues(waitForValues = []) {
   const raw = Array.isArray(waitForValues) && waitForValues.length === 1 ? waitForValues[0] : waitForValues
@@ -78,9 +83,16 @@ async function isImportReadyForParent({
     const dataWaitForIds = importRefId
       ? await g.V(importRefId).out(domain.edge.wait_for.importRef_data.constants.LABEL).id()
       : []
+    const [lifecycleWaitForValues] = importRefId
+      ? await g.V(importRefId).valueMap(LIFECYCLE_WAIT_FOR_PROPERTY)
+      : []
+    const lifecycleWaitFor = normalizeLifecycleWaitForValues(
+      lifecycleWaitForValues?.[LIFECYCLE_WAIT_FOR_PROPERTY],
+    )
     const waitFor = normalizeWaitForValues([
       ...(taskWaitForIds ?? []),
       ...(dataWaitForIds ?? []),
+      ...lifecycleWaitFor,
     ])
 
     const ready = await areWaitForsProvided({

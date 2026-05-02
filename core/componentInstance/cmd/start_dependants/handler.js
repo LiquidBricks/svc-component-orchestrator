@@ -4,6 +4,8 @@ import {
   findStateEdgeForNodeInInstanceTree,
   hasInstanceStarted,
   isNodeProvided,
+  LIFECYCLE_WAIT_FOR_PROPERTY,
+  normalizeLifecycleWaitForValues,
   normalizeResult,
   setNested,
   vertexLabelToType,
@@ -404,9 +406,16 @@ async function findReadyImportsForInstance({
     const dataWaitForIds = importRefId
       ? await g.V(importRefId).out(domain.edge.wait_for.importRef_data.constants.LABEL).id()
       : []
+    const [lifecycleWaitForValues] = importRefId
+      ? await g.V(importRefId).valueMap(LIFECYCLE_WAIT_FOR_PROPERTY)
+      : []
+    const lifecycleWaitFor = normalizeLifecycleWaitForValues(
+      lifecycleWaitForValues?.[LIFECYCLE_WAIT_FOR_PROPERTY],
+    )
     const waitFor = normalizeWaitForValues([
       ...(taskWaitForIds ?? []),
       ...(dataWaitForIds ?? []),
+      ...lifecycleWaitFor,
     ])
     const [importInstanceVertexId] = await g
       .V(importRefInstanceId)

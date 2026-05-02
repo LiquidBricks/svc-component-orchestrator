@@ -1,4 +1,8 @@
 import { domain } from '@liquid-bricks/spec-domain/domain'
+import {
+  LIFECYCLE_WAIT_FOR_PROPERTY,
+  normalizeLifecycleWaitForValues,
+} from '../../dependencyUtils.js'
 
 function normalizeWaitForValues(waitForValues = []) {
   const raw = Array.isArray(waitForValues) && waitForValues.length === 1 ? waitForValues[0] : waitForValues
@@ -38,9 +42,16 @@ export async function usesImportInstances({ rootCtx: { g }, scope: { instanceVer
         .V(importRefId)
         .out(domain.edge.wait_for.importRef_data.constants.LABEL)
         .id()
+      const [lifecycleWaitForValues] = await g
+        .V(importRefId)
+        .valueMap(LIFECYCLE_WAIT_FOR_PROPERTY)
+      const lifecycleWaitFor = normalizeLifecycleWaitForValues(
+        lifecycleWaitForValues?.[LIFECYCLE_WAIT_FOR_PROPERTY],
+      )
       waitFor = normalizeWaitForValues([
         ...(taskWaitForIds ?? []),
         ...(dataWaitForIds ?? []),
+        ...lifecycleWaitFor,
       ])
     }
 

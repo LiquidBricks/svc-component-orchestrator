@@ -1,6 +1,7 @@
 import { domain } from '@liquid-bricks/spec-domain/domain'
 import { parseDependencyPath, resolveDependencyTargetId } from './dependencyPath.js'
 import { Errors } from '../../../../../errors.js'
+import { LIFECYCLE_WAIT_FOR_PROPERTY } from '../../../../componentInstance/cmd/dependencyUtils.js'
 
 export async function attachImportWaitFor({
   rootCtx: { g, dataMapper },
@@ -14,6 +15,7 @@ export async function attachImportWaitFor({
     const waitForTargets = {
       task: new Set(),
       data: new Set(),
+      lifecycle: new Set(),
     }
 
     for (const dep of waitFor ?? []) {
@@ -40,6 +42,11 @@ export async function attachImportWaitFor({
         dependencyName: importName,
         dep: trimmedDep,
       })
+
+      if (targetType === 'lifecycle') {
+        waitForTargets.lifecycle.add(targetId)
+        continue
+      }
 
       if (targetId) {
         handlerDiagnostics.require(
@@ -71,6 +78,11 @@ export async function attachImportWaitFor({
     }
     for (const targetId of waitForTargets.data) {
       await dataMapper.edge.wait_for.importRef_data.create({ fromId: importRefId, toId: targetId })
+    }
+    if (waitForTargets.lifecycle.size) {
+      await g
+        .V(importRefId)
+        .property(LIFECYCLE_WAIT_FOR_PROPERTY, JSON.stringify(Array.from(waitForTargets.lifecycle)))
     }
   }
 }

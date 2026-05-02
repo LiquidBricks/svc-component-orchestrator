@@ -8,6 +8,27 @@ const STATE_EDGE_LABELS = [
   domain.edge.has_task_state.stateMachine_task.constants.LABEL,
 ]
 
+function pickFirst(values) {
+  return Array.isArray(values) ? values[0] : values
+}
+
+function valueFor(values, key) {
+  if (!values || typeof values !== 'object') return values
+  const fieldValue = values[key]
+  if (fieldValue === undefined) return undefined
+  return pickFirst(fieldValue)
+}
+
+function normalizeResult(value) {
+  if (typeof value !== 'string') return value ?? null
+
+  try {
+    return JSON.parse(value)
+  } catch {
+    return value
+  }
+}
+
 async function areAllStatesProvided({ g, stateMachineId }) {
   const statusMaps = await g
     .V(stateMachineId)
@@ -17,8 +38,7 @@ async function areAllStatesProvided({ g, stateMachineId }) {
 
   return statusMaps.every(map => {
     const statusMap = Array.isArray(map) ? map[0] : map
-    const statusValues = statusMap?.status ?? statusMap
-    const status = Array.isArray(statusValues) ? statusValues[0] : statusValues
+    const status = valueFor(statusMap, 'status')
     return status === PROVIDED_STATUS
   })
 }
@@ -41,19 +61,29 @@ async function publishCompletion({ natsContext, instanceId, stateMachineId }) {
 
 async function getCurrentState({ g, stateMachineId }) {
   const [stateValues] = await g.V(stateMachineId).valueMap('state')
-  const stateMap = stateValues?.state ?? stateValues
-  return Array.isArray(stateMap) ? stateMap[0] : stateMap
+  return valueFor(stateValues, 'state')
 }
 
 async function findParentInstances({ g, instanceVertexId }) {
-  const parentInstanceVertexIds = await g
+  const importParentInstanceVertexIds = await g
     .V(instanceVertexId)
     .in(domain.edge.uses_import.importInstanceRef_componentInstance.constants.LABEL)
     .in(domain.edge.uses_import.componentInstance_importInstanceRef.constants.LABEL)
     .id()
 
+  const gateParentInstanceVertexIds = await g
+    .V(instanceVertexId)
+    .in(domain.edge.uses_gate.gateInstanceRef_componentInstance.constants.LABEL)
+    .in(domain.edge.uses_gate.componentInstance_gateInstanceRef.constants.LABEL)
+    .id()
+
   const parents = []
-  for (const parentInstanceVertexId of parentInstanceVertexIds ?? []) {
+  const parentInstanceVertexIds = new Set([
+    ...(importParentInstanceVertexIds ?? []),
+    ...(gateParentInstanceVertexIds ?? []),
+  ])
+
+  for (const parentInstanceVertexId of parentInstanceVertexIds) {
     if (!parentInstanceVertexId) continue
     const [stateMachineId] = await g
       .V(parentInstanceVertexId)
@@ -62,11 +92,53 @@ async function findParentInstances({ g, instanceVertexId }) {
     if (!stateMachineId) continue
 
     const [instanceIdValues] = await g.V(parentInstanceVertexId).valueMap('instanceId')
-    const instanceIdValue = instanceIdValues?.instanceId ?? instanceIdValues
-    const instanceId = Array.isArray(instanceIdValue) ? instanceIdValue[0] : instanceIdValue
+    const instanceId = valueFor(instanceIdValues, 'instanceId')
     parents.push({ instanceVertexId: parentInstanceVertexId, stateMachineId, instanceId })
   }
   return parents
+}
+
+async function isGateFinished({ g, gateInstanceRefId, cache }) {
+  const [resultValues] = await g.V(gateInstanceRefId).valueMap('result')
+  const rawResult = valueFor(resultValues, 'result')
+  if (rawResult === undefined || rawResult === null || rawResult === '') return false
+
+  const result = normalizeResult(rawResult)
+  if (result !== true) return true
+
+  const [gateInstanceVertexId] = await g
+    .V(gateInstanceRefId)
+    .out(domain.edge.uses_gate.gateInstanceRef_componentInstance.constants.LABEL)
+    .id()
+  if (!gateInstanceVertexId) return false
+
+  const [gateStateMachineId] = await g
+    .V(gateInstanceVertexId)
+    .out(domain.edge.has_stateMachine.componentInstance_stateMachine.constants.LABEL)
+    .id()
+  if (!gateStateMachineId) return false
+
+  return isInstanceFinished({
+    g,
+    instanceVertexId: gateInstanceVertexId,
+    stateMachineId: gateStateMachineId,
+    cache,
+  })
+}
+
+async function areAllGatesFinished({ g, instanceVertexId, cache }) {
+  const gateInstanceRefIds = await g
+    .V(instanceVertexId)
+    .out(domain.edge.uses_gate.componentInstance_gateInstanceRef.constants.LABEL)
+    .id()
+
+  for (const gateInstanceRefId of gateInstanceRefIds ?? []) {
+    if (!gateInstanceRefId) continue
+    const finishedGate = await isGateFinished({ g, gateInstanceRefId, cache })
+    if (!finishedGate) return false
+  }
+
+  return true
 }
 
 async function isInstanceFinished({ g, instanceVertexId, stateMachineId, cache }) {
@@ -105,6 +177,12 @@ async function isInstanceFinished({ g, instanceVertexId, stateMachineId, cache }
       cache.set(cacheKey, false)
       return false
     }
+  }
+
+  const gatesFinished = await areAllGatesFinished({ g, instanceVertexId, cache })
+  if (!gatesFinished) {
+    cache.set(cacheKey, false)
+    return false
   }
 
   cache.set(cacheKey, true)
