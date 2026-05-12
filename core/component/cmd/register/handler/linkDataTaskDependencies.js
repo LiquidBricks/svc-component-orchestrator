@@ -1,11 +1,11 @@
 import { Errors } from '../../../../../errors.js'
-import { parseDependencyPath, resolveDependencyTargetId } from './dependencyPath.js'
+import { parseDependencyPath, resolveDependencyTargetId, validateAgentFnDependency } from './dependencyPath.js'
 
 export async function linkDataTaskDependencies({
   rootCtx: { g, dataMapper },
   scope: { handlerDiagnostics, dependencyList, componentVID, component },
 }) {
-  const { name: compName, hash } = component
+  const { name: compName, hash, agentFns = [] } = component
   const edgeCreators = {
     dependency: {
       task: {
@@ -44,6 +44,26 @@ export async function linkDataTaskDependencies({
         dependencyType,
         dependencyName,
       })
+
+      if (targetType === 'agentFn') {
+        handlerDiagnostics.require(
+          edgeKind === 'dependency',
+          Errors.PRECONDITION_INVALID,
+          `agentFn only supports deps for component(${compName})#${hash} ${dependencyType}:${dependencyName} dep[${trimmedDep}]`,
+          { component: compName, hash, dependencyType, dependencyName, dep: trimmedDep },
+        )
+        validateAgentFnDependency({
+          handlerDiagnostics,
+          agentFns,
+          targetName,
+          compName,
+          hash,
+          dependencyType,
+          dependencyName,
+          dep: trimmedDep,
+        })
+        continue
+      }
 
       const targetId = await resolveDependencyTargetId({
         handlerDiagnostics,

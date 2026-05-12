@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { component as componentBuilder } from '@liquid-bricks/lib-component-builder'
+import { agentFn, component as componentBuilder } from '../../../../../../../../lib-component-builder/componentBuilder/index.js'
 
 import { domain, registerHandlerComponent, withGraphContext } from '../helpers.mjs'
 
@@ -102,6 +102,46 @@ test('handler resolves namespaced dependency paths through imports', async () =>
     assert.deepEqual(dataDeps, [wordsVocabId])
 
     assert.deepEqual(await g.V(mainTaskId).out(domain.edge.has_dependency.task_deferred.constants.LABEL).id(), [])
+  })
+})
+
+test('handler accepts agentFn deps without creating graph dependency edges', async () => {
+  await withGraphContext(async ({ diagnostics, dataMapper, g }) => {
+    const runCommand = agentFn({ portAddr: 'cmd.run', fn: () => 'ok' })
+    const component = componentBuilder('AgentFnDeps')
+      .agentFn('runCommand', { portAddr: runCommand })
+      .task('bootstrap', { deps: ({ agentFn }) => agentFn.runCommand })
+      .toJSON()
+
+    await registerHandlerComponent({ diagnostics, dataMapper, g }, component)
+
+    const [componentId] = await g
+      .V()
+      .has('label', domain.vertex.component.constants.LABEL)
+      .has('hash', component.hash)
+      .id()
+    const [bootstrapTaskId] = await g.V(componentId)
+      .out(domain.edge.has_task.component_task.constants.LABEL)
+      .has('name', 'bootstrap')
+      .id()
+
+    assert.ok(bootstrapTaskId, 'bootstrap task missing')
+    assert.deepEqual(await g.V(bootstrapTaskId).out(domain.edge.has_dependency.task_task.constants.LABEL).id(), [])
+    assert.deepEqual(await g.V(bootstrapTaskId).out(domain.edge.has_dependency.task_data.constants.LABEL).id(), [])
+    assert.deepEqual(await g.V(bootstrapTaskId).out(domain.edge.has_dependency.task_deferred.constants.LABEL).id(), [])
+  })
+})
+
+test('handler rejects agentFn deps when the alias is not registered', async () => {
+  await withGraphContext(async ({ diagnostics, dataMapper, g }) => {
+    const component = componentBuilder('MissingAgentFnDep')
+      .task('bootstrap', { deps: ({ agentFn }) => agentFn.runCommand })
+      .toJSON()
+
+    await assert.rejects(
+      registerHandlerComponent({ diagnostics, dataMapper, g }, component),
+      diagnostics.DiagnosticError,
+    )
   })
 })
 

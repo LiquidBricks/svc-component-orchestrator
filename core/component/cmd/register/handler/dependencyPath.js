@@ -1,7 +1,7 @@
 import { Errors } from '../../../../../errors.js'
 import { domain } from '@liquid-bricks/spec-domain/domain'
 
-const SUPPORTED_DEPENDENCY_TYPES = ['data', 'task', 'deferred', 'lifecycle']
+const SUPPORTED_DEPENDENCY_TYPES = ['data', 'task', 'deferred', 'lifecycle', 'agentFn']
 
 export function parseDependencyPath({ handlerDiagnostics, dep, compName, hash, dependencyType, dependencyName }) {
   const trimmedDep = String(dep ?? '').trim()
@@ -48,6 +48,12 @@ export function parseDependencyPath({ handlerDiagnostics, dep, compName, hash, d
     `Deferred dependency cannot reference imports for component(${compName})#${hash} ${dependencyType}:${dependencyName} dep[${trimmedDep}]`,
     { component: compName, hash, dependencyType, dependencyName, dep: trimmedDep },
   )
+  handlerDiagnostics.require(
+    targetType !== 'agentFn' || importPath.length === 0,
+    Errors.PRECONDITION_INVALID,
+    `agentFn dependency cannot reference imports for component(${compName})#${hash} ${dependencyType}:${dependencyName} dep[${trimmedDep}]`,
+    { component: compName, hash, dependencyType, dependencyName, dep: trimmedDep },
+  )
 
   return {
     trimmedDep,
@@ -55,6 +61,27 @@ export function parseDependencyPath({ handlerDiagnostics, dep, compName, hash, d
     targetType,
     targetName,
   }
+}
+
+export function validateAgentFnDependency({
+  handlerDiagnostics,
+  agentFns = [],
+  targetName,
+  compName,
+  hash,
+  dependencyType,
+  dependencyName,
+  dep,
+}) {
+  const list = Array.isArray(agentFns) ? agentFns : []
+  const match = list.find(({ name }) => name === targetName)
+  handlerDiagnostics.require(
+    match,
+    Errors.PRECONDITION_INVALID,
+    `agentFn not found for component(${compName})#${hash} ${dependencyType}:${dependencyName} dep[${dep}]`,
+    { dep, component: compName, hash, dependencyType, dependencyName, agentFn: targetName },
+  )
+  return match
 }
 
 async function resolveImportedComponent({

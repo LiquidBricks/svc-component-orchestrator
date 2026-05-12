@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { component as componentBuilder } from '@liquid-bricks/lib-component-builder'
+import { agentFn, component as componentBuilder } from '../../../../../../../../lib-component-builder/componentBuilder/index.js'
 
 import { domain, registerHandlerComponent, withGraphContext } from '../helpers.mjs'
 
@@ -51,6 +51,37 @@ test('handler links gates to existing components and records waitFor/deps', asyn
     assert.equal(waitForDataIds.length, 1)
     assert.equal(waitForTaskIds.length, 0)
     assert.equal(depTaskIds.length, 1)
+  })
+})
+
+test('handler accepts agentFn gate deps without creating graph dependency edges', async () => {
+  await withGraphContext(async ({ diagnostics, dataMapper, g }) => {
+    const runCommand = agentFn({ portAddr: 'cmd.run', fn: () => 'ok' })
+    const component = componentBuilder('AgentFnGateDeps')
+      .agentFn('runCommand', { portAddr: runCommand })
+      .gate('setup', {
+        hash: 'shared-hash',
+        fnc: () => true,
+        deps: ({ agentFn }) => agentFn.runCommand,
+      })
+      .toJSON()
+
+    await dataMapper.vertex.component.create({ hash: 'shared-hash', name: 'SharedComponent' })
+
+    await registerHandlerComponent({ diagnostics, dataMapper, g }, component)
+
+    const [componentId] = await g
+      .V()
+      .has('label', domain.vertex.component.constants.LABEL)
+      .has('hash', component.hash)
+      .id()
+    const [gateRefId] = await g.V(componentId)
+      .out(domain.edge.has_gate.component_gateRef.constants.LABEL)
+      .id()
+
+    assert.ok(gateRefId, 'gateRef missing')
+    assert.deepEqual(await g.V(gateRefId).out(domain.edge.has_dependency.gateRef_task.constants.LABEL).id(), [])
+    assert.deepEqual(await g.V(gateRefId).out(domain.edge.has_dependency.gateRef_data.constants.LABEL).id(), [])
   })
 })
 

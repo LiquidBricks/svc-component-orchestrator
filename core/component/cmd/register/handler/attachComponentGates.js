@@ -1,6 +1,6 @@
 import { domain } from '@liquid-bricks/spec-domain/domain'
 import { Errors } from '../../../../../errors.js'
-import { parseDependencyPath, resolveDependencyTargetId } from './dependencyPath.js'
+import { parseDependencyPath, resolveDependencyTargetId, validateAgentFnDependency } from './dependencyPath.js'
 
 function ensureArray(value) {
   if (value === undefined || value === null) return []
@@ -11,7 +11,7 @@ async function attachComponentGatesHandler({
   rootCtx: { g, dataMapper },
   scope: { handlerDiagnostics, component, dependencyList, componentVID },
 }) {
-  const { name: compName, hash, gates = [] } = component ?? {}
+  const { name: compName, hash, gates = [], agentFns = [] } = component ?? {}
   if (!gates?.length) return
 
   handlerDiagnostics.require(
@@ -125,6 +125,20 @@ async function attachComponentGatesHandler({
         dependencyType: 'gate',
         dependencyName: gateName,
       })
+
+      if (targetType === 'agentFn') {
+        validateAgentFnDependency({
+          handlerDiagnostics,
+          agentFns,
+          targetName,
+          compName,
+          hash,
+          dependencyType: 'gate',
+          dependencyName: gateName,
+          dep: trimmedDep,
+        })
+        continue
+      }
 
       handlerDiagnostics.require(
         targetType === 'task' || targetType === 'data',
