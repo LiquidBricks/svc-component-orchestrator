@@ -28,6 +28,7 @@ test('validatePayload deserializes the registration payload', () => {
   assert.deepEqual(result.component, {
     name: 'ok-component',
     hash: 'hash-ok',
+    agentFns: [],
     imports: [{ name: 'shared', hash: 'import-hash', inject: {}, waitFor: [], codeRef: undefined }],
     gates: [],
     data: [{ name: 'value', deps: ['task.result'], waitFor: [], inject: [], fnc: undefined, codeRef: undefined }],
