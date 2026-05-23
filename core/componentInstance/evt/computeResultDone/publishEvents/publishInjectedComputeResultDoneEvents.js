@@ -202,7 +202,7 @@ async function findStateEdgeForNode({ g, stateMachineId, targetNodeId, targetSta
   return stateEdgeId
 }
 
-export async function publishInjectedResultComputedEvents({ scope, rootCtx: { g, natsContext } }) {
+export async function publishInjectedComputeResultDoneEvents({ scope, rootCtx: { g, natsContext } }) {
   const { handlerDiagnostics, instanceId, instanceVertexId, stateMachineId, stateEdgeId, stateEdgeLabel, type, result } = scope
 
   const [providedNodeId] = await g
@@ -232,12 +232,12 @@ export async function publishInjectedResultComputedEvents({ scope, rootCtx: { g,
   const injectsIntoEdges = INJECTS_INTO_EDGE_BY_TYPE[type]
   if (!injectsIntoEdges?.length) return
 
-  const resultComputedSubject = createBasicSubject()
+  const computeResultDoneSubject = createBasicSubject()
     .env('prod')
     .ns('component-service')
     .entity('componentInstance')
     .channel('evt')
-    .action('result_computed')
+    .action('computeResultDone')
     .version('v1')
     .build()
 
@@ -399,7 +399,7 @@ export async function publishInjectedResultComputedEvents({ scope, rootCtx: { g,
       )
 
       await natsContext.publish(
-        resultComputedSubject,
+        computeResultDoneSubject,
         JSON.stringify({
           data: {
             instanceId: targetInstanceId,

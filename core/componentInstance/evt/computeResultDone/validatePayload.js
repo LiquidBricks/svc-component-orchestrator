@@ -11,20 +11,20 @@ export function validatePayload({ scope: { handlerDiagnostics, instanceId, type,
   handlerDiagnostics.require(
     typeof type === 'string' && type.length,
     Errors.PRECONDITION_REQUIRED,
-    'type required for result_computed',
+    'type required for computeResultDone',
     { field: 'type' }
   )
   const allowedTypes = ['data', 'task', 'gate']
   handlerDiagnostics.require(
     allowedTypes.includes(type),
     Errors.PRECONDITION_INVALID,
-    `unknown type ${type} for result_computed`,
+    `unknown type ${type} for computeResultDone`,
     { field: 'type', type }
   )
   handlerDiagnostics.require(
     typeof name === 'string' && name.length,
     Errors.PRECONDITION_REQUIRED,
-    'name required for result_computed',
+    'name required for computeResultDone',
     { field: 'name' }
   )
 

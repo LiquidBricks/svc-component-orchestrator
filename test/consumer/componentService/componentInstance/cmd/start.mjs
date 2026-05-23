@@ -272,7 +272,7 @@ test('doesInstanceExist validates presence and usesImportInstances returns impor
   })
 })
 
-test('publishEvents starts dependency-free states, imports, and emits started', async () => {
+test('publishEvents starts dependency-free states, imports, and emits startDone', async () => {
   const instanceId = 'publish-events-instance'
   const dataStateIds = ['data-state-1', 'data-state-2']
   const taskStateIds = ['task-state-1']
@@ -313,12 +313,12 @@ test('publishEvents starts dependency-free states, imports, and emits started', 
     .action('start')
     .version('v1')
     .build()
-  const startedSubject = createBasicSubject()
+  const startDoneSubject = createBasicSubject()
     .env('prod')
     .ns('component-service')
     .entity('componentInstance')
     .channel('evt')
-    .action('started')
+    .action('startDone')
     .version('v1')
     .build()
 
@@ -343,9 +343,9 @@ test('publishEvents starts dependency-free states, imports, and emits started', 
   )
   assert.ok(startImportEvents.every(({ payload }) => payload.data.parentInstanceId === instanceId))
 
-  const startedEvents = published.filter(({ subject }) => subject === startedSubject)
-  assert.equal(startedEvents.length, 1)
-  assert.deepEqual(startedEvents[0].payload.data, { instanceId })
+  const startDoneEvents = published.filter(({ subject }) => subject === startDoneSubject)
+  assert.equal(startDoneEvents.length, 1)
+  assert.deepEqual(startDoneEvents[0].payload.data, { instanceId })
 })
 
 test('publishEvents dispatches gate start command and gate handler emits compute_result', async () => {

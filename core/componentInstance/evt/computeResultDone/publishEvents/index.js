@@ -1,6 +1,6 @@
 import { completeStateMachineIfFinished } from './completeStateMachineIfFinished.js'
 import { publishGateStartIfPassed } from './publishGateStartIfPassed.js'
-import { publishInjectedResultComputedEvents } from './publishInjectedResultComputedEvents.js'
+import { publishInjectedComputeResultDoneEvents } from './publishInjectedComputeResultDoneEvents.js'
 import { publishStartDependantsCommand } from './publishStartDependantsCommand.js'
 
 export async function publishEvents(args) {
@@ -13,7 +13,7 @@ export async function publishEvents(args) {
 
   await Promise.all([
     completeStateMachineIfFinished(args),
-    publishInjectedResultComputedEvents(args),
+    publishInjectedComputeResultDoneEvents(args),
     publishStartDependantsCommand(args),
   ])
 }

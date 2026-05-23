@@ -1,5 +1,5 @@
-import { componentInstanceCreated } from './componentInstanceCreated.js'
+import { componentInstanceCreateDone } from './componentInstanceCreateDone.js'
 
 export async function publishEvents(args) {
-  await componentInstanceCreated(args)
+  await componentInstanceCreateDone(args)
 }

@@ -13,7 +13,7 @@ import {
   getStateMachineId,
   pickFirst,
   runSpec,
-  resultComputedSpec,
+  computeResultDoneSpec,
   STATE_EDGE_STATUS_BY_TYPE,
   createHandlerDiagnostics,
   makeDiagnosticsInstance,
@@ -21,9 +21,9 @@ import {
   domain,
 } from './helpers.mjs'
 
-test('result_computed stores state result, marks status provided, and publishes start_dependants', async () => {
+test('computeResultDone stores state result, marks status provided, and publishes start_dependants', async () => {
   await withGraphContext(async ({ diagnostics, dataMapper, g }) => {
-    const component = componentBuilder('ResultComputedComponent')
+    const component = componentBuilder('ComputeResultDoneComponent')
       .data('dataInput', { deps: () => { } })
       .toJSON()
 
@@ -54,7 +54,7 @@ test('result_computed stores state result, marks status provided, and publishes 
         .ns('component-service')
         .entity('componentInstance')
         .channel('evt')
-        .action('result_computed')
+        .action('computeResultDone')
         .version('v1')
         .build(),
       ack: () => { acked = true },
@@ -74,7 +74,7 @@ test('result_computed stores state result, marks status provided, and publishes 
       natsContext: { publish: async (subject, payload) => published.push({ subject, payload: JSON.parse(payload) }) },
     }
 
-    const finalScope = await runSpec({ spec: resultComputedSpec, rootCtx, message })
+    const finalScope = await runSpec({ spec: computeResultDoneSpec, rootCtx, message })
 
     assert.equal(finalScope.stateEdgeId, stateEdgeId)
     assert.equal(acked, true)

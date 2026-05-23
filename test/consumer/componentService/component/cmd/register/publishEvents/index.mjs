@@ -5,10 +5,10 @@ import { create as createBasicSubject } from '@liquid-bricks/lib-nats-subject/cr
 
 import { publishEvents } from '../../../../../../../core/component/cmd/register/publishEvents/index.js'
 
-test('publishEvents publishes component registered event', async () => {
+test('publishEvents publishes component registerDone event', async () => {
   const calls = []
   const natsContext = { publish: async (...args) => calls.push(args) }
-  const hash = 'hash-registered'
+  const hash = 'hash-register-done'
 
   await publishEvents({
     rootCtx: { natsContext },
@@ -23,7 +23,7 @@ test('publishEvents publishes component registered event', async () => {
     .ns('component-service')
     .entity('component')
     .channel('evt')
-    .action('registered')
+    .action('registerDone')
     .version('v1')
     .build()
 

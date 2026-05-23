@@ -15,7 +15,7 @@ import {
   getImportedInstance,
   pickFirst,
   runSpec,
-  resultComputedSpec,
+  computeResultDoneSpec,
   startDependantsSpec,
   domain,
 } from './helpers.mjs'
@@ -60,12 +60,12 @@ test('imported injection triggers dependant starts inside imported component', a
     assert.ok(childDepDataStateEdgeId, 'child data dependant state edge missing')
     assert.ok(childDepTaskStateEdgeId, 'child task dependant state edge missing')
 
-    const resultComputedSubject = createBasicSubject()
+    const computeResultDoneSubject = createBasicSubject()
       .env('prod')
       .ns('component-service')
       .entity('componentInstance')
       .channel('evt')
-      .action('result_computed')
+      .action('computeResultDone')
       .version('v1')
       .build()
     const startDependantsSubject = createBasicSubject()
@@ -95,7 +95,7 @@ test('imported injection triggers dependant starts inside imported component', a
 
     const initialPublishes = []
     await runSpec({
-      spec: resultComputedSpec,
+      spec: computeResultDoneSpec,
       rootCtx: {
         diagnostics,
         g,
@@ -103,7 +103,7 @@ test('imported injection triggers dependant starts inside imported component', a
         natsContext: { publish: async (subject, payload) => initialPublishes.push({ subject, payload: JSON.parse(payload) }) },
       },
       message: {
-        subject: resultComputedSubject,
+        subject: computeResultDoneSubject,
         ack: () => { },
         json: () => ({
           data: {
@@ -117,7 +117,7 @@ test('imported injection triggers dependant starts inside imported component', a
     })
 
     const injectedEvent = initialPublishes.find(p =>
-      p.subject === resultComputedSubject
+      p.subject === computeResultDoneSubject
       && p.payload?.data?.instanceId === childInstanceId
       && p.payload?.data?.name === 'childTarget'
     )
@@ -125,7 +125,7 @@ test('imported injection triggers dependant starts inside imported component', a
 
     const injectedPublishes = []
     await runSpec({
-      spec: resultComputedSpec,
+      spec: computeResultDoneSpec,
       rootCtx: {
         diagnostics,
         g,
@@ -133,7 +133,7 @@ test('imported injection triggers dependant starts inside imported component', a
         natsContext: { publish: async (subject, payload) => injectedPublishes.push({ subject, payload: JSON.parse(payload) }) },
       },
       message: {
-        subject: resultComputedSubject,
+        subject: computeResultDoneSubject,
         ack: () => { },
         json: () => injectedEvent.payload,
       },
@@ -167,7 +167,7 @@ test('imported injection triggers dependant starts inside imported component', a
   })
 })
 
-test('result_computed triggers parent dependant starts across imports', async () => {
+test('computeResultDone triggers parent dependant starts across imports', async () => {
   await withGraphContext(async ({ diagnostics, dataMapper, g }) => {
     const childComponent = component('ParentDependantsChild')
       .data('childTarget', { deps: () => { }, fnc: function fnChildTarget() { } })
@@ -199,17 +199,17 @@ test('result_computed triggers parent dependant starts across imports', async ()
 
     const published = []
     let resultAcked = false
-    const resultComputedSubject = createBasicSubject()
+    const computeResultDoneSubject = createBasicSubject()
       .env('prod')
       .ns('component-service')
       .entity('componentInstance')
       .channel('evt')
-      .action('result_computed')
+      .action('computeResultDone')
       .version('v1')
       .build()
 
     await runSpec({
-      spec: resultComputedSpec,
+      spec: computeResultDoneSpec,
       rootCtx: {
         diagnostics,
         g,
@@ -217,7 +217,7 @@ test('result_computed triggers parent dependant starts across imports', async ()
         natsContext: { publish: async (subject, payload) => published.push({ subject, payload: JSON.parse(payload) }) },
       },
       message: {
-        subject: resultComputedSubject,
+        subject: computeResultDoneSubject,
         ack: () => { resultAcked = true },
         json: () => ({
           data: {

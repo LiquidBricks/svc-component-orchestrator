@@ -1,12 +1,12 @@
 import { create as createBasicSubject } from '@liquid-bricks/lib-nats-subject/create/basic'
 
-export async function componentInstanceCreated({ scope: { instanceId, componentHash }, rootCtx: { natsContext } }) {
+export async function componentInstanceCreateDone({ scope: { instanceId, componentHash }, rootCtx: { natsContext } }) {
   const subject = createBasicSubject()
     .env('prod')
     .ns('component-service')
     .entity('componentInstance')
     .channel('evt')
-    .action('created')
+    .action('createDone')
     .version('v1')
 
   await natsContext.publish(

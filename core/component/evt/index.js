@@ -1,1 +1,1 @@
-export * as registered from './registered/index.js'
+export * as registerDone from './registerDone/index.js'

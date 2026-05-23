@@ -2,7 +2,7 @@ import { ackMessage, decodeData } from '../../../../middleware/index.js'
 import { handler } from './handler.js'
 import { validatePayload } from './validatePayload.js'
 
-export const path = { channel: 'evt', entity: 'component', action: 'registered' }
+export const path = { channel: 'evt', entity: 'component', action: 'registerDone' }
 export const spec = {
   decode: [
     // Extract only the hash from message.data

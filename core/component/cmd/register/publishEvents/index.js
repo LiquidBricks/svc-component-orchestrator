@@ -1,5 +1,5 @@
-import { componentRegistered } from './componentRegistered.js'
+import { componentRegisterDone } from './componentRegisterDone.js'
 
 export async function publishEvents(args) {
-  await componentRegistered(args)
+  await componentRegisterDone(args)
 }

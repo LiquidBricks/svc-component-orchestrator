@@ -14,12 +14,12 @@ import {
   getStateEdgeId,
   pickFirst,
   runSpec,
-  resultComputedSpec,
+  computeResultDoneSpec,
   startDependantsSpec,
   STATE_EDGE_STATUS_BY_TYPE,
 } from './helpers.mjs'
 
-test('result_computed publishes injected result_computed events for injection targets', async () => {
+test('computeResultDone publishes injected computeResultDone events for injection targets', async () => {
   await withGraphContext(async ({ diagnostics, dataMapper, g }) => {
     const component = componentBuilder('ResultInjectionComponent')
       .task('taskB', {})
@@ -55,7 +55,7 @@ test('result_computed publishes injected result_computed events for injection ta
         .ns('component-service')
         .entity('componentInstance')
         .channel('evt')
-        .action('result_computed')
+        .action('computeResultDone')
         .version('v1')
         .build(),
       ack: () => { acked = true },
@@ -75,7 +75,7 @@ test('result_computed publishes injected result_computed events for injection ta
       natsContext: { publish: async (subject, payload) => published.push({ subject, payload: JSON.parse(payload) }) },
     }
 
-    const finalScope = await runSpec({ spec: resultComputedSpec, rootCtx, message })
+    const finalScope = await runSpec({ spec: computeResultDoneSpec, rootCtx, message })
 
     assert.equal(finalScope.stateEdgeId, sourceEdgeId)
     assert.equal(acked, true)
@@ -84,12 +84,12 @@ test('result_computed publishes injected result_computed events for injection ta
     assert.equal(pickFirst(updatedValues.status), STATE_EDGE_STATUS_BY_TYPE.data)
     assert.equal(pickFirst(updatedValues.result), JSON.stringify(resultPayload))
 
-    const resultComputedSubject = createBasicSubject()
+    const computeResultDoneSubject = createBasicSubject()
       .env('prod')
       .ns('component-service')
       .entity('componentInstance')
       .channel('evt')
-      .action('result_computed')
+      .action('computeResultDone')
       .version('v1')
       .build()
     const startDependantsSubject = createBasicSubject()
@@ -101,7 +101,7 @@ test('result_computed publishes injected result_computed events for injection ta
       .version('v1')
       .build()
 
-    const injectedEvents = published.filter(p => p.subject === resultComputedSubject)
+    const injectedEvents = published.filter(p => p.subject === computeResultDoneSubject)
     const startDependantsEvents = published.filter(p => p.subject === startDependantsSubject)
 
     assert.equal(startDependantsEvents.length, 1)
@@ -144,12 +144,12 @@ test('injected result triggers dependant data and task start commands', async ()
     assert.ok(dependantDataStateEdgeId, 'dataDependent state edge missing')
     assert.ok(dependantTaskStateEdgeId, 'taskDependent state edge missing')
 
-    const resultComputedSubject = createBasicSubject()
+    const computeResultDoneSubject = createBasicSubject()
       .env('prod')
       .ns('component-service')
       .entity('componentInstance')
       .channel('evt')
-      .action('result_computed')
+      .action('computeResultDone')
       .version('v1')
       .build()
     const startDependantsSubject = createBasicSubject()
@@ -179,7 +179,7 @@ test('injected result triggers dependant data and task start commands', async ()
 
     const initialPublishes = []
     const initialMessage = {
-      subject: resultComputedSubject,
+      subject: computeResultDoneSubject,
       ack: () => { },
       json: () => ({
         data: {
@@ -191,7 +191,7 @@ test('injected result triggers dependant data and task start commands', async ()
       }),
     }
     await runSpec({
-      spec: resultComputedSpec,
+      spec: computeResultDoneSpec,
       rootCtx: {
         diagnostics,
         g,
@@ -201,18 +201,18 @@ test('injected result triggers dependant data and task start commands', async ()
       message: initialMessage,
     })
 
-    const injectedEvent = initialPublishes.find(p => p.subject === resultComputedSubject && p.payload?.data?.name === 'dataTarget')
+    const injectedEvent = initialPublishes.find(p => p.subject === computeResultDoneSubject && p.payload?.data?.name === 'dataTarget')
     assert.ok(injectedEvent, 'injected result for dataTarget not published')
 
     const injectedPublishes = []
     let injectedAcked = false
     const injectedMessage = {
-      subject: resultComputedSubject,
+      subject: computeResultDoneSubject,
       ack: () => { injectedAcked = true },
       json: () => injectedEvent.payload,
     }
     await runSpec({
-      spec: resultComputedSpec,
+      spec: computeResultDoneSpec,
       rootCtx: {
         diagnostics,
         g,

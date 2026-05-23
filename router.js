@@ -38,7 +38,7 @@ export function createComponentServiceRouter({
       return { handlerDiagnostics }
     })
     .route(component.cmd.register.path, component.cmd.register.spec)
-    .route(component.evt.registered.path, component.evt.registered.spec)
+    .route(component.evt.registerDone.path, component.evt.registerDone.spec)
     .route(componentInstance.cmd.create.path, componentInstance.cmd.create.spec)
     .route(componentInstance.cmd.start.path, componentInstance.cmd.start.spec)
     .route(componentInstance.cmd.start_dependants.path, componentInstance.cmd.start_dependants.spec)
@@ -46,10 +46,10 @@ export function createComponentServiceRouter({
     .route(gate.cmd.start.path, gate.cmd.start.spec)
     .route(importEntity.cmd.start.path, importEntity.cmd.start.spec)
     .route(task.cmd.start.path, task.cmd.start.spec)
-    .route(componentInstance.evt.created.path, componentInstance.evt.created.spec)
-    .route(componentInstance.evt.result_computed.path, componentInstance.evt.result_computed.spec)
+    .route(componentInstance.evt.createDone.path, componentInstance.evt.createDone.spec)
+    .route(componentInstance.evt.computeResultDone.path, componentInstance.evt.computeResultDone.spec)
     .route(componentInstance.evt.state_machine_completed.path, componentInstance.evt.state_machine_completed.spec)
-    .route(componentInstance.evt.started.path, componentInstance.evt.started.spec)
+    .route(componentInstance.evt.startDone.path, componentInstance.evt.startDone.spec)
     .default({
       handler: async ({ message, rootCtx: { diagnostics } }) => {
         diagnostics.invariant(

@@ -15,12 +15,12 @@ import {
   getImportedInstance,
   pickFirst,
   runSpec,
-  resultComputedSpec,
+  computeResultDoneSpec,
   STATE_EDGE_STATUS_BY_TYPE,
   domain,
 } from './helpers.mjs'
 
-test('result_computed publishes injected events across imports using import inject mappings', async () => {
+test('computeResultDone publishes injected events across imports using import inject mappings', async () => {
   await withGraphContext(async ({ diagnostics, dataMapper, g }) => {
     const providerComponent = componentBuilder('ImportInjectProviderEvents')
       .task('providerTask', {})
@@ -79,17 +79,17 @@ test('result_computed publishes injected events across imports using import inje
     const published = []
     let ackedTargetTask = false
     const resultPayload = { viaImportInject: true }
-    const resultComputedSubject = createBasicSubject()
+    const computeResultDoneSubject = createBasicSubject()
       .env('prod')
       .ns('component-service')
       .entity('componentInstance')
       .channel('evt')
-      .action('result_computed')
+      .action('computeResultDone')
       .version('v1')
       .build()
 
     const targetTaskMessage = {
-      subject: resultComputedSubject,
+      subject: computeResultDoneSubject,
       ack: () => { ackedTargetTask = true },
       json: () => ({
         data: {
@@ -102,7 +102,7 @@ test('result_computed publishes injected events across imports using import inje
     }
 
     await runSpec({
-      spec: resultComputedSpec,
+      spec: computeResultDoneSpec,
       rootCtx: {
         diagnostics,
         g,
@@ -114,7 +114,7 @@ test('result_computed publishes injected events across imports using import inje
 
     assert.equal(ackedTargetTask, true)
 
-    const targetTaskInjectedEvents = published.filter(p => p.subject === resultComputedSubject).map(p => p.payload.data)
+    const targetTaskInjectedEvents = published.filter(p => p.subject === computeResultDoneSubject).map(p => p.payload.data)
     const sortedTaskInjected = targetTaskInjectedEvents.sort((a, b) => a.name.localeCompare(b.name))
     assert.deepEqual(sortedTaskInjected, [
       { instanceId: providerInstanceId, stateId: providerDataStateEdgeId, name: 'providerData', type: 'data', result: resultPayload },
@@ -124,7 +124,7 @@ test('result_computed publishes injected events across imports using import inje
     published.length = 0
     let ackedTargetData = false
     const targetDataMessage = {
-      subject: resultComputedSubject,
+      subject: computeResultDoneSubject,
       ack: () => { ackedTargetData = true },
       json: () => ({
         data: {
@@ -137,7 +137,7 @@ test('result_computed publishes injected events across imports using import inje
     }
 
     await runSpec({
-      spec: resultComputedSpec,
+      spec: computeResultDoneSpec,
       rootCtx: {
         diagnostics,
         g,
@@ -149,14 +149,14 @@ test('result_computed publishes injected events across imports using import inje
 
     assert.equal(ackedTargetData, true)
 
-    const dataInjectedEvents = published.filter(p => p.subject === resultComputedSubject).map(p => p.payload.data)
+    const dataInjectedEvents = published.filter(p => p.subject === computeResultDoneSubject).map(p => p.payload.data)
     assert.deepEqual(dataInjectedEvents, [
       { instanceId: providerInstanceId, stateId: providerTaskStateEdgeId, name: 'providerTask', type: 'task', result: resultPayload },
     ])
   })
 })
 
-test('result_computed publishes injected result_computed to imported component instance targets', async () => {
+test('computeResultDone publishes injected computeResultDone to imported component instance targets', async () => {
   await withGraphContext(async ({ diagnostics, dataMapper, g }) => {
     const childComponent = componentBuilder('InjectedChild')
       .data('childData', { deps: () => { } })
@@ -197,7 +197,7 @@ test('result_computed publishes injected result_computed to imported component i
         .ns('component-service')
         .entity('componentInstance')
         .channel('evt')
-        .action('result_computed')
+        .action('computeResultDone')
         .version('v1')
         .build(),
       ack: () => { acked = true },
@@ -217,7 +217,7 @@ test('result_computed publishes injected result_computed to imported component i
       natsContext: { publish: async (subject, payload) => published.push({ subject, payload: JSON.parse(payload) }) },
     }
 
-    const finalScope = await runSpec({ spec: resultComputedSpec, rootCtx, message })
+    const finalScope = await runSpec({ spec: computeResultDoneSpec, rootCtx, message })
     assert.equal(finalScope.stateEdgeId, rootDataStateEdgeId)
     assert.equal(acked, true)
 
@@ -225,12 +225,12 @@ test('result_computed publishes injected result_computed to imported component i
     assert.equal(pickFirst(updatedValues.status), STATE_EDGE_STATUS_BY_TYPE.data)
     assert.equal(pickFirst(updatedValues.result), JSON.stringify(resultPayload))
 
-    const resultComputedSubject = createBasicSubject()
+    const computeResultDoneSubject = createBasicSubject()
       .env('prod')
       .ns('component-service')
       .entity('componentInstance')
       .channel('evt')
-      .action('result_computed')
+      .action('computeResultDone')
       .version('v1')
       .build()
     const startDependantsSubject = createBasicSubject()
@@ -242,7 +242,7 @@ test('result_computed publishes injected result_computed to imported component i
       .version('v1')
       .build()
 
-    const injectedEvents = published.filter(p => p.subject === resultComputedSubject)
+    const injectedEvents = published.filter(p => p.subject === computeResultDoneSubject)
     const startDependantsEvents = published.filter(p => p.subject === startDependantsSubject)
 
     assert.equal(startDependantsEvents.length, 1)
@@ -259,7 +259,7 @@ test('result_computed publishes injected result_computed to imported component i
   })
 })
 
-test('result_computed skips unreachable injected targets in a different instance context', async () => {
+test('computeResultDone skips unreachable injected targets in a different instance context', async () => {
   await withGraphContext(async ({ diagnostics, dataMapper, g }) => {
     const providerComponent = componentBuilder('ImportInjectProviderContextSkip')
       .data('id', { deps: () => { } })
@@ -291,12 +291,12 @@ test('result_computed skips unreachable injected targets in a different instance
     const providerDataStateEdgeId = await getStateEdgeId({ g, stateMachineId: providerStateMachineId, type: 'data', name: 'id' })
     assert.ok(providerDataStateEdgeId, 'provider data state edge missing')
 
-    const resultComputedSubject = createBasicSubject()
+    const computeResultDoneSubject = createBasicSubject()
       .env('prod')
       .ns('component-service')
       .entity('componentInstance')
       .channel('evt')
-      .action('result_computed')
+      .action('computeResultDone')
       .version('v1')
       .build()
     const startDependantsSubject = createBasicSubject()
@@ -311,7 +311,7 @@ test('result_computed skips unreachable injected targets in a different instance
     const published = []
     let acked = false
     await runSpec({
-      spec: resultComputedSpec,
+      spec: computeResultDoneSpec,
       rootCtx: {
         diagnostics,
         g,
@@ -319,7 +319,7 @@ test('result_computed skips unreachable injected targets in a different instance
         natsContext: { publish: async (subject, payload) => published.push({ subject, payload: JSON.parse(payload) }) },
       },
       message: {
-        subject: resultComputedSubject,
+        subject: computeResultDoneSubject,
         ack: () => { acked = true },
         json: () => ({
           data: {
@@ -333,7 +333,7 @@ test('result_computed skips unreachable injected targets in a different instance
     })
 
     assert.equal(acked, true)
-    const injectedEvents = published.filter((entry) => entry.subject === resultComputedSubject)
+    const injectedEvents = published.filter((entry) => entry.subject === computeResultDoneSubject)
     assert.equal(injectedEvents.length, 0)
 
     const startDependantsEvents = published.filter((entry) => entry.subject === startDependantsSubject)

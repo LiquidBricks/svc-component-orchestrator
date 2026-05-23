@@ -18,18 +18,18 @@ function makeRegisterSubject() {
     .build()
 }
 
-function makeRegisteredSubject() {
+function makeRegisterDoneSubject() {
   return createBasicSubject()
     .env('prod')
     .ns('component-service')
     .entity('component')
     .channel('evt')
-    .action('registered')
+    .action('registerDone')
     .version('v1')
     .build()
 }
 
-test('register route executes decode/pre/handler/post and publishes component registered event', async () => {
+test('register route executes decode/pre/handler/post and publishes component registerDone event', async () => {
   await withGraphContext(async ({ diagnostics, dataMapper, g }) => {
     const component = componentBuilder('RegisterRouteSuccess')
       .task('setup', {})
@@ -52,7 +52,7 @@ test('register route executes decode/pre/handler/post and publishes component re
 
     assert.equal(publishCalls.length, 1)
     const [publishedSubject, payload] = publishCalls[0]
-    assert.equal(publishedSubject, makeRegisteredSubject())
+    assert.equal(publishedSubject, makeRegisterDoneSubject())
     assert.deepEqual(JSON.parse(payload), { data: { hash: component.hash } })
   })
 })

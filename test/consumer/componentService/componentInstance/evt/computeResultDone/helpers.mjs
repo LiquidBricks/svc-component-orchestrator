@@ -7,8 +7,8 @@ import { ulid } from 'ulid'
 
 import { createComponentServiceRouter } from '../../../../../../router.js'
 import { path as registerPath } from '../../../../../../core/component/cmd/register/index.js'
-import { STATE_EDGE_LABEL_BY_TYPE, STATE_EDGE_STATUS_BY_TYPE } from '../../../../../../core/componentInstance/evt/result_computed/constants.js'
-import { validatePayload } from '../../../../../../core/componentInstance/evt/result_computed/validatePayload.js'
+import { STATE_EDGE_LABEL_BY_TYPE, STATE_EDGE_STATUS_BY_TYPE } from '../../../../../../core/componentInstance/evt/computeResultDone/constants.js'
+import { validatePayload } from '../../../../../../core/componentInstance/evt/computeResultDone/validatePayload.js'
 import { componentImports } from '../../../../../../core/componentInstance/cmd/create/loadData/componentImports.js'
 import { dataMapper as createDataMapper, domain } from '@liquid-bricks/spec-domain/domain'
 import { serviceConfiguration } from '../../../../../provider/serviceConfiguration/dotenv/index.js'
@@ -50,7 +50,7 @@ export async function withGraphContext(run) {
 
 const createInstanceSpec = getCreateInstanceSpec()
 const startInstanceSpec = getStartInstanceSpec()
-const resultComputedSpec = getResultComputedSpec()
+const computeResultDoneSpec = getComputeResultDoneSpec()
 const stateMachineCompletedSpec = getStateMachineCompletedSpec()
 const startDependantsSpec = getStartDependantsSpec()
 const dataStartSpec = getDataStartSpec()
@@ -87,7 +87,7 @@ function getStartInstanceSpec() {
   return route.config
 }
 
-function getResultComputedSpec() {
+function getComputeResultDoneSpec() {
   const router = createComponentServiceRouter({
     natsContext: {},
     g: {},
@@ -97,9 +97,9 @@ function getResultComputedSpec() {
   const route = router.routes.find(({ values }) =>
     values.channel === 'evt'
     && values.entity === 'componentInstance'
-    && values.action === 'result_computed'
+    && values.action === 'computeResultDone'
   )
-  assert.ok(route, 'result_computed route not found')
+  assert.ok(route, 'computeResultDone route not found')
   return route.config
 }
 
@@ -283,7 +283,7 @@ export {
   validatePayload,
   createInstanceSpec,
   startInstanceSpec,
-  resultComputedSpec,
+  computeResultDoneSpec,
   stateMachineCompletedSpec,
   startDependantsSpec,
   dataStartSpec,
