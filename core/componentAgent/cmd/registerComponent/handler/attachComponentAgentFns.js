@@ -46,8 +46,9 @@ async function createComponentAgentFnEdge({ g, dataMapper, fromId, toId }) {
 
 export async function attachComponentAgentFns({
   rootCtx: { g, dataMapper },
-  scope: { handlerDiagnostics, component, componentVID },
+  scope: { handlerDiagnostics, component, componentVID, componentAlreadyRegistered },
 }) {
+  if (componentAlreadyRegistered) return
   const { name: compName, hash: compHash, agentFns = [] } = component ?? {}
   if (!agentFns?.length) return
 

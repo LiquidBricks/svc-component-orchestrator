@@ -6,8 +6,9 @@ import { domain } from '@liquid-bricks/spec-domain/domain'
 export async function republishIfGatesMissing({
   message,
   rootCtx: { g, natsContext },
-  scope: { handlerDiagnostics, component, [s.scope.ac]: abortCtl },
+  scope: { handlerDiagnostics, component, componentAlreadyRegistered, [s.scope.ac]: abortCtl },
 }) {
+  if (componentAlreadyRegistered) return
   const { hash, name: compName, gates = [] } = component
   if (!gates.length) return
 

@@ -9,7 +9,7 @@ import { create as createBasicSubject } from '@liquid-bricks/lib-nats-subject/cr
 import { ulid } from 'ulid'
 
 import { createComponentServiceRouter } from '../../../../../router.js'
-import { path as registerPath } from '../../../../../core/component/cmd/register/index.js'
+import { path as registerPath } from '../../../../../core/componentAgent/cmd/registerComponent/index.js'
 import { dataMapper as createDataMapper, domain } from '@liquid-bricks/spec-domain/domain'
 import { findDependencyFreeStates } from '../../../../../core/componentInstance/cmd/start/findDependencyFreeStates.js'
 import { publishEvents as publishStartInstanceEvents }
@@ -100,7 +100,7 @@ function getStartInstanceSpec() {
 }
 
 async function registerComponent(component, ctx) {
-  await invokeRoute(ctx, { path: registerPath, data: component })
+  await invokeRoute(ctx, { path: registerPath, data: { component, agentID: 'test-agent' } })
 }
 
 async function createInstance(ctx, scope) {

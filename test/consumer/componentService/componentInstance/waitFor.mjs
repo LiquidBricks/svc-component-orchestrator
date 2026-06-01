@@ -8,7 +8,7 @@ import { diagnostics as makeDiagnostics } from '@liquid-bricks/lib-diagnostics'
 import { create as createBasicSubject } from '@liquid-bricks/lib-nats-subject/create/basic'
 import { dataMapper as createDataMapper, domain } from '@liquid-bricks/spec-domain/domain'
 
-import { path as registerPath } from '../../../../core/component/cmd/register/index.js'
+import { path as registerPath } from '../../../../core/componentAgent/cmd/registerComponent/index.js'
 import { handler as createInstanceHandler } from '../../../../core/componentInstance/cmd/create/handler/index.js'
 import { componentImports } from '../../../../core/componentInstance/cmd/create/loadData/componentImports.js'
 import { findDependencyFreeStates } from '../../../../core/componentInstance/cmd/start/findDependencyFreeStates.js'
@@ -109,7 +109,7 @@ test('task waitFor behaves like a dependency', async () => {
       .task('second', { waitFor: ({ task }) => task.first })
       .toJSON()
 
-    await invokeRoute(ctx, { path: registerPath, data: component })
+    await invokeRoute(ctx, { path: registerPath, data: { component, agentID: 'test-agent' } })
     const componentId = await getComponentId({ g: ctx.g, diagnostics: ctx.diagnostics, componentHash: component.hash })
     const { imports } = await componentImports({ rootCtx: { g: ctx.g }, scope: { componentId } })
 
@@ -165,9 +165,9 @@ test('import waitFor can reference another import lifecycle.done', async () => {
       })
       .toJSON()
 
-    await invokeRoute(ctx, { path: registerPath, data: controlPlaneComponent })
-    await invokeRoute(ctx, { path: registerPath, data: corednsComponent })
-    await invokeRoute(ctx, { path: registerPath, data: rootComponent })
+    await invokeRoute(ctx, { path: registerPath, data: { component: controlPlaneComponent, agentID: 'test-agent' } })
+    await invokeRoute(ctx, { path: registerPath, data: { component: corednsComponent, agentID: 'test-agent' } })
+    await invokeRoute(ctx, { path: registerPath, data: { component: rootComponent, agentID: 'test-agent' } })
 
     const componentId = await getComponentId({ g: ctx.g, diagnostics: ctx.diagnostics, componentHash: rootComponent.hash })
     const { imports } = await componentImports({ rootCtx: { g: ctx.g }, scope: { componentId } })
@@ -210,9 +210,9 @@ test('import waitFor lifecycle.done starts dependent import after referenced imp
       })
       .toJSON()
 
-    await invokeRoute(ctx, { path: registerPath, data: controlPlaneComponent })
-    await invokeRoute(ctx, { path: registerPath, data: corednsComponent })
-    await invokeRoute(ctx, { path: registerPath, data: rootComponent })
+    await invokeRoute(ctx, { path: registerPath, data: { component: controlPlaneComponent, agentID: 'test-agent' } })
+    await invokeRoute(ctx, { path: registerPath, data: { component: corednsComponent, agentID: 'test-agent' } })
+    await invokeRoute(ctx, { path: registerPath, data: { component: rootComponent, agentID: 'test-agent' } })
 
     const componentId = await getComponentId({ g: ctx.g, diagnostics: ctx.diagnostics, componentHash: rootComponent.hash })
     const { imports } = await componentImports({ rootCtx: { g: ctx.g }, scope: { componentId } })
@@ -308,8 +308,8 @@ test('import waitFor prevents starting child until dependency provided', async (
       .data('gate', { deps: () => { } })
       .toJSON()
 
-    await invokeRoute(ctx, { path: registerPath, data: childComponent })
-    await invokeRoute(ctx, { path: registerPath, data: parentComponent })
+    await invokeRoute(ctx, { path: registerPath, data: { component: childComponent, agentID: 'test-agent' } })
+    await invokeRoute(ctx, { path: registerPath, data: { component: parentComponent, agentID: 'test-agent' } })
 
     const componentId = await getComponentId({ g: ctx.g, diagnostics: ctx.diagnostics, componentHash: parentComponent.hash })
     const { imports } = await componentImports({ rootCtx: { g: ctx.g }, scope: { componentId } })

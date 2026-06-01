@@ -9,7 +9,7 @@ import { create as createBasicSubject } from '@liquid-bricks/lib-nats-subject/cr
 import { ulid } from 'ulid'
 
 import { createComponentServiceRouter } from '../../../../../router.js'
-import { path as registerPath } from '../../../../../core/component/cmd/register/index.js'
+import { path as registerPath } from '../../../../../core/componentAgent/cmd/registerComponent/index.js'
 import { dataMapper as createDataMapper, domain } from '@liquid-bricks/spec-domain/domain'
 import { publishEvents as publishCreateInstanceEvents } from '../../../../../core/componentInstance/cmd/create/publishEvents/index.js'
 import { publishEvents as publishStartInstanceEvents } from '../../../../../core/componentInstance/cmd/start/publishEvents/index.js'
@@ -77,7 +77,7 @@ function getCreateInstanceSpec() {
 }
 
 async function registerComponent(component, ctx) {
-  await invokeRoute(ctx, { path: registerPath, data: component })
+  await invokeRoute(ctx, { path: registerPath, data: { component, agentID: 'test-agent' } })
 }
 
 async function createInstance(ctx, scope) {

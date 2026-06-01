@@ -5,8 +5,9 @@ import { LIFECYCLE_WAIT_FOR_PROPERTY } from '../../../../componentInstance/cmd/d
 
 export async function attachImportWaitFor({
   rootCtx: { g, dataMapper },
-  scope: { handlerDiagnostics, component, dependencyList, componentVID },
+  scope: { handlerDiagnostics, component, dependencyList, componentVID, componentAlreadyRegistered },
 }) {
+  if (componentAlreadyRegistered) return
   const { name: compName, hash, imports = [] } = component ?? {}
   if (!imports.length) return
 

@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { parseDependencyPath } from '../../../../../../../core/component/cmd/register/handler/dependencyPath.js'
+import { parseDependencyPath } from '../../../../../../../core/componentAgent/cmd/registerComponent/handler/dependencyPath.js'
 import { createHandlerDiagnostics, makeDiagnosticsInstance } from '../helpers.mjs'
 
 test('dependency paths support import lifecycle.done references for waitFor', () => {

@@ -3,8 +3,9 @@ import { domain } from '@liquid-bricks/spec-domain/domain'
 
 export async function attachComponentImports({
   rootCtx: { g, dataMapper },
-  scope: { handlerDiagnostics, component, componentVID },
+  scope: { handlerDiagnostics, component, componentVID, componentAlreadyRegistered },
 }) {
+  if (componentAlreadyRegistered) return
   const { hash, name: compName, imports = [] } = component
 
   const uniqueImportNamesSet = new Set()

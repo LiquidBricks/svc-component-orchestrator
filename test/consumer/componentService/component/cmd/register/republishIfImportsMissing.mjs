@@ -20,9 +20,9 @@ test('republishIfImportsMissing republishes and aborts when an import is missing
     const handlerDiagnostics = createHandlerDiagnostics(diagnostics, { component })
     const abortCtl = { aborted: false, payload: null, abort(payload) { this.aborted = true; this.payload = payload } }
     const publishCalls = []
-    const messagePayload = { data: component }
+    const messagePayload = { data: { component, agentID: 'test-agent' } }
     const message = {
-      subject: 'prod.component-service._._.cmd.component.register.v1._',
+      subject: 'prod.component-service._._.cmd.componentAgent.registerComponent.v1._',
       json: () => messagePayload,
     }
     const natsContext = { publish: async (...args) => publishCalls.push(args) }
@@ -58,8 +58,8 @@ test('republishIfImportsMissing rejects missing import name', async () => {
     const handlerDiagnostics = createHandlerDiagnostics(diagnostics, { component })
     const abortCtl = { aborted: false, payload: null, abort(payload) { this.aborted = true; this.payload = payload } }
     const message = {
-      subject: 'prod.component-service._._.cmd.component.register.v1._',
-      json: () => ({ data: component }),
+      subject: 'prod.component-service._._.cmd.componentAgent.registerComponent.v1._',
+      json: () => ({ data: { component, agentID: 'test-agent' } }),
     }
 
     await assert.rejects(
@@ -85,8 +85,8 @@ test('republishIfImportsMissing rejects missing import hash', async () => {
     const handlerDiagnostics = createHandlerDiagnostics(diagnostics, { component })
     const abortCtl = { aborted: false, payload: null, abort(payload) { this.aborted = true; this.payload = payload } }
     const message = {
-      subject: 'prod.component-service._._.cmd.component.register.v1._',
-      json: () => ({ data: component }),
+      subject: 'prod.component-service._._.cmd.componentAgent.registerComponent.v1._',
+      json: () => ({ data: { component, agentID: 'test-agent' } }),
     }
 
     await assert.rejects(
@@ -114,9 +114,9 @@ test('republishIfImportsMissing no-ops when imports already registered', async (
     const handlerDiagnostics = createHandlerDiagnostics(diagnostics, { component })
     const abortCtl = { aborted: false, payload: null, abort(payload) { this.aborted = true; this.payload = payload } }
     const publishCalls = []
-    const messagePayload = { data: component }
+    const messagePayload = { data: { component, agentID: 'test-agent' } }
     const message = {
-      subject: 'prod.component-service._._.cmd.component.register.v1._',
+      subject: 'prod.component-service._._.cmd.componentAgent.registerComponent.v1._',
       json: () => messagePayload,
     }
     const natsContext = { publish: async (...args) => publishCalls.push(args) }

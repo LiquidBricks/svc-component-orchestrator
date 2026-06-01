@@ -76,8 +76,9 @@ function validateDataPayload(diagnostics, dataItem) {
 
 export async function buildDependencyList({
   rootCtx: { dataMapper },
-  scope: { handlerDiagnostics, component, componentVID },
+  scope: { handlerDiagnostics, component, componentVID, componentAlreadyRegistered },
 }) {
+  if (componentAlreadyRegistered) return
   const { data = [], tasks = [] } = component
   const dependencyList = new Map()
 

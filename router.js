@@ -1,6 +1,7 @@
 import router from "@liquid-bricks/lib-nats-subject/router";
 import { Errors } from "./errors.js";
 import * as component from './core/component/index.js'
+import * as componentAgent from './core/componentAgent/index.js'
 import * as componentInstance from './core/componentInstance/index.js'
 import * as data from './core/data/index.js'
 import * as gate from './core/gate/index.js'
@@ -37,7 +38,8 @@ export function createComponentServiceRouter({
 
       return { handlerDiagnostics }
     })
-    .route(component.cmd.register.path, component.cmd.register.spec)
+    .route(componentAgent.cmd.registerComponent.path, componentAgent.cmd.registerComponent.spec)
+    .route(componentAgent.cmd.register.path, componentAgent.cmd.register.spec)
     .route(component.evt.registerDone.path, component.evt.registerDone.spec)
     .route(componentInstance.cmd.create.path, componentInstance.cmd.create.spec)
     .route(componentInstance.cmd.start.path, componentInstance.cmd.start.spec)

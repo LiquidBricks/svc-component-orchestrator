@@ -6,7 +6,7 @@ import { create as createBasicSubject } from '@liquid-bricks/lib-nats-subject/cr
 import { ulid } from 'ulid'
 
 import { createComponentServiceRouter } from '../../../../../../router.js'
-import { path as registerPath } from '../../../../../../core/component/cmd/register/index.js'
+import { path as registerPath } from '../../../../../../core/componentAgent/cmd/registerComponent/index.js'
 import { STATE_EDGE_LABEL_BY_TYPE, STATE_EDGE_STATUS_BY_TYPE } from '../../../../../../core/componentInstance/evt/computeResultDone/constants.js'
 import { validatePayload } from '../../../../../../core/componentInstance/evt/computeResultDone/validatePayload.js'
 import { componentImports } from '../../../../../../core/componentInstance/cmd/create/loadData/componentImports.js'
@@ -158,7 +158,7 @@ export function createHandlerDiagnostics(diagnostics, scope = {}, message) {
 }
 
 export async function registerComponent(component, ctx) {
-  await invokeRoute(ctx, { path: registerPath, data: component })
+  await invokeRoute(ctx, { path: registerPath, data: { component, agentID: 'test-agent' } })
 }
 
 export async function createInstance(ctx, scope) {

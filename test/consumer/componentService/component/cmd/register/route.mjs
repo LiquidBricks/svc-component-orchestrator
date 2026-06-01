@@ -11,9 +11,9 @@ function makeRegisterSubject() {
   return createBasicSubject()
     .env('prod')
     .ns('component-service')
-    .entity('component')
+    .entity('componentAgent')
     .channel('cmd')
-    .action('register')
+    .action('registerComponent')
     .version('v1')
     .build()
 }
@@ -36,7 +36,7 @@ test('register route executes decode/pre/handler/post and publishes component re
       .toJSON()
     const publishCalls = []
     const subject = makeRegisterSubject()
-    const message = createRouteMessage({ subject, data: component })
+    const message = createRouteMessage({ subject, data: { component, agentID: 'test-agent' } })
     const natsContext = { publish: async (...args) => publishCalls.push(args) }
 
     await registerComponent({ diagnostics, dataMapper, g }, component, { message, natsContext })
@@ -50,10 +50,13 @@ test('register route executes decode/pre/handler/post and publishes component re
       .id()
     assert.ok(componentId, 'component vertex missing')
 
-    assert.equal(publishCalls.length, 1)
+    assert.equal(publishCalls.length, 2)
     const [publishedSubject, payload] = publishCalls[0]
     assert.equal(publishedSubject, makeRegisterDoneSubject())
     assert.deepEqual(JSON.parse(payload), { data: { hash: component.hash } })
+    const [execSubject, execPayload] = publishCalls[1]
+    assert.equal(execSubject, 'prod.component-service._._.exec.componentAgent.cmdRegisterProvidingAgentsComponent.v1.test-agent')
+    assert.deepEqual(JSON.parse(execPayload), { data: { agentID: 'test-agent', hash: component.hash } })
   })
 })
 
@@ -64,7 +67,7 @@ test('register route republishes and aborts when imports are missing', async () 
       .toJSON()
     const publishCalls = []
     const subject = makeRegisterSubject()
-    const message = createRouteMessage({ subject, data: component })
+    const message = createRouteMessage({ subject, data: { component, agentID: 'test-agent' } })
     const natsContext = { publish: async (...args) => publishCalls.push(args) }
 
     const { scope } = await registerComponent({ diagnostics, dataMapper, g }, component, { message, natsContext })
@@ -82,7 +85,7 @@ test('register route republishes and aborts when imports are missing', async () 
     assert.equal(publishCalls.length, 1)
     const [publishedSubject, payload] = publishCalls[0]
     assert.equal(publishedSubject, subject)
-    assert.deepEqual(JSON.parse(payload), { data: component })
+    assert.deepEqual(JSON.parse(payload), { data: { component, agentID: 'test-agent' } })
   })
 })
 
@@ -93,7 +96,7 @@ test('register route republishes and aborts when gates are missing', async () =>
       .toJSON()
     const publishCalls = []
     const subject = makeRegisterSubject()
-    const message = createRouteMessage({ subject, data: component })
+    const message = createRouteMessage({ subject, data: { component, agentID: 'test-agent' } })
     const natsContext = { publish: async (...args) => publishCalls.push(args) }
 
     const { scope } = await registerComponent({ diagnostics, dataMapper, g }, component, { message, natsContext })
@@ -111,18 +114,18 @@ test('register route republishes and aborts when gates are missing', async () =>
     assert.equal(publishCalls.length, 1)
     const [publishedSubject, payload] = publishCalls[0]
     assert.equal(publishedSubject, subject)
-    assert.deepEqual(JSON.parse(payload), { data: component })
+    assert.deepEqual(JSON.parse(payload), { data: { component, agentID: 'test-agent' } })
   })
 })
 
-test('register route aborts without publishing when component already exists', async () => {
+test('register route attaches provider when component already exists', async () => {
   await withGraphContext(async ({ diagnostics, dataMapper, g }) => {
     const component = componentBuilder('RegisterRouteExisting')
       .task('setup', {})
       .toJSON()
     const publishCalls = []
     const subject = makeRegisterSubject()
-    const message = createRouteMessage({ subject, data: component })
+    const message = createRouteMessage({ subject, data: { component, agentID: 'test-agent' } })
     const natsContext = { publish: async (...args) => publishCalls.push(args) }
 
     await dataMapper.vertex.component.create({ hash: component.hash, name: component.name })
@@ -130,7 +133,7 @@ test('register route aborts without publishing when component already exists', a
     const { scope } = await registerComponent({ diagnostics, dataMapper, g }, component, { message, natsContext })
 
     assert.equal(message.acked, true)
-    assert.equal(scope.status, 'aborted')
+    assert.equal(scope.componentAlreadyRegistered, true)
 
     const componentIds = await g
       .V()
@@ -138,6 +141,13 @@ test('register route aborts without publishing when component already exists', a
       .has('hash', component.hash)
       .id()
     assert.equal(componentIds.length, 1)
-    assert.deepEqual(publishCalls, [])
+
+    const [providedComponentId] = await g
+      .V(scope.componentAgentVID)
+      .out('domain.edge.provides_component.componentAgent__component')
+      .has('hash', component.hash)
+      .id()
+    assert.equal(providedComponentId, componentIds[0])
+    assert.equal(publishCalls.length, 2)
   })
 })

@@ -3,8 +3,9 @@ import { parseDependencyPath, resolveDependencyTargetId, validateAgentFnDependen
 
 export async function linkDataTaskDependencies({
   rootCtx: { g, dataMapper },
-  scope: { handlerDiagnostics, dependencyList, componentVID, component },
+  scope: { handlerDiagnostics, dependencyList, componentVID, component, componentAlreadyRegistered },
 }) {
+  if (componentAlreadyRegistered) return
   const { name: compName, hash, agentFns = [] } = component
   const edgeCreators = {
     dependency: {

@@ -9,8 +9,9 @@ function ensureArray(value) {
 
 async function attachComponentGatesHandler({
   rootCtx: { g, dataMapper },
-  scope: { handlerDiagnostics, component, dependencyList, componentVID },
+  scope: { handlerDiagnostics, component, dependencyList, componentVID, componentAlreadyRegistered },
 }) {
+  if (componentAlreadyRegistered) return
   const { name: compName, hash, gates = [], agentFns = [] } = component ?? {}
   if (!gates?.length) return
 

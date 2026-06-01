@@ -6,11 +6,11 @@ import { skipIfExists } from './skipIfExists.js'
 import { publishEvents } from './publishEvents/index.js'
 import { validatePayload } from './validatePayload/index.js'
 
-export const path = { channel: 'cmd', entity: 'component', action: 'register' }
+export const path = { channel: 'cmd', entity: 'componentAgent', action: 'registerComponent' }
 
 export const spec = {
   decode: [
-    decodeData('component'),
+    decodeData(['component', 'agentID']),
     validatePayload,
   ],
   pre: [

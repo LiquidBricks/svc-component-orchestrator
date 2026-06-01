@@ -1,4 +1,6 @@
 import { createComponentVertex } from './createComponentVertex.js'
+import { ensureComponentAgentVertex } from './ensureComponentAgentVertex.js'
+import { attachProvidingAgentsComponent } from './attachProvidingAgentsComponent.js'
 import { attachComponentAgentFns } from './attachComponentAgentFns.js'
 import { attachComponentImports } from './attachComponentImports.js'
 import { buildDependencyList } from './buildDependencyList.js'
@@ -10,6 +12,8 @@ import { attachComponentGates } from './attachComponentGates.js'
 
 export const handler = [
   createComponentVertex,
+  ensureComponentAgentVertex,
+  attachProvidingAgentsComponent,
   attachComponentAgentFns,
   attachComponentImports,
   buildDependencyList,

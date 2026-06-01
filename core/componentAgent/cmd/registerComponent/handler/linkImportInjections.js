@@ -179,8 +179,9 @@ function createEdgeFactory({ g, dataMapper }) {
 
 export async function linkImportInjections({
   rootCtx: { g, dataMapper },
-  scope: { handlerDiagnostics, dependencyList, componentVID, component },
+  scope: { handlerDiagnostics, dependencyList, componentVID, component, componentAlreadyRegistered },
 }) {
+  if (componentAlreadyRegistered) return
   const { name: compName, hash } = component
   const imports = component?.imports ?? []
   const gates = component?.gates ?? []

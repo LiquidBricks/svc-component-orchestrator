@@ -6,7 +6,7 @@ import { diagnostics as makeDiagnostics } from '@liquid-bricks/lib-diagnostics'
 import { ulid } from 'ulid'
 
 import { createComponentServiceRouter } from '../../../../../../router.js'
-import { path as registerPath } from '../../../../../../core/component/cmd/register/index.js'
+import { path as registerPath } from '../../../../../../core/componentAgent/cmd/registerComponent/index.js'
 import { dataMapper as createDataMapper, domain } from '@liquid-bricks/spec-domain/domain'
 import { serviceConfiguration } from '../../../../../provider/serviceConfiguration/dotenv/index.js'
 import { createRouteMessage, invokeRoute } from '../../../../../util/invokeRoute.js'
@@ -61,8 +61,8 @@ export function getRegisterSpec() {
   })
   const route = router.routes.find(({ values }) =>
     values.channel === 'cmd'
-    && values.entity === 'component'
-    && values.action === 'register'
+    && values.entity === 'componentAgent'
+    && values.action === 'registerComponent'
   )
   assert.ok(route, 'register route not found')
   return route.config
@@ -88,12 +88,12 @@ export async function registerHandlerComponent(context, component) {
   const handlerDiagnostics = createHandlerDiagnostics(diagnostics, { component })
   return invokeHandlerList(registerSpec.handler, {
     rootCtx: { diagnostics, dataMapper, g },
-    scope: { handlerDiagnostics, component },
+    scope: { handlerDiagnostics, component, agentID: 'test-agent' },
   })
 }
 
 export async function registerComponent(context, component, options = {}) {
-  return invokeRoute(context, { path: registerPath, data: component, ...options })
+  return invokeRoute(context, { path: registerPath, data: { component, agentID: options.agentID ?? 'test-agent' }, ...options })
 }
 
 export { domain }

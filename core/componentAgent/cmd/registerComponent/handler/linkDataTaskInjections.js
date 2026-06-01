@@ -143,8 +143,9 @@ async function resolveInjectionTargetId({
 
 export async function linkDataTaskInjections({
   rootCtx: { g, dataMapper },
-  scope: { handlerDiagnostics, dependencyList, componentVID, component },
+  scope: { handlerDiagnostics, dependencyList, componentVID, component, componentAlreadyRegistered },
 }) {
+  if (componentAlreadyRegistered) return
   const { name: compName, hash } = component
   for (const [dependencyRef, { id, inject = [] }] of dependencyList.entries()) {
     const [dependencyType, dependencyName] = dependencyRef.split('.')
