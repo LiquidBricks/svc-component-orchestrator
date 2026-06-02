@@ -1,31 +1,23 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-
 import { create as createBasicSubject } from '@liquid-bricks/lib-nats-subject/create/basic'
 import { component as componentBuilder } from '@liquid-bricks/lib-component-builder'
 
 import { createRouteMessage } from '../../../../../util/invokeRoute.js'
 import { domain, registerComponent, withGraphContext } from './helpers.mjs'
 
+import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
+
+
 function makeRegisterSubject() {
-  return createBasicSubject()
+  return createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentAgent.registerComponent.v1['*'])
     .env('prod')
-    .ns('component-service')
-    .entity('componentAgent')
-    .channel('cmd')
-    .action('registerComponent')
-    .version('v1')
     .build()
 }
 
 function makeRegisterDoneSubject() {
-  return createBasicSubject()
+  return createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.component.registerDone.v1['*'])
     .env('prod')
-    .ns('component-service')
-    .entity('component')
-    .channel('evt')
-    .action('registerDone')
-    .version('v1')
     .build()
 }
 

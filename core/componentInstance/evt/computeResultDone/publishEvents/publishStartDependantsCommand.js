@@ -2,6 +2,9 @@ import { create as createBasicSubject } from '@liquid-bricks/lib-nats-subject/cr
 import { domain } from '@liquid-bricks/spec-domain/domain'
 import { hasInstanceStarted } from '../../../cmd/dependencyUtils.js'
 
+import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
+
+
 export async function publishStartDependantsCommand({
   scope: { instanceId, instanceVertexId, stateEdgeId, type },
   rootCtx: { natsContext, g },
@@ -18,13 +21,8 @@ export async function publishStartDependantsCommand({
     }
   }
 
-  const subject = createBasicSubject()
+  const subject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start_dependants.v1['*'])
     .env('prod')
-    .ns('component-service')
-    .entity('componentInstance')
-    .channel('cmd')
-    .action('start_dependants')
-    .version('v1')
 
   await natsContext.publish(
     subject.build(),

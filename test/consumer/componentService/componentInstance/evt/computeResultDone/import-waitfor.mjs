@@ -1,6 +1,5 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-
 import { component as componentBuilder } from '@liquid-bricks/lib-component-builder'
 
 import {
@@ -23,6 +22,9 @@ import {
   STATE_EDGE_STATUS_BY_TYPE,
 } from './helpers.mjs'
 import { handler as startImportHandler } from '../../../../../../core/import/cmd/start/handler.js'
+
+import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
+
 
 test('import start preserves injected data when waitFor delays the import', async () => {
   await withGraphContext(async ({ diagnostics, dataMapper, g }) => {
@@ -70,45 +72,20 @@ test('import start preserves injected data when waitFor delays the import', asyn
     assert.ok(targetDataStateEdgeId, 'target data state edge missing')
     assert.ok(gateStateEdgeId, 'gate state edge missing')
 
-    const rootStartSubject = createBasicSubject()
+    const rootStartSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start.v1['*'])
       .env('prod')
-      .ns('component-service')
-      .entity('componentInstance')
-      .channel('cmd')
-      .action('start')
-      .version('v1')
       .build()
-    const importStartSubject = createBasicSubject()
+    const importStartSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.import.start.v1['*'])
       .env('prod')
-      .ns('component-service')
-      .entity('import')
-      .channel('cmd')
-      .action('start')
-      .version('v1')
       .build()
-    const computeResultDoneSubject = createBasicSubject()
+    const computeResultDoneSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.computeResultDone.v1['*'])
       .env('prod')
-      .ns('component-service')
-      .entity('componentInstance')
-      .channel('evt')
-      .action('computeResultDone')
-      .version('v1')
       .build()
-    const startDependantsSubject = createBasicSubject()
+    const startDependantsSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start_dependants.v1['*'])
       .env('prod')
-      .ns('component-service')
-      .entity('componentInstance')
-      .channel('cmd')
-      .action('start_dependants')
-      .version('v1')
       .build()
-    const startDataSubject = createBasicSubject()
+    const startDataSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.data.start.v1['*'])
       .env('prod')
-      .ns('component-service')
-      .entity('data')
-      .channel('cmd')
-      .action('start')
-      .version('v1')
       .build()
 
     const rootStartPublishes = []

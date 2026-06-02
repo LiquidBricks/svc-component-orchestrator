@@ -1,6 +1,5 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-
 import { component as componentBuilder } from '@liquid-bricks/lib-component-builder'
 
 import { componentGates } from '../../../../../../core/componentInstance/cmd/create/loadData/componentGates.js'
@@ -19,6 +18,9 @@ import {
   computeResultDoneSpec,
   domain,
 } from './helpers.mjs'
+
+import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
+
 
 async function loadGates({ g, componentId }) {
   const { gates = [] } = await componentGates({ rootCtx: { g }, scope: { componentId } })
@@ -58,13 +60,8 @@ test('computeResultDone with gate=true publishes start for gated instance', asyn
     const gateInstanceId = await getGateInstanceId({ g, rootInstanceVertexId, alias: 'setup' })
     assert.ok(gateInstanceId, 'gated instance id missing')
 
-    const computeResultDoneSubject = createBasicSubject()
+    const computeResultDoneSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.computeResultDone.v1['*'])
       .env('prod')
-      .ns('component-service')
-      .entity('componentInstance')
-      .channel('evt')
-      .action('computeResultDone')
-      .version('v1')
       .build()
 
     const published = []
@@ -92,13 +89,8 @@ test('computeResultDone with gate=true publishes start for gated instance', asyn
     })
     assert.equal(acked, true)
 
-    const startSubject = createBasicSubject()
+    const startSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start.v1['*'])
       .env('prod')
-      .ns('component-service')
-      .entity('componentInstance')
-      .channel('cmd')
-      .action('start')
-      .version('v1')
       .build()
     const startEvents = published.filter(({ subject }) => subject === startSubject)
     assert.equal(startEvents.length, 1)
@@ -140,22 +132,12 @@ test('computeResultDone does not publish start_dependants for unstarted gated in
     const gatedInstanceStarted = await hasInstanceStarted({ g, instanceVertexId: gatedInstanceVertexId })
     assert.equal(gatedInstanceStarted, false)
 
-    const computeResultDoneSubject = createBasicSubject()
+    const computeResultDoneSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.computeResultDone.v1['*'])
       .env('prod')
-      .ns('component-service')
-      .entity('componentInstance')
-      .channel('evt')
-      .action('computeResultDone')
-      .version('v1')
       .build()
 
-    const startDependantsSubject = createBasicSubject()
+    const startDependantsSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start_dependants.v1['*'])
       .env('prod')
-      .ns('component-service')
-      .entity('componentInstance')
-      .channel('cmd')
-      .action('start_dependants')
-      .version('v1')
       .build()
 
     const firstRunPublished = []
@@ -229,13 +211,8 @@ test('computeResultDone with gate=false does not publish gated instance start', 
       { componentHash: rootComponent.hash, componentId: rootComponentId, instanceId: rootInstanceId, imports, gates },
     )
 
-    const computeResultDoneSubject = createBasicSubject()
+    const computeResultDoneSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.computeResultDone.v1['*'])
       .env('prod')
-      .ns('component-service')
-      .entity('componentInstance')
-      .channel('evt')
-      .action('computeResultDone')
-      .version('v1')
       .build()
 
     const published = []
@@ -263,13 +240,8 @@ test('computeResultDone with gate=false does not publish gated instance start', 
     })
     assert.equal(acked, true)
 
-    const startSubject = createBasicSubject()
+    const startSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start.v1['*'])
       .env('prod')
-      .ns('component-service')
-      .entity('componentInstance')
-      .channel('cmd')
-      .action('start')
-      .version('v1')
       .build()
     const startEvents = published.filter(({ subject }) => subject === startSubject)
     assert.equal(startEvents.length, 0)
@@ -324,13 +296,8 @@ test('computeResultDone routes gate inject targets by alias when multiple gates 
     assert.ok(gateInstanceByAlias.simpleCompFalseGate, 'simpleCompFalseGate instance missing')
     assert.ok(gateInstanceByAlias.simpleCompThirdGate, 'simpleCompThirdGate instance missing')
 
-    const computeResultDoneSubject = createBasicSubject()
+    const computeResultDoneSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.computeResultDone.v1['*'])
       .env('prod')
-      .ns('component-service')
-      .entity('componentInstance')
-      .channel('evt')
-      .action('computeResultDone')
-      .version('v1')
       .build()
 
     const cases = [
@@ -413,13 +380,8 @@ test('computeResultDone routes identifier->gate inject to the same pod instance 
 
     const { instanceVertexId: rootInstanceVertexId } = await getStateMachineId({ g, instanceId: rootInstanceId })
 
-    const computeResultDoneSubject = createBasicSubject()
+    const computeResultDoneSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.computeResultDone.v1['*'])
       .env('prod')
-      .ns('component-service')
-      .entity('componentInstance')
-      .channel('evt')
-      .action('computeResultDone')
-      .version('v1')
       .build()
 
     const aliases = ['left', 'right']

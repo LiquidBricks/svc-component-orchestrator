@@ -1,24 +1,28 @@
 import { create as createBasicSubject } from '@liquid-bricks/lib-nats-subject/create/basic'
 
+import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
+
+
 export async function publishStartCommands({ rootCtx: { natsContext }, scope: {
   starters } }) {
 
   for (const { dataStateIds, taskStateIds, importInstanceIds = [], gateStartRequests = [], instanceId } of starters) {
 
     const publishList = [
-      { stateIds: dataStateIds, entity: 'data', action: 'start' },
-      { stateIds: taskStateIds, entity: 'task', action: 'start' },
+      {
+        stateIds: dataStateIds,
+        startSubject: createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.data.start.v1['*'])
+          .env('prod'),
+      },
+      {
+        stateIds: taskStateIds,
+        startSubject: createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.task.start.v1['*'])
+          .env('prod'),
+      },
     ]
 
-    for (const { stateIds, entity, action } of publishList) {
+    for (const { stateIds, startSubject } of publishList) {
       if (!stateIds?.length) continue
-      const startSubject = createBasicSubject()
-        .env('prod')
-        .ns('component-service')
-        .entity(entity)
-        .channel('cmd')
-        .action(action)
-        .version('v1')
 
       for (const stateId of stateIds) {
         await natsContext.publish(
@@ -28,13 +32,8 @@ export async function publishStartCommands({ rootCtx: { natsContext }, scope: {
       }
     }
 
-    const importSubject = createBasicSubject()
+    const importSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.import.start.v1['*'])
       .env('prod')
-      .ns('component-service')
-      .entity('import')
-      .channel('cmd')
-      .action('start')
-      .version('v1')
 
     const childInstanceIds = [...new Set(importInstanceIds ?? [])]
     for (const childInstanceId of childInstanceIds) {
@@ -45,13 +44,8 @@ export async function publishStartCommands({ rootCtx: { natsContext }, scope: {
       )
     }
 
-    const gateSubject = createBasicSubject()
+    const gateSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].exec.component.compute_result.v1['*'])
       .env('prod')
-      .ns('component-service')
-      .entity('component')
-      .channel('exec')
-      .action('compute_result')
-      .version('v1')
 
     const normalizedGates = (gateStartRequests ?? [])
       .filter(Boolean)

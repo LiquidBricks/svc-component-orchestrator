@@ -1,5 +1,8 @@
 import { create as createBasicSubject } from '@liquid-bricks/lib-nats-subject/create/basic'
 
+import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
+
+
 export async function startImports({
   scope: { instanceId: parentInstanceId, usesImportInstances = [] },
   rootCtx: { natsContext },
@@ -10,13 +13,8 @@ export async function startImports({
     .map((entry) => (typeof entry === 'string' ? { instanceId: entry } : entry))
     .filter(Boolean)
 
-  const subject = createBasicSubject()
+  const subject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.import.start.v1['*'])
     .env('prod')
-    .ns('component-service')
-    .entity('import')
-    .channel('cmd')
-    .action('start')
-    .version('v1')
   for (const { instanceId: importedInstanceId } of normalizedImports) {
     if (!importedInstanceId || started.has(importedInstanceId)) continue
     started.add(importedInstanceId)

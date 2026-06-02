@@ -10,6 +10,9 @@ import {
   vertexLabelToType,
 } from '../../../componentInstance/cmd/dependencyUtils.js'
 
+import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
+
+
 function pickFirst(values) {
   return Array.isArray(values) ? values[0] : values
 }
@@ -137,13 +140,8 @@ async function publishGateComputeRequest({
   name,
   deps,
 }) {
-  const subject = createBasicSubject()
+  const subject = createBasicSubject(natsEvents['*'].component_service['*']['*'].exec.component.compute_result.v1['*'])
     .env('prod')
-    .ns('component-service')
-    .entity('component')
-    .channel('exec')
-    .action('compute_result')
-    .version('v1')
     .build()
 
   await natsContext.publish(

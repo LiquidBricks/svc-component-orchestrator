@@ -1,6 +1,5 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-
 import { component as componentBuilder } from '@liquid-bricks/lib-component-builder'
 
 import { Graph } from '@liquid-bricks/lib-nats-graph/graph'
@@ -18,6 +17,9 @@ import { componentImports } from '../../../../../core/componentInstance/cmd/crea
 import { componentGates } from '../../../../../core/componentInstance/cmd/create/loadData/componentGates.js'
 import { serviceConfiguration } from '../../../../provider/serviceConfiguration/dotenv/index.js'
 import { invokeRoute } from '../../../../util/invokeRoute.js'
+
+import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
+
 
 const { NATS_IP_ADDRESS } = serviceConfiguration()
 assert.ok(NATS_IP_ADDRESS, 'NATS_IP_ADDRESS missing; set in .env or .env.local')
@@ -118,7 +120,6 @@ test('handler creates componentInstance stateMachine and links data/task states'
       .toJSON()
 
     await registerComponent(component, { diagnostics, dataMapper, g })
-
 
     const [componentId] = await g
       .V()
@@ -457,13 +458,8 @@ test('publishEvents does not start imported componentInstances after creation', 
 
     await publishCreateInstanceEvents({ rootCtx: { natsContext }, scope })
 
-    const createSubject = createBasicSubject()
+    const createSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.createDone.v1['*'])
       .env('prod')
-      .ns('component-service')
-      .entity('componentInstance')
-      .channel('evt')
-      .action('createDone')
-      .version('v1')
       .build()
 
     const createEvents = published.filter(({ subject }) => subject === createSubject)
@@ -518,21 +514,11 @@ test('start publishes start commands for imported componentInstances', async () 
       },
     })
 
-    const startImportSubject = createBasicSubject()
+    const startImportSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.import.start.v1['*'])
       .env('prod')
-      .ns('component-service')
-      .entity('import')
-      .channel('cmd')
-      .action('start')
-      .version('v1')
       .build()
-    const startDoneSubject = createBasicSubject()
+    const startDoneSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.startDone.v1['*'])
       .env('prod')
-      .ns('component-service')
-      .entity('componentInstance')
-      .channel('evt')
-      .action('startDone')
-      .version('v1')
       .build()
 
     const startCommands = published.filter(({ subject }) => subject === startImportSubject)

@@ -1,6 +1,5 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-
 import { component as componentBuilder } from '@liquid-bricks/lib-component-builder'
 
 import { Graph } from '@liquid-bricks/lib-nats-graph/graph'
@@ -23,6 +22,9 @@ import { componentGates } from '../../../../../core/componentInstance/cmd/create
 import { handler as startGateHandler } from '../../../../../core/gate/cmd/start/handler.js'
 import { serviceConfiguration } from '../../../../provider/serviceConfiguration/dotenv/index.js'
 import { invokeRoute } from '../../../../util/invokeRoute.js'
+
+import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
+
 
 const { NATS_IP_ADDRESS } = serviceConfiguration()
 assert.ok(NATS_IP_ADDRESS, 'NATS_IP_ADDRESS missing; set in .env or .env.local')
@@ -289,37 +291,17 @@ test('publishEvents starts dependency-free states, imports, and emits startDone'
     scope: { instanceId, dataStateIds, taskStateIds, usesImportInstances: importInstances },
   })
 
-  const startDataSubject = createBasicSubject()
+  const startDataSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.data.start.v1['*'])
     .env('prod')
-    .ns('component-service')
-    .entity('data')
-    .channel('cmd')
-    .action('start')
-    .version('v1')
     .build()
-  const startTaskSubject = createBasicSubject()
+  const startTaskSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.task.start.v1['*'])
     .env('prod')
-    .ns('component-service')
-    .entity('task')
-    .channel('cmd')
-    .action('start')
-    .version('v1')
     .build()
-  const startImportSubject = createBasicSubject()
+  const startImportSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.import.start.v1['*'])
     .env('prod')
-    .ns('component-service')
-    .entity('import')
-    .channel('cmd')
-    .action('start')
-    .version('v1')
     .build()
-  const startDoneSubject = createBasicSubject()
+  const startDoneSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.startDone.v1['*'])
     .env('prod')
-    .ns('component-service')
-    .entity('componentInstance')
-    .channel('evt')
-    .action('startDone')
-    .version('v1')
     .build()
 
   const startDataEvents = published.filter(({ subject }) => subject === startDataSubject)
@@ -394,29 +376,14 @@ test('publishEvents dispatches gate start command and gate handler emits compute
       },
     })
 
-    const gateStartSubject = createBasicSubject()
+    const gateStartSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.gate.start.v1['*'])
       .env('prod')
-      .ns('component-service')
-      .entity('gate')
-      .channel('cmd')
-      .action('start')
-      .version('v1')
       .build()
-    const gateExecSubject = createBasicSubject()
+    const gateExecSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].exec.component.compute_result.v1['*'])
       .env('prod')
-      .ns('component-service')
-      .entity('component')
-      .channel('exec')
-      .action('compute_result')
-      .version('v1')
       .build()
-    const startInstanceSubject = createBasicSubject()
+    const startInstanceSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start.v1['*'])
       .env('prod')
-      .ns('component-service')
-      .entity('componentInstance')
-      .channel('cmd')
-      .action('start')
-      .version('v1')
       .build()
 
     const gateStartEvents = published.filter(({ subject }) => subject === gateStartSubject)

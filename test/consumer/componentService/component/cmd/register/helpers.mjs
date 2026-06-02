@@ -71,12 +71,13 @@ export function getRegisterSpec() {
 export const registerSpec = getRegisterSpec()
 
 async function invokeHandlerList(handler, { rootCtx, scope } = {}) {
+  const routes = [[{ stage: 'handler' }, { handler }]]
   const stageRouter = router({
     tokens: ['stage'],
     context: rootCtx,
   })
     .before(() => ({ ...(scope ?? {}) }))
-    .route({ stage: 'handler' }, { handler })
+    .route({}, { children: routes })
 
   const message = createRouteMessage({ subject: 'handler' })
   const { scope: resultScope } = await stageRouter.request({ subject: 'handler', message })

@@ -9,6 +9,23 @@ import * as importEntity from './core/import/index.js'
 import * as task from './core/task/index.js'
 import { dataMapper as createDataMapper } from '@liquid-bricks/spec-domain/domain'
 
+export const routes = [
+  [componentAgent.cmd.registerComponent.path, componentAgent.cmd.registerComponent.spec],
+  [componentAgent.cmd.register.path, componentAgent.cmd.register.spec],
+  [component.evt.registerDone.path, component.evt.registerDone.spec],
+  [componentInstance.cmd.create.path, componentInstance.cmd.create.spec],
+  [componentInstance.cmd.start.path, componentInstance.cmd.start.spec],
+  [componentInstance.cmd.start_dependants.path, componentInstance.cmd.start_dependants.spec],
+  [data.cmd.start.path, data.cmd.start.spec],
+  [gate.cmd.start.path, gate.cmd.start.spec],
+  [importEntity.cmd.start.path, importEntity.cmd.start.spec],
+  [task.cmd.start.path, task.cmd.start.spec],
+  [componentInstance.evt.createDone.path, componentInstance.evt.createDone.spec],
+  [componentInstance.evt.computeResultDone.path, componentInstance.evt.computeResultDone.spec],
+  [componentInstance.evt.state_machine_completed.path, componentInstance.evt.state_machine_completed.spec],
+  [componentInstance.evt.startDone.path, componentInstance.evt.startDone.spec],
+]
+
 export function createComponentServiceRouter({
   natsContext,
   g,
@@ -38,20 +55,7 @@ export function createComponentServiceRouter({
 
       return { handlerDiagnostics }
     })
-    .route(componentAgent.cmd.registerComponent.path, componentAgent.cmd.registerComponent.spec)
-    .route(componentAgent.cmd.register.path, componentAgent.cmd.register.spec)
-    .route(component.evt.registerDone.path, component.evt.registerDone.spec)
-    .route(componentInstance.cmd.create.path, componentInstance.cmd.create.spec)
-    .route(componentInstance.cmd.start.path, componentInstance.cmd.start.spec)
-    .route(componentInstance.cmd.start_dependants.path, componentInstance.cmd.start_dependants.spec)
-    .route(data.cmd.start.path, data.cmd.start.spec)
-    .route(gate.cmd.start.path, gate.cmd.start.spec)
-    .route(importEntity.cmd.start.path, importEntity.cmd.start.spec)
-    .route(task.cmd.start.path, task.cmd.start.spec)
-    .route(componentInstance.evt.createDone.path, componentInstance.evt.createDone.spec)
-    .route(componentInstance.evt.computeResultDone.path, componentInstance.evt.computeResultDone.spec)
-    .route(componentInstance.evt.state_machine_completed.path, componentInstance.evt.state_machine_completed.spec)
-    .route(componentInstance.evt.startDone.path, componentInstance.evt.startDone.spec)
+    .route({}, { children: routes })
     .default({
       handler: async ({ message, rootCtx: { diagnostics } }) => {
         diagnostics.invariant(

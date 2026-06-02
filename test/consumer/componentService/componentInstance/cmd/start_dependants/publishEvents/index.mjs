@@ -1,9 +1,11 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-
 import { create as createBasicSubject } from '@liquid-bricks/lib-nats-subject/create/basic'
 
 import { publishEvents } from '../../../../../../../core/componentInstance/cmd/start_dependants/publishEvents/index.js'
+
+import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
+
 
 test('publishEvents publishes start commands for dependant states', async () => {
   const published = []
@@ -24,21 +26,11 @@ test('publishEvents publishes start commands for dependant states', async () => 
     },
   })
 
-  const dataSubject = createBasicSubject()
+  const dataSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.data.start.v1['*'])
     .env('prod')
-    .ns('component-service')
-    .entity('data')
-    .channel('cmd')
-    .action('start')
-    .version('v1')
     .build()
-  const taskSubject = createBasicSubject()
+  const taskSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.task.start.v1['*'])
     .env('prod')
-    .ns('component-service')
-    .entity('task')
-    .channel('cmd')
-    .action('start')
-    .version('v1')
     .build()
 
   const dataEvents = published.filter(({ subject }) => subject === dataSubject)
@@ -74,13 +66,8 @@ test('publishEvents publishes import start commands with parent instance context
     },
   })
 
-  const startImportSubject = createBasicSubject()
+  const startImportSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.import.start.v1['*'])
     .env('prod')
-    .ns('component-service')
-    .entity('import')
-    .channel('cmd')
-    .action('start')
-    .version('v1')
     .build()
 
   const importEvents = published.filter(({ subject }) => subject === startImportSubject)
@@ -119,21 +106,11 @@ test('publishEvents dispatches gate compute_result requests to component executi
     },
   })
 
-  const gateSubject = createBasicSubject()
+  const gateSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].exec.component.compute_result.v1['*'])
     .env('prod')
-    .ns('component-service')
-    .entity('component')
-    .channel('exec')
-    .action('compute_result')
-    .version('v1')
     .build()
-  const startInstanceSubject = createBasicSubject()
+  const startInstanceSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start.v1['*'])
     .env('prod')
-    .ns('component-service')
-    .entity('componentInstance')
-    .channel('cmd')
-    .action('start')
-    .version('v1')
     .build()
 
   const gateEvents = published.filter(({ subject }) => subject === gateSubject)

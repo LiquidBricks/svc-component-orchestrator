@@ -1,6 +1,5 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-
 import { component as componentBuilder } from '@liquid-bricks/lib-component-builder'
 
 import {
@@ -20,6 +19,9 @@ import {
   validatePayload,
   domain,
 } from './helpers.mjs'
+
+import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
+
 
 test('computeResultDone stores state result, marks status provided, and publishes start_dependants', async () => {
   await withGraphContext(async ({ diagnostics, dataMapper, g }) => {
@@ -49,13 +51,8 @@ test('computeResultDone stores state result, marks status provided, and publishe
     const published = []
     let acked = false
     const message = {
-      subject: createBasicSubject()
+      subject: createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.computeResultDone.v1['*'])
         .env('prod')
-        .ns('component-service')
-        .entity('componentInstance')
-        .channel('evt')
-        .action('computeResultDone')
-        .version('v1')
         .build(),
       ack: () => { acked = true },
       json: () => ({
@@ -84,21 +81,11 @@ test('computeResultDone stores state result, marks status provided, and publishe
     assert.equal(pickFirst(updatedValues.result), JSON.stringify({ count: 2 }))
     assert.notEqual(pickFirst(updatedValues.updatedAt), initialUpdatedAt)
 
-    const startDependantsSubject = createBasicSubject()
+    const startDependantsSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start_dependants.v1['*'])
       .env('prod')
-      .ns('component-service')
-      .entity('componentInstance')
-      .channel('cmd')
-      .action('start_dependants')
-      .version('v1')
       .build()
-    const completionSubject = createBasicSubject()
+    const completionSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.state_machine_completed.v1['*'])
       .env('prod')
-      .ns('component-service')
-      .entity('componentInstance')
-      .channel('evt')
-      .action('state_machine_completed')
-      .version('v1')
       .build()
 
     const startDependantsEvents = published.filter(p => p.subject === startDependantsSubject)

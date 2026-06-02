@@ -7,6 +7,9 @@ import {
   normalizeLifecycleWaitForValues,
 } from '../../../componentInstance/cmd/dependencyUtils.js'
 
+import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
+
+
 function normalizeWaitForValues(waitForValues = []) {
   const raw = Array.isArray(waitForValues) && waitForValues.length === 1 ? waitForValues[0] : waitForValues
   const list = Array.isArray(raw)
@@ -152,13 +155,8 @@ export async function handler({ rootCtx: { natsContext, g }, scope: { instanceId
   }
   if (!readyToStart) return
 
-  const subject = createBasicSubject()
+  const subject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start.v1['*'])
     .env('prod')
-    .ns('component-service')
-    .entity('componentInstance')
-    .channel('cmd')
-    .action('start')
-    .version('v1')
 
   await natsContext.publish(
     subject.build(),

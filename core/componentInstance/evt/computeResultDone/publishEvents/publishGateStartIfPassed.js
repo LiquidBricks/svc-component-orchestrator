@@ -2,6 +2,9 @@ import { create as createBasicSubject } from '@liquid-bricks/lib-nats-subject/cr
 import { domain } from '@liquid-bricks/spec-domain/domain'
 import { hasInstanceStarted } from '../../../cmd/dependencyUtils.js'
 
+import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
+
+
 function pickFirst(values) {
   return Array.isArray(values) ? values[0] : values
 }
@@ -28,13 +31,8 @@ export async function publishGateStartIfPassed({
   const gateInstanceId = pickFirst(instanceValues?.instanceId ?? instanceValues)
   if (!gateInstanceId) return
 
-  const subject = createBasicSubject()
+  const subject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start.v1['*'])
     .env('prod')
-    .ns('component-service')
-    .entity('componentInstance')
-    .channel('cmd')
-    .action('start')
-    .version('v1')
     .build()
 
   await natsContext.publish(

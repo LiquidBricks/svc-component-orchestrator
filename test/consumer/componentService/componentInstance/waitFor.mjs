@@ -1,6 +1,5 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-
 import { component as componentBuilder } from '@liquid-bricks/lib-component-builder'
 
 import { Graph } from '@liquid-bricks/lib-nats-graph/graph'
@@ -18,6 +17,9 @@ import { usesImportInstances } from '../../../../core/componentInstance/cmd/star
 import { startImports } from '../../../../core/componentInstance/cmd/start/publishEvents/startImports.js'
 import { handler as startImportHandler } from '../../../../core/import/cmd/start/handler.js'
 import { invokeRoute } from '../../../util/invokeRoute.js'
+
+import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
+
 
 const noop = console.log
 function makeDiagnosticsInstance() {
@@ -237,13 +239,8 @@ test('import waitFor lifecycle.done starts dependent import after referenced imp
     assert.ok(controlPlaneImport, 'controlplanepod import instance missing')
     assert.ok(corednsImport, 'corednsStart import instance missing')
 
-    const startComponentInstanceSubject = createBasicSubject()
+    const startComponentInstanceSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start.v1['*'])
       .env('prod')
-      .ns('component-service')
-      .entity('componentInstance')
-      .channel('cmd')
-      .action('start')
-      .version('v1')
       .build()
 
     const blockedPublishes = []
@@ -332,21 +329,11 @@ test('import waitFor prevents starting child until dependency provided', async (
 
     const initialPublishes = []
     const natsContext = { publish: async (subject, payload) => initialPublishes.push({ subject, payload: JSON.parse(payload) }) }
-    const startImportSubject = createBasicSubject()
+    const startImportSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.import.start.v1['*'])
       .env('prod')
-      .ns('component-service')
-      .entity('import')
-      .channel('cmd')
-      .action('start')
-      .version('v1')
       .build()
-    const startComponentInstanceSubject = createBasicSubject()
+    const startComponentInstanceSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start.v1['*'])
       .env('prod')
-      .ns('component-service')
-      .entity('componentInstance')
-      .channel('cmd')
-      .action('start')
-      .version('v1')
       .build()
     await startImports({
       rootCtx: { natsContext },
@@ -401,10 +388,10 @@ test('import waitFor prevents starting child until dependency provided', async (
     const postGateImportStartContext = {
       publish: async (subject, payload) => postGateImportStartPublishes.push({ subject, payload: JSON.parse(payload) }),
     }
-    for (const importStartCommand of published.filter(({ subject }) => subject === startImportSubject)) {
+    for (const publishedImportStartCommand of published.filter(({ subject }) => subject === startImportSubject)) {
       await startImportHandler({
         rootCtx: { natsContext: postGateImportStartContext, g: ctx.g },
-        scope: importStartCommand.payload.data,
+        scope: publishedImportStartCommand.payload.data,
       })
     }
     assert.ok(postGateImportStartPublishes.some(({ subject, payload }) =>

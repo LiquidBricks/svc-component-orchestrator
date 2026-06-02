@@ -1,9 +1,11 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-
 import { create as createBasicSubject } from '@liquid-bricks/lib-nats-subject/create/basic'
 
 import { publishExecutionRequest } from '../../../../../../core/task/cmd/start/publishExecutionRequest.js'
+
+import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
+
 
 test('publishExecutionRequest emits task execution request', async () => {
   const published = []
@@ -21,13 +23,8 @@ test('publishExecutionRequest emits task execution request', async () => {
     },
   })
 
-  const subject = createBasicSubject()
+  const subject = createBasicSubject(natsEvents['*'].component_service['*']['*'].exec.component.compute_result.v1['*'])
     .env('prod')
-    .ns('component-service')
-    .entity('component')
-    .channel('exec')
-    .action('compute_result')
-    .version('v1')
     .build()
 
   assert.equal(published.length, 1)

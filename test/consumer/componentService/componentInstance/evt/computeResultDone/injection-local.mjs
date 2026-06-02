@@ -1,6 +1,5 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-
 import { component as componentBuilder } from '@liquid-bricks/lib-component-builder'
 
 import {
@@ -18,6 +17,9 @@ import {
   startDependantsSpec,
   STATE_EDGE_STATUS_BY_TYPE,
 } from './helpers.mjs'
+
+import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
+
 
 test('computeResultDone publishes injected computeResultDone events for injection targets', async () => {
   await withGraphContext(async ({ diagnostics, dataMapper, g }) => {
@@ -50,13 +52,8 @@ test('computeResultDone publishes injected computeResultDone events for injectio
     let acked = false
     const resultPayload = { injected: true }
     const message = {
-      subject: createBasicSubject()
+      subject: createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.computeResultDone.v1['*'])
         .env('prod')
-        .ns('component-service')
-        .entity('componentInstance')
-        .channel('evt')
-        .action('computeResultDone')
-        .version('v1')
         .build(),
       ack: () => { acked = true },
       json: () => ({
@@ -84,21 +81,11 @@ test('computeResultDone publishes injected computeResultDone events for injectio
     assert.equal(pickFirst(updatedValues.status), STATE_EDGE_STATUS_BY_TYPE.data)
     assert.equal(pickFirst(updatedValues.result), JSON.stringify(resultPayload))
 
-    const computeResultDoneSubject = createBasicSubject()
+    const computeResultDoneSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.computeResultDone.v1['*'])
       .env('prod')
-      .ns('component-service')
-      .entity('componentInstance')
-      .channel('evt')
-      .action('computeResultDone')
-      .version('v1')
       .build()
-    const startDependantsSubject = createBasicSubject()
+    const startDependantsSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start_dependants.v1['*'])
       .env('prod')
-      .ns('component-service')
-      .entity('componentInstance')
-      .channel('cmd')
-      .action('start_dependants')
-      .version('v1')
       .build()
 
     const injectedEvents = published.filter(p => p.subject === computeResultDoneSubject)
@@ -144,37 +131,17 @@ test('injected result triggers dependant data and task start commands', async ()
     assert.ok(dependantDataStateEdgeId, 'dataDependent state edge missing')
     assert.ok(dependantTaskStateEdgeId, 'taskDependent state edge missing')
 
-    const computeResultDoneSubject = createBasicSubject()
+    const computeResultDoneSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.computeResultDone.v1['*'])
       .env('prod')
-      .ns('component-service')
-      .entity('componentInstance')
-      .channel('evt')
-      .action('computeResultDone')
-      .version('v1')
       .build()
-    const startDependantsSubject = createBasicSubject()
+    const startDependantsSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start_dependants.v1['*'])
       .env('prod')
-      .ns('component-service')
-      .entity('componentInstance')
-      .channel('cmd')
-      .action('start_dependants')
-      .version('v1')
       .build()
-    const startDataSubject = createBasicSubject()
+    const startDataSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.data.start.v1['*'])
       .env('prod')
-      .ns('component-service')
-      .entity('data')
-      .channel('cmd')
-      .action('start')
-      .version('v1')
       .build()
-    const startTaskSubject = createBasicSubject()
+    const startTaskSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.task.start.v1['*'])
       .env('prod')
-      .ns('component-service')
-      .entity('task')
-      .channel('cmd')
-      .action('start')
-      .version('v1')
       .build()
 
     const initialPublishes = []

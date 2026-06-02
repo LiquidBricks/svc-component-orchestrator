@@ -1,16 +1,14 @@
 import { create as createBasicSubject } from '@liquid-bricks/lib-nats-subject/create/basic'
 
+import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
+
+
 export async function componentAgentCmdRegisterProvidingAgentsComponent({
   scope: { agentID, component: { hash } },
   rootCtx: { natsContext },
 }) {
-  const subject = createBasicSubject()
+  const subject = createBasicSubject(natsEvents['*'].component_service['*']['*'].exec.componentAgent.cmdRegisterProvidingAgentsComponent.v1['*'])
     .env('prod')
-    .ns('component-service')
-    .entity('componentAgent')
-    .channel('exec')
-    .action('cmdRegisterProvidingAgentsComponent')
-    .version('v1')
     .id(agentID)
 
   await natsContext.publish(

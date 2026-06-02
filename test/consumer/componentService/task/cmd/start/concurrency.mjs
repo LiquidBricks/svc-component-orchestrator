@@ -1,6 +1,5 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-
 import { component as componentBuilder } from '@liquid-bricks/lib-component-builder'
 import { create as createBasicSubject } from '@liquid-bricks/lib-nats-subject/create/basic'
 import { JetStreamApiCodes, JetStreamApiError } from '@nats-io/jetstream'
@@ -15,6 +14,9 @@ import {
   getRouteSpec,
 } from '../../../helpers.mjs'
 import { invokeRoute } from '../../../../../util/invokeRoute.js'
+
+import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
+
 
 function createNatsContextSpy() {
   const acquiredKeys = new Set()
@@ -113,13 +115,8 @@ test('concurrent duplicate task starts should emit only one execution request', 
       }),
     ])
 
-    const executionRequestSubject = createBasicSubject()
+    const executionRequestSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].exec.component.compute_result.v1['*'])
       .env('prod')
-      .ns('component-service')
-      .entity('component')
-      .channel('exec')
-      .action('compute_result')
-      .version('v1')
       .build()
 
     const executionRequests = published.filter(({ subject }) => subject === executionRequestSubject)

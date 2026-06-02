@@ -1,15 +1,13 @@
 import { create as createBasicSubject } from '@liquid-bricks/lib-nats-subject/create/basic'
 
+import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
+
+
 export async function startDataStates({ scope: { instanceId, dataStateIds = [] }, rootCtx: { natsContext } }) {
   if (!dataStateIds.length) return
 
-  const subject = createBasicSubject()
+  const subject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.data.start.v1['*'])
     .env('prod')
-    .ns('component-service')
-    .entity('data')
-    .channel('cmd')
-    .action('start')
-    .version('v1')
 
   for (const stateId of dataStateIds) {
     await natsContext.publish(

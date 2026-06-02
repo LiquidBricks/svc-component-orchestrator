@@ -1,6 +1,5 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-
 import { component as componentBuilder } from '@liquid-bricks/lib-component-builder'
 
 import { componentGates } from '../../../../../../core/componentInstance/cmd/create/loadData/componentGates.js'
@@ -20,6 +19,9 @@ import {
   stateMachineCompletedSpec,
   domain,
 } from './helpers.mjs'
+
+import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
+
 
 async function loadGates({ g, componentId }) {
   const { gates = [] } = await componentGates({ rootCtx: { g }, scope: { componentId } })
@@ -54,13 +56,8 @@ test('stateMachine state switches to complete once all states are provided', asy
     await startInstance({ diagnostics, g }, { stateMachineId })
 
     const published = []
-    const computeResultDoneSubject = createBasicSubject()
+    const computeResultDoneSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.computeResultDone.v1['*'])
       .env('prod')
-      .ns('component-service')
-      .entity('componentInstance')
-      .channel('evt')
-      .action('computeResultDone')
-      .version('v1')
       .build()
 
     let dataAcked = false
@@ -114,13 +111,8 @@ test('stateMachine state switches to complete once all states are provided', asy
     })
     assert.equal(taskAcked, true)
 
-    const stateMachineCompletedSubject = createBasicSubject()
+    const stateMachineCompletedSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.state_machine_completed.v1['*'])
       .env('prod')
-      .ns('component-service')
-      .entity('componentInstance')
-      .channel('evt')
-      .action('state_machine_completed')
-      .version('v1')
       .build()
     const completionEvent = published.find(p => p.subject === stateMachineCompletedSubject)
     assert.ok(completionEvent, 'state_machine_completed event not published')
@@ -170,21 +162,11 @@ test('componentInstance completes when only imports exist and imports finish', a
     await startInstance({ diagnostics, dataMapper, g }, { stateMachineId: childStateMachineId })
 
     const published = []
-    const computeResultDoneSubject = createBasicSubject()
+    const computeResultDoneSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.computeResultDone.v1['*'])
       .env('prod')
-      .ns('component-service')
-      .entity('componentInstance')
-      .channel('evt')
-      .action('computeResultDone')
-      .version('v1')
       .build()
-    const stateMachineCompletedSubject = createBasicSubject()
+    const stateMachineCompletedSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.state_machine_completed.v1['*'])
       .env('prod')
-      .ns('component-service')
-      .entity('componentInstance')
-      .channel('evt')
-      .action('state_machine_completed')
-      .version('v1')
       .build()
 
     await runSpec({
@@ -283,29 +265,14 @@ test('componentInstance completes after false gates settle and true gates comple
     })
 
     const published = []
-    const computeResultDoneSubject = createBasicSubject()
+    const computeResultDoneSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.computeResultDone.v1['*'])
       .env('prod')
-      .ns('component-service')
-      .entity('componentInstance')
-      .channel('evt')
-      .action('computeResultDone')
-      .version('v1')
       .build()
-    const startSubject = createBasicSubject()
+    const startSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start.v1['*'])
       .env('prod')
-      .ns('component-service')
-      .entity('componentInstance')
-      .channel('cmd')
-      .action('start')
-      .version('v1')
       .build()
-    const stateMachineCompletedSubject = createBasicSubject()
+    const stateMachineCompletedSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.state_machine_completed.v1['*'])
       .env('prod')
-      .ns('component-service')
-      .entity('componentInstance')
-      .channel('evt')
-      .action('state_machine_completed')
-      .version('v1')
       .build()
     const natsContext = {
       publish: async (subject, payload) => published.push({ subject, payload: JSON.parse(payload) }),

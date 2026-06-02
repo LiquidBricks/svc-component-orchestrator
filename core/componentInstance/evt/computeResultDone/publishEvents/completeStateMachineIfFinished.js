@@ -1,6 +1,8 @@
 import { create as createBasicSubject } from '@liquid-bricks/lib-nats-subject/create/basic'
-
 import { domain } from '@liquid-bricks/spec-domain/domain'
+
+import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
+
 
 const PROVIDED_STATUS = domain.edge.has_data_state.stateMachine_data.constants.Status.PROVIDED
 const STATE_EDGE_LABELS = [
@@ -44,13 +46,8 @@ async function areAllStatesProvided({ g, stateMachineId }) {
 }
 
 async function publishCompletion({ natsContext, instanceId, stateMachineId }) {
-  const subject = createBasicSubject()
+  const subject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.state_machine_completed.v1['*'])
     .env('prod')
-    .ns('component-service')
-    .entity('componentInstance')
-    .channel('evt')
-    .action('state_machine_completed')
-    .version('v1')
     .build()
 
   await natsContext.publish(
