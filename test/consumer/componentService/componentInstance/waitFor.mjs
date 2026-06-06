@@ -239,7 +239,7 @@ test('import waitFor lifecycle.done starts dependent import after referenced imp
     assert.ok(controlPlaneImport, 'controlplanepod import instance missing')
     assert.ok(corednsImport, 'corednsStart import instance missing')
 
-    const startComponentInstanceSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start.v1['*'])
+    const startComponentInstanceSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start.v1['*']).forPublish()
       .env('prod')
       .build()
 
@@ -329,10 +329,10 @@ test('import waitFor prevents starting child until dependency provided', async (
 
     const initialPublishes = []
     const natsContext = { publish: async (subject, payload) => initialPublishes.push({ subject, payload: JSON.parse(payload) }) }
-    const startImportSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.import.start.v1['*'])
+    const startImportSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.import.start.v1['*']).forPublish()
       .env('prod')
       .build()
-    const startComponentInstanceSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start.v1['*'])
+    const startComponentInstanceSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start.v1['*']).forPublish()
       .env('prod')
       .build()
     await startImports({

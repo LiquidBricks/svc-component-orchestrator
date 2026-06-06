@@ -6,7 +6,7 @@ import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nat
 export async function startDataStates({ scope: { instanceId, dataStateIds = [] }, rootCtx: { natsContext } }) {
   if (!dataStateIds.length) return
 
-  const subject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.data.start.v1['*'])
+  const subject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.data.start.v1['*']).forPublish()
     .env('prod')
 
   for (const stateId of dataStateIds) {

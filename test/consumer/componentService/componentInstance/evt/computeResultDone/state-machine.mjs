@@ -56,7 +56,7 @@ test('stateMachine state switches to complete once all states are provided', asy
     await startInstance({ diagnostics, g }, { stateMachineId })
 
     const published = []
-    const computeResultDoneSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.computeResultDone.v1['*'])
+    const computeResultDoneSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.computeResultDone.v1['*']).forPublish()
       .env('prod')
       .build()
 
@@ -111,7 +111,7 @@ test('stateMachine state switches to complete once all states are provided', asy
     })
     assert.equal(taskAcked, true)
 
-    const stateMachineCompletedSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.state_machine_completed.v1['*'])
+    const stateMachineCompletedSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.state_machine_completed.v1['*']).forPublish()
       .env('prod')
       .build()
     const completionEvent = published.find(p => p.subject === stateMachineCompletedSubject)
@@ -162,10 +162,10 @@ test('componentInstance completes when only imports exist and imports finish', a
     await startInstance({ diagnostics, dataMapper, g }, { stateMachineId: childStateMachineId })
 
     const published = []
-    const computeResultDoneSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.computeResultDone.v1['*'])
+    const computeResultDoneSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.computeResultDone.v1['*']).forPublish()
       .env('prod')
       .build()
-    const stateMachineCompletedSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.state_machine_completed.v1['*'])
+    const stateMachineCompletedSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.state_machine_completed.v1['*']).forPublish()
       .env('prod')
       .build()
 
@@ -265,13 +265,13 @@ test('componentInstance completes after false gates settle and true gates comple
     })
 
     const published = []
-    const computeResultDoneSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.computeResultDone.v1['*'])
+    const computeResultDoneSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.computeResultDone.v1['*']).forPublish()
       .env('prod')
       .build()
-    const startSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start.v1['*'])
+    const startSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start.v1['*']).forPublish()
       .env('prod')
       .build()
-    const stateMachineCompletedSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.state_machine_completed.v1['*'])
+    const stateMachineCompletedSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.state_machine_completed.v1['*']).forPublish()
       .env('prod')
       .build()
     const natsContext = {

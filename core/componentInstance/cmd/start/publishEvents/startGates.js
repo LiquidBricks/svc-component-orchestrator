@@ -14,7 +14,7 @@ export async function startGates({
     .map((entry) => (typeof entry === 'string' ? { instanceId: entry } : entry))
     .filter(Boolean)
 
-  const subject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.gate.start.v1['*'])
+  const subject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.gate.start.v1['*']).forPublish()
     .env('prod')
 
   for (const { instanceId: gateInstanceId } of normalizedGates) {

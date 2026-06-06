@@ -291,16 +291,16 @@ test('publishEvents starts dependency-free states, imports, and emits startDone'
     scope: { instanceId, dataStateIds, taskStateIds, usesImportInstances: importInstances },
   })
 
-  const startDataSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.data.start.v1['*'])
+  const startDataSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.data.start.v1['*']).forPublish()
     .env('prod')
     .build()
-  const startTaskSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.task.start.v1['*'])
+  const startTaskSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.task.start.v1['*']).forPublish()
     .env('prod')
     .build()
-  const startImportSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.import.start.v1['*'])
+  const startImportSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.import.start.v1['*']).forPublish()
     .env('prod')
     .build()
-  const startDoneSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.startDone.v1['*'])
+  const startDoneSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.startDone.v1['*']).forPublish()
     .env('prod')
     .build()
 
@@ -376,13 +376,13 @@ test('publishEvents dispatches gate start command and gate handler emits compute
       },
     })
 
-    const gateStartSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.gate.start.v1['*'])
+    const gateStartSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.gate.start.v1['*']).forPublish()
       .env('prod')
       .build()
-    const gateExecSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].exec.component.compute_result.v1['*'])
+    const gateExecSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].exec.component.compute_result.v1['*']).forPublish()
       .env('prod')
       .build()
-    const startInstanceSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start.v1['*'])
+    const startInstanceSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start.v1['*']).forPublish()
       .env('prod')
       .build()
 

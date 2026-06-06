@@ -21,7 +21,7 @@ export async function publishStartDependantsCommand({
     }
   }
 
-  const subject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start_dependants.v1['*'])
+  const subject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start_dependants.v1['*']).forPublish()
     .env('prod')
 
   await natsContext.publish(

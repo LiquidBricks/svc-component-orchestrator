@@ -11,12 +11,12 @@ export async function publishStartCommands({ rootCtx: { natsContext }, scope: {
     const publishList = [
       {
         stateIds: dataStateIds,
-        startSubject: createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.data.start.v1['*'])
+        startSubject: createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.data.start.v1['*']).forPublish()
           .env('prod'),
       },
       {
         stateIds: taskStateIds,
-        startSubject: createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.task.start.v1['*'])
+        startSubject: createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.task.start.v1['*']).forPublish()
           .env('prod'),
       },
     ]
@@ -32,7 +32,7 @@ export async function publishStartCommands({ rootCtx: { natsContext }, scope: {
       }
     }
 
-    const importSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.import.start.v1['*'])
+    const importSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.import.start.v1['*']).forPublish()
       .env('prod')
 
     const childInstanceIds = [...new Set(importInstanceIds ?? [])]
@@ -44,7 +44,7 @@ export async function publishStartCommands({ rootCtx: { natsContext }, scope: {
       )
     }
 
-    const gateSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].exec.component.compute_result.v1['*'])
+    const gateSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].exec.component.compute_result.v1['*']).forPublish()
       .env('prod')
 
     const normalizedGates = (gateStartRequests ?? [])

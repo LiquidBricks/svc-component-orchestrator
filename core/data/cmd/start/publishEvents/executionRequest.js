@@ -4,7 +4,7 @@ import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nat
 
 
 export async function executionRequest({ scope: { instanceId, componentHash, name, deps }, rootCtx: { natsContext } }) {
-  const subject = createBasicSubject(natsEvents['*'].component_service['*']['*'].exec.component.compute_result.v1['*'])
+  const subject = createBasicSubject(natsEvents['*'].component_service['*']['*'].exec.component.compute_result.v1['*']).forPublish()
     .env('prod')
 
   await natsContext.publish(

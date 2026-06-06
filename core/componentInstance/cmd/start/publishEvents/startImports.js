@@ -13,7 +13,7 @@ export async function startImports({
     .map((entry) => (typeof entry === 'string' ? { instanceId: entry } : entry))
     .filter(Boolean)
 
-  const subject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.import.start.v1['*'])
+  const subject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.import.start.v1['*']).forPublish()
     .env('prod')
   for (const { instanceId: importedInstanceId } of normalizedImports) {
     if (!importedInstanceId || started.has(importedInstanceId)) continue

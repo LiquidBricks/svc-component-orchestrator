@@ -10,13 +10,13 @@ import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nat
 
 
 function makeRegisterSubject() {
-  return createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentAgent.registerComponent.v1['*'])
+  return createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentAgent.registerComponent.v1['*']).forPublish()
     .env('prod')
     .build()
 }
 
 function makeRegisterDoneSubject() {
-  return createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.component.registerDone.v1['*'])
+  return createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.component.registerDone.v1['*']).forPublish()
     .env('prod')
     .build()
 }

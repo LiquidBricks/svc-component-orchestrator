@@ -31,7 +31,7 @@ export async function publishGateStartIfPassed({
   const gateInstanceId = pickFirst(instanceValues?.instanceId ?? instanceValues)
   if (!gateInstanceId) return
 
-  const subject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start.v1['*'])
+  const subject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start.v1['*']).forPublish()
     .env('prod')
     .build()
 

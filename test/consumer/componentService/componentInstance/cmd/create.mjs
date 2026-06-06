@@ -458,7 +458,7 @@ test('publishEvents does not start imported componentInstances after creation', 
 
     await publishCreateInstanceEvents({ rootCtx: { natsContext }, scope })
 
-    const createSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.createDone.v1['*'])
+    const createSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.createDone.v1['*']).forPublish()
       .env('prod')
       .build()
 
@@ -514,10 +514,10 @@ test('start publishes start commands for imported componentInstances', async () 
       },
     })
 
-    const startImportSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.import.start.v1['*'])
+    const startImportSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.import.start.v1['*']).forPublish()
       .env('prod')
       .build()
-    const startDoneSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.startDone.v1['*'])
+    const startDoneSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.startDone.v1['*']).forPublish()
       .env('prod')
       .build()
 

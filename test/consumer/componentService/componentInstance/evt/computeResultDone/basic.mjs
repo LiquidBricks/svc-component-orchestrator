@@ -51,7 +51,7 @@ test('computeResultDone stores state result, marks status provided, and publishe
     const published = []
     let acked = false
     const message = {
-      subject: createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.computeResultDone.v1['*'])
+      subject: createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.computeResultDone.v1['*']).forPublish()
         .env('prod')
         .build(),
       ack: () => { acked = true },
@@ -81,10 +81,10 @@ test('computeResultDone stores state result, marks status provided, and publishe
     assert.equal(pickFirst(updatedValues.result), JSON.stringify({ count: 2 }))
     assert.notEqual(pickFirst(updatedValues.updatedAt), initialUpdatedAt)
 
-    const startDependantsSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start_dependants.v1['*'])
+    const startDependantsSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start_dependants.v1['*']).forPublish()
       .env('prod')
       .build()
-    const completionSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.state_machine_completed.v1['*'])
+    const completionSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.state_machine_completed.v1['*']).forPublish()
       .env('prod')
       .build()
 

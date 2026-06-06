@@ -155,7 +155,7 @@ export async function handler({ rootCtx: { natsContext, g }, scope: { instanceId
   }
   if (!readyToStart) return
 
-  const subject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start.v1['*'])
+  const subject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start.v1['*']).forPublish()
     .env('prod')
 
   await natsContext.publish(

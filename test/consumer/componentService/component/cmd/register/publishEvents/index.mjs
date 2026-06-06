@@ -20,14 +20,14 @@ test('publishEvents publishes component registerDone and provider registration e
   assert.equal(calls.length, 2)
   const [subject, payload] = calls[0]
 
-  const expectedSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.component.registerDone.v1['*'])
+  const expectedSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.component.registerDone.v1['*']).forPublish()
     .env('prod')
     .build()
 
   assert.equal(subject, expectedSubject)
   assert.deepEqual(JSON.parse(payload), { data: { hash } })
   const [providerSubject, providerPayload] = calls[1]
-  const expectedProviderSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].exec.componentAgent.cmdRegisterProvidingAgentsComponent.v1['*'])
+  const expectedProviderSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].exec.componentAgent.cmdRegisterProvidingAgentsComponent.v1['*']).forPublish()
     .env('prod')
     .id('agent-1')
     .build()

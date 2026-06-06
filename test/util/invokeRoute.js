@@ -32,7 +32,7 @@ export async function invokeRoute(context, {
   message,
   natsContext,
 } = {}) {
-  const routeSubject = subject ?? createBasicSubject().set(path).build()
+  const routeSubject = subject ?? createBasicSubject().set(path).forPublish().build()
   const routeMessage = message ?? createRouteMessage({ subject: routeSubject, data })
   const effectiveMessage = {
     ...routeMessage,

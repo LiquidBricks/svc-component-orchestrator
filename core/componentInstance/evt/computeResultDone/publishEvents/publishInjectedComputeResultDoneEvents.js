@@ -234,7 +234,7 @@ export async function publishInjectedComputeResultDoneEvents({ scope, rootCtx: {
   const injectsIntoEdges = INJECTS_INTO_EDGE_BY_TYPE[type]
   if (!injectsIntoEdges?.length) return
 
-  const computeResultDoneSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.computeResultDone.v1['*'])
+  const computeResultDoneSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.computeResultDone.v1['*']).forPublish()
     .env('prod')
     .build()
 

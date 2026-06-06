@@ -46,7 +46,7 @@ async function areAllStatesProvided({ g, stateMachineId }) {
 }
 
 async function publishCompletion({ natsContext, instanceId, stateMachineId }) {
-  const subject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.state_machine_completed.v1['*'])
+  const subject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.state_machine_completed.v1['*']).forPublish()
     .env('prod')
     .build()
 

@@ -62,16 +62,16 @@ test('imported injection triggers dependant starts inside imported component', a
     assert.ok(childDepDataStateEdgeId, 'child data dependant state edge missing')
     assert.ok(childDepTaskStateEdgeId, 'child task dependant state edge missing')
 
-    const computeResultDoneSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.computeResultDone.v1['*'])
+    const computeResultDoneSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.computeResultDone.v1['*']).forPublish()
       .env('prod')
       .build()
-    const startDependantsSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start_dependants.v1['*'])
+    const startDependantsSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start_dependants.v1['*']).forPublish()
       .env('prod')
       .build()
-    const startDataSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.data.start.v1['*'])
+    const startDataSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.data.start.v1['*']).forPublish()
       .env('prod')
       .build()
-    const startTaskSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.task.start.v1['*'])
+    const startTaskSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.task.start.v1['*']).forPublish()
       .env('prod')
       .build()
 
@@ -181,7 +181,7 @@ test('computeResultDone triggers parent dependant starts across imports', async 
 
     const published = []
     let resultAcked = false
-    const computeResultDoneSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.computeResultDone.v1['*'])
+    const computeResultDoneSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.computeResultDone.v1['*']).forPublish()
       .env('prod')
       .build()
 
@@ -208,7 +208,7 @@ test('computeResultDone triggers parent dependant starts across imports', async 
     })
     assert.equal(resultAcked, true)
 
-    const startDependantsSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start_dependants.v1['*'])
+    const startDependantsSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start_dependants.v1['*']).forPublish()
       .env('prod')
       .build()
 
@@ -233,10 +233,10 @@ test('computeResultDone triggers parent dependant starts across imports', async 
     })
     assert.equal(startAcked, true)
 
-    const startDataSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.data.start.v1['*'])
+    const startDataSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.data.start.v1['*']).forPublish()
       .env('prod')
       .build()
-    const startTaskSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.task.start.v1['*'])
+    const startTaskSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.task.start.v1['*']).forPublish()
       .env('prod')
       .build()
 

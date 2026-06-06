@@ -26,10 +26,10 @@ test('publishEvents publishes start commands for dependant states', async () => 
     },
   })
 
-  const dataSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.data.start.v1['*'])
+  const dataSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.data.start.v1['*']).forPublish()
     .env('prod')
     .build()
-  const taskSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.task.start.v1['*'])
+  const taskSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.task.start.v1['*']).forPublish()
     .env('prod')
     .build()
 
@@ -66,7 +66,7 @@ test('publishEvents publishes import start commands with parent instance context
     },
   })
 
-  const startImportSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.import.start.v1['*'])
+  const startImportSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.import.start.v1['*']).forPublish()
     .env('prod')
     .build()
 
@@ -106,10 +106,10 @@ test('publishEvents dispatches gate compute_result requests to component executi
     },
   })
 
-  const gateSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].exec.component.compute_result.v1['*'])
+  const gateSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].exec.component.compute_result.v1['*']).forPublish()
     .env('prod')
     .build()
-  const startInstanceSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start.v1['*'])
+  const startInstanceSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start.v1['*']).forPublish()
     .env('prod')
     .build()
 

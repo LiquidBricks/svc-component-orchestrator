@@ -52,7 +52,7 @@ test('computeResultDone publishes injected computeResultDone events for injectio
     let acked = false
     const resultPayload = { injected: true }
     const message = {
-      subject: createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.computeResultDone.v1['*'])
+      subject: createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.computeResultDone.v1['*']).forPublish()
         .env('prod')
         .build(),
       ack: () => { acked = true },
@@ -81,10 +81,10 @@ test('computeResultDone publishes injected computeResultDone events for injectio
     assert.equal(pickFirst(updatedValues.status), STATE_EDGE_STATUS_BY_TYPE.data)
     assert.equal(pickFirst(updatedValues.result), JSON.stringify(resultPayload))
 
-    const computeResultDoneSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.computeResultDone.v1['*'])
+    const computeResultDoneSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.computeResultDone.v1['*']).forPublish()
       .env('prod')
       .build()
-    const startDependantsSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start_dependants.v1['*'])
+    const startDependantsSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start_dependants.v1['*']).forPublish()
       .env('prod')
       .build()
 
@@ -131,16 +131,16 @@ test('injected result triggers dependant data and task start commands', async ()
     assert.ok(dependantDataStateEdgeId, 'dataDependent state edge missing')
     assert.ok(dependantTaskStateEdgeId, 'taskDependent state edge missing')
 
-    const computeResultDoneSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.computeResultDone.v1['*'])
+    const computeResultDoneSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.computeResultDone.v1['*']).forPublish()
       .env('prod')
       .build()
-    const startDependantsSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start_dependants.v1['*'])
+    const startDependantsSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start_dependants.v1['*']).forPublish()
       .env('prod')
       .build()
-    const startDataSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.data.start.v1['*'])
+    const startDataSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.data.start.v1['*']).forPublish()
       .env('prod')
       .build()
-    const startTaskSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.task.start.v1['*'])
+    const startTaskSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.task.start.v1['*']).forPublish()
       .env('prod')
       .build()
 
