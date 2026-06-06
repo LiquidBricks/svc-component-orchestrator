@@ -1,4 +1,6 @@
 import { AckPolicy, DeliverPolicy } from "@nats-io/jetstream";
+import { create as createBasicSubject } from '@liquid-bricks/lib-nats-subject/create/basic'
+import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
 import { createComponentServiceRouter } from './router.js'
 
 const consumerName = 'componentServiceConsumer'
@@ -18,8 +20,8 @@ export async function Consumer({ streamName, natsContext, g, diagnostics: d }) {
     ack_policy: AckPolicy.Explicit,
     deliver_policy: DeliverPolicy.All,
     filter_subjects: [
-      '*.component-service.*.*.cmd.>',
-      '*.component-service.*.*.evt.>',
+      createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd['>']).forSubscribe().build(),
+      createBasicSubject(natsEvents['*'].component_service['*']['*'].evt['>']).forSubscribe().build(),
     ],
   });
 
