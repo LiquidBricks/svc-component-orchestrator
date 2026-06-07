@@ -1,8 +1,13 @@
 import { ackMessage, decodeData } from '../../../../middleware/index.js'
 import { handler } from './handler.js'
 import { validatePayload } from './validatePayload.js'
+import { create as createSubject } from '@liquid-bricks/lib-nats-subject/create/basic'
+import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
 
-export const path = { channel: 'evt', entity: 'componentInstance', action: 'state_machine_completed' }
+export const path = createSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.state_machine_completed.v1['*'])
+  .forSubscribe()
+  .toObject()
+
 export const spec = {
   decode: [
     decodeData(['instanceId', 'stateMachineId']),

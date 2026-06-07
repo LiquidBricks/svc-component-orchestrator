@@ -5,8 +5,12 @@ import { republishIfImportsMissing } from './republishIfImportsMissing.js'
 import { skipIfExists } from './skipIfExists.js'
 import { publishEvents } from './publishEvents/index.js'
 import { validatePayload } from './validatePayload/index.js'
+import { create as createSubject } from '@liquid-bricks/lib-nats-subject/create/basic'
+import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
 
-export const path = { channel: 'cmd', entity: 'componentAgent', action: 'registerComponent' }
+export const path = createSubject(natsEvents['*'].component_service['*']['*'].cmd.componentAgent.registerComponent.v1['*'])
+  .forSubscribe()
+  .toObject()
 
 export const spec = {
   decode: [
