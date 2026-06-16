@@ -13,6 +13,8 @@ import {
   getStateEdgeId,
   pickFirst,
   runSpec,
+  runProcessInjectedComputeResultDoneEvents,
+  createProcessInjectedComputeResultDoneSubject,
   computeResultDoneSpec,
   startDependantsSpec,
   STATE_EDGE_STATUS_BY_TYPE,
@@ -88,8 +90,22 @@ test('computeResultDone publishes injected computeResultDone events for injectio
       .env('prod')
       .build()
 
-    const injectedEvents = published.filter(p => p.subject === computeResultDoneSubject)
+    const processInjectedSubject = createProcessInjectedComputeResultDoneSubject()
+    const processInjectedEvents = published.filter(p => p.subject === processInjectedSubject)
     const startDependantsEvents = published.filter(p => p.subject === startDependantsSubject)
+
+    assert.equal(processInjectedEvents.length, 1)
+    assert.deepEqual(processInjectedEvents[0].payload.data, {
+      instanceId,
+      instanceVertexId: finalScope.instanceVertexId,
+      stateMachineId,
+      stateEdgeId: sourceEdgeId,
+      type: 'data',
+      result: resultPayload,
+    })
+
+    const injectedPublishes = await runProcessInjectedComputeResultDoneEvents({ rootCtx, events: published })
+    const injectedEvents = injectedPublishes.filter(p => p.subject === computeResultDoneSubject)
 
     assert.equal(startDependantsEvents.length, 1)
     assert.deepEqual(startDependantsEvents[0].payload.data, { instanceId, stateEdgeId: sourceEdgeId, type: 'data' })
@@ -157,18 +173,23 @@ test('injected result triggers dependant data and task start commands', async ()
         }
       }),
     }
+    const initialRootCtx = {
+      diagnostics,
+      g,
+      dataMapper,
+      natsContext: { publish: async (subject, payload) => initialPublishes.push({ subject, payload: JSON.parse(payload) }) },
+    }
     await runSpec({
       spec: computeResultDoneSpec,
-      rootCtx: {
-        diagnostics,
-        g,
-        dataMapper,
-        natsContext: { publish: async (subject, payload) => initialPublishes.push({ subject, payload: JSON.parse(payload) }) },
-      },
+      rootCtx: initialRootCtx,
       message: initialMessage,
     })
 
-    const injectedEvent = initialPublishes.find(p => p.subject === computeResultDoneSubject && p.payload?.data?.name === 'dataTarget')
+    const initialInjectedPublishes = await runProcessInjectedComputeResultDoneEvents({
+      rootCtx: initialRootCtx,
+      events: initialPublishes,
+    })
+    const injectedEvent = initialInjectedPublishes.find(p => p.subject === computeResultDoneSubject && p.payload?.data?.name === 'dataTarget')
     assert.ok(injectedEvent, 'injected result for dataTarget not published')
 
     const injectedPublishes = []

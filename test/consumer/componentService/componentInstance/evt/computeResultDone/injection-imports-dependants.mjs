@@ -14,6 +14,7 @@ import {
   getImportedInstance,
   pickFirst,
   runSpec,
+  runProcessInjectedComputeResultDoneEvents,
   computeResultDoneSpec,
   startDependantsSpec,
   domain,
@@ -76,14 +77,15 @@ test('imported injection triggers dependant starts inside imported component', a
       .build()
 
     const initialPublishes = []
+    const initialRootCtx = {
+      diagnostics,
+      g,
+      dataMapper,
+      natsContext: { publish: async (subject, payload) => initialPublishes.push({ subject, payload: JSON.parse(payload) }) },
+    }
     await runSpec({
       spec: computeResultDoneSpec,
-      rootCtx: {
-        diagnostics,
-        g,
-        dataMapper,
-        natsContext: { publish: async (subject, payload) => initialPublishes.push({ subject, payload: JSON.parse(payload) }) },
-      },
+      rootCtx: initialRootCtx,
       message: {
         subject: computeResultDoneSubject,
         ack: () => { },
@@ -98,7 +100,11 @@ test('imported injection triggers dependant starts inside imported component', a
       },
     })
 
-    const injectedEvent = initialPublishes.find(p =>
+    const initialInjectedPublishes = await runProcessInjectedComputeResultDoneEvents({
+      rootCtx: initialRootCtx,
+      events: initialPublishes,
+    })
+    const injectedEvent = initialInjectedPublishes.find(p =>
       p.subject === computeResultDoneSubject
       && p.payload?.data?.instanceId === childInstanceId
       && p.payload?.data?.name === 'childTarget'

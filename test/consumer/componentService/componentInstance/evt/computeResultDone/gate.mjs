@@ -15,6 +15,7 @@ import {
   getImportedInstance,
   pickFirst,
   runSpec,
+  runProcessInjectedComputeResultDoneEvents,
   computeResultDoneSpec,
   domain,
 } from './helpers.mjs'
@@ -141,14 +142,15 @@ test('computeResultDone does not publish start_dependants for unstarted gated in
       .build()
 
     const firstRunPublished = []
+    const firstRunRootCtx = {
+      diagnostics,
+      g,
+      dataMapper,
+      natsContext: { publish: async (subject, payload) => firstRunPublished.push({ subject, payload: JSON.parse(payload) }) },
+    }
     await runSpec({
       spec: computeResultDoneSpec,
-      rootCtx: {
-        diagnostics,
-        g,
-        dataMapper,
-        natsContext: { publish: async (subject, payload) => firstRunPublished.push({ subject, payload: JSON.parse(payload) }) },
-      },
+      rootCtx: firstRunRootCtx,
       message: {
         subject: computeResultDoneSubject,
         ack: () => { },
@@ -163,7 +165,11 @@ test('computeResultDone does not publish start_dependants for unstarted gated in
       },
     })
 
-    const injectedGateEvent = firstRunPublished.find(({ subject, payload }) =>
+    const firstRunInjectedPublishes = await runProcessInjectedComputeResultDoneEvents({
+      rootCtx: firstRunRootCtx,
+      events: firstRunPublished,
+    })
+    const injectedGateEvent = firstRunInjectedPublishes.find(({ subject, payload }) =>
       subject === computeResultDoneSubject
       && payload?.data?.instanceId === gatedInstanceId
       && payload?.data?.type === 'data'
@@ -308,14 +314,15 @@ test('computeResultDone routes gate inject targets by alias when multiple gates 
 
     for (const { sourceName, expectedAlias, result } of cases) {
       const published = []
+      const rootCtx = {
+        diagnostics,
+        g,
+        dataMapper,
+        natsContext: { publish: async (subject, payload) => published.push({ subject, payload: JSON.parse(payload) }) },
+      }
       await runSpec({
         spec: computeResultDoneSpec,
-        rootCtx: {
-          diagnostics,
-          g,
-          dataMapper,
-          natsContext: { publish: async (subject, payload) => published.push({ subject, payload: JSON.parse(payload) }) },
-        },
+        rootCtx,
         message: {
           subject: computeResultDoneSubject,
           ack: () => { },
@@ -330,7 +337,8 @@ test('computeResultDone routes gate inject targets by alias when multiple gates 
         },
       })
 
-      const injectedEvents = published.filter(({ subject }) => subject === computeResultDoneSubject)
+      const injectedPublishes = await runProcessInjectedComputeResultDoneEvents({ rootCtx, events: published })
+      const injectedEvents = injectedPublishes.filter(({ subject }) => subject === computeResultDoneSubject)
       assert.equal(injectedEvents.length, 1, `expected one injected result for ${sourceName}`)
       assert.equal(
         injectedEvents[0].payload.data.instanceId,
@@ -406,14 +414,15 @@ test('computeResultDone routes identifier->gate inject to the same pod instance 
       assert.ok(createInstanceId, `${alias} create gate instance missing`)
 
       const published = []
+      const rootCtx = {
+        diagnostics,
+        g,
+        dataMapper,
+        natsContext: { publish: async (subject, payload) => published.push({ subject, payload: JSON.parse(payload) }) },
+      }
       await runSpec({
         spec: computeResultDoneSpec,
-        rootCtx: {
-          diagnostics,
-          g,
-          dataMapper,
-          natsContext: { publish: async (subject, payload) => published.push({ subject, payload: JSON.parse(payload) }) },
-        },
+        rootCtx,
         message: {
           subject: computeResultDoneSubject,
           ack: () => { },
@@ -428,7 +437,8 @@ test('computeResultDone routes identifier->gate inject to the same pod instance 
         },
       })
 
-      const injectedEvents = published.filter(({ subject, payload }) =>
+      const injectedPublishes = await runProcessInjectedComputeResultDoneEvents({ rootCtx, events: published })
+      const injectedEvents = injectedPublishes.filter(({ subject, payload }) =>
         subject === computeResultDoneSubject
         && payload?.data?.type === 'data'
         && payload?.data?.name === 'id'

@@ -4,6 +4,7 @@ import { Graph } from '@liquid-bricks/lib-nats-graph/graph'
 import { diagnostics as makeDiagnostics } from '@liquid-bricks/lib-diagnostics'
 import { create as createBasicSubject } from '@liquid-bricks/lib-nats-subject/create/basic'
 import { ulid } from 'ulid'
+import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
 
 import { createComponentServiceRouter } from '../../../../../../router.js'
 import { path as registerPath } from '../../../../../../core/componentAgent/cmd/registerComponent/index.js'
@@ -51,6 +52,7 @@ export async function withGraphContext(run) {
 const createInstanceSpec = getCreateInstanceSpec()
 const startInstanceSpec = getStartInstanceSpec()
 const computeResultDoneSpec = getComputeResultDoneSpec()
+const processInjectedComputeResultDoneSpec = getProcessInjectedComputeResultDoneSpec()
 const stateMachineCompletedSpec = getStateMachineCompletedSpec()
 const startDependantsSpec = getStartDependantsSpec()
 const dataStartSpec = getDataStartSpec()
@@ -100,6 +102,22 @@ function getComputeResultDoneSpec() {
     && values.action === 'computeResultDone'
   )
   assert.ok(route, 'computeResultDone route not found')
+  return route.config
+}
+
+function getProcessInjectedComputeResultDoneSpec() {
+  const router = createComponentServiceRouter({
+    natsContext: {},
+    g: {},
+    diagnostics: makeDiagnosticsInstance(),
+    dataMapper: {},
+  })
+  const route = router.routes.find(({ values }) =>
+    values.channel === 'evt'
+    && values.entity === 'componentInstance'
+    && values.action === 'processInjectedComputeResultDone'
+  )
+  assert.ok(route, 'processInjectedComputeResultDone route not found')
   return route.config
 }
 
@@ -238,6 +256,40 @@ export async function getImportedInstance({ g, rootInstanceVertexId, aliasPath }
   return current
 }
 
+
+export function createProcessInjectedComputeResultDoneSubject() {
+  return createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.processInjectedComputeResultDone.v1['*'])
+    .forPublish()
+    .env('prod')
+    .build()
+}
+
+export async function runProcessInjectedComputeResultDoneEvents({ rootCtx, events }) {
+  const subject = createProcessInjectedComputeResultDoneSubject()
+  const published = []
+
+  for (const event of events.filter(entry => entry.subject === subject)) {
+    await runSpec({
+      spec: processInjectedComputeResultDoneSpec,
+      rootCtx: {
+        ...rootCtx,
+        natsContext: {
+          publish: async (publishedSubject, payload) => {
+            published.push({ subject: publishedSubject, payload: JSON.parse(payload) })
+          },
+        },
+      },
+      message: {
+        subject,
+        ack: () => { },
+        json: () => event.payload,
+      },
+    })
+  }
+
+  return published
+}
+
 export async function runSpec({ spec, rootCtx, message, initialScope = {} }) {
   const messagePayload = initialScope.handlerDiagnostics ? undefined : message?.json?.()
   const handlerDiagnostics = initialScope.handlerDiagnostics
@@ -284,6 +336,7 @@ export {
   createInstanceSpec,
   startInstanceSpec,
   computeResultDoneSpec,
+  processInjectedComputeResultDoneSpec,
   stateMachineCompletedSpec,
   startDependantsSpec,
   dataStartSpec,

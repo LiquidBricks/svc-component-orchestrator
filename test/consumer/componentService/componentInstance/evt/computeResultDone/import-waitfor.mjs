@@ -15,6 +15,7 @@ import {
   getImportedInstance,
   pickFirst,
   runSpec,
+  runProcessInjectedComputeResultDoneEvents,
   computeResultDoneSpec,
   startDependantsSpec,
   startInstanceSpec,
@@ -171,14 +172,15 @@ test('import start preserves injected data when waitFor delays the import', asyn
 
     const providerResultPublishes = []
     const podNameResult = { pod: 'import-pod' }
+    const providerResultRootCtx = {
+      diagnostics,
+      g,
+      dataMapper,
+      natsContext: { publish: async (subject, payload) => providerResultPublishes.push({ subject, payload: JSON.parse(payload) }) },
+    }
     await runSpec({
       spec: computeResultDoneSpec,
-      rootCtx: {
-        diagnostics,
-        g,
-        dataMapper,
-        natsContext: { publish: async (subject, payload) => providerResultPublishes.push({ subject, payload: JSON.parse(payload) }) },
-      },
+      rootCtx: providerResultRootCtx,
       message: {
         subject: computeResultDoneSubject,
         ack: () => { },
@@ -193,7 +195,11 @@ test('import start preserves injected data when waitFor delays the import', asyn
       },
     })
 
-    const injectedEvent = providerResultPublishes.find(({ subject, payload }) =>
+    const providerInjectedPublishes = await runProcessInjectedComputeResultDoneEvents({
+      rootCtx: providerResultRootCtx,
+      events: providerResultPublishes,
+    })
+    const injectedEvent = providerInjectedPublishes.find(({ subject, payload }) =>
       subject === computeResultDoneSubject
       && payload?.data?.instanceId === targetInstanceId
       && payload?.data?.name === 'pod'
