@@ -1,7 +1,7 @@
 import { create as createBasicSubject } from '@liquid-bricks/lib-nats-subject/create/basic'
 import { Errors } from '../../../../../errors.js'
 import { domain } from '@liquid-bricks/spec-domain/domain'
-import { STATE_EDGE_LABEL_BY_TYPE } from '../constants.js'
+import { STATE_EDGE_LABEL_BY_TYPE } from '../../../evt/computeResultDone/constants.js'
 
 import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
 
