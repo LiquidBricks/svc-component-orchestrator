@@ -16,7 +16,7 @@ import { usesImportInstances } from '../../../../../core/componentInstance/cmd/s
 import { componentImports } from '../../../../../core/componentInstance/cmd/create/loadData/componentImports.js'
 import { componentGates } from '../../../../../core/componentInstance/cmd/create/loadData/componentGates.js'
 import { serviceConfiguration } from '../../../../provider/serviceConfiguration/dotenv/index.js'
-import { invokeRoute } from '../../../../util/invokeRoute.js'
+import { invokeRoute, runHookGroup } from '../../../../util/invokeRoute.js'
 
 import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
 
@@ -456,7 +456,7 @@ test('publishEvents does not start imported componentInstances after creation', 
     const published = []
     const natsContext = { publish: async (subject, payload) => published.push({ subject, payload: JSON.parse(payload) }) }
 
-    await publishCreateInstanceEvents({ rootCtx: { natsContext }, scope })
+    await runHookGroup(publishCreateInstanceEvents, { rootCtx: { natsContext }, scope })
 
     const createSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.createDone.v1['*']).forPublish()
       .env('prod')
@@ -504,7 +504,7 @@ test('start publishes start commands for imported componentInstances', async () 
     const published = []
     const natsContext = { publish: async (subject, payload) => published.push({ subject, payload: JSON.parse(payload) }) }
 
-    await publishStartInstanceEvents({
+    await runHookGroup(publishStartInstanceEvents, {
       rootCtx: { natsContext },
       scope: {
         instanceId,

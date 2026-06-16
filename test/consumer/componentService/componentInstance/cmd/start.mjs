@@ -21,7 +21,7 @@ import { componentImports } from '../../../../../core/componentInstance/cmd/crea
 import { componentGates } from '../../../../../core/componentInstance/cmd/create/loadData/componentGates.js'
 import { handler as startGateHandler } from '../../../../../core/gate/cmd/start/handler.js'
 import { serviceConfiguration } from '../../../../provider/serviceConfiguration/dotenv/index.js'
-import { invokeRoute } from '../../../../util/invokeRoute.js'
+import { invokeRoute, runHookGroup } from '../../../../util/invokeRoute.js'
 
 import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
 
@@ -286,7 +286,7 @@ test('publishEvents starts dependency-free states, imports, and emits startDone'
   const published = []
   const natsContext = { publish: async (subject, payload) => published.push({ subject, payload: JSON.parse(payload) }) }
 
-  await publishStartInstanceEvents({
+  await runHookGroup(publishStartInstanceEvents, {
     rootCtx: { natsContext },
     scope: { instanceId, dataStateIds, taskStateIds, usesImportInstances: importInstances },
   })
@@ -364,7 +364,7 @@ test('publishEvents dispatches gate start command and gate handler emits compute
     const published = []
     const natsContext = { publish: async (subject, payload) => published.push({ subject, payload: JSON.parse(payload) }) }
 
-    await publishStartInstanceEvents({
+    await runHookGroup(publishStartInstanceEvents, {
       rootCtx: { natsContext, g },
       scope: {
         instanceId,

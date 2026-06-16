@@ -13,7 +13,7 @@ import { validatePayload } from '../../../../../../core/componentInstance/evt/co
 import { componentImports } from '../../../../../../core/componentInstance/cmd/create/loadData/componentImports.js'
 import { dataMapper as createDataMapper, domain } from '@liquid-bricks/spec-domain/domain'
 import { serviceConfiguration } from '../../../../../provider/serviceConfiguration/dotenv/index.js'
-import { invokeRoute } from '../../../../../util/invokeRoute.js'
+import { invokeRoute, runHookGroup } from '../../../../../util/invokeRoute.js'
 
 const { NATS_IP_ADDRESS } = serviceConfiguration()
 assert.ok(NATS_IP_ADDRESS, 'NATS_IP_ADDRESS missing; set in .env or .env.local')
@@ -298,18 +298,9 @@ export async function runSpec({ spec, rootCtx, message, initialScope = {} }) {
 
   const runStep = async (step) => {
     if (!step) return
-    if (Array.isArray(step)) {
-      for (const item of step) {
-        await runStep(item)
-      }
-      return
-    }
-    if (typeof step !== 'function') {
-      throw new TypeError('fn is not a function')
-    }
-    const result = await step({ message, rootCtx, scope })
+    const result = await runHookGroup(step, { message, rootCtx, scope })
     if (result && typeof result === 'object') {
-      scope = { ...scope, ...result }
+      Object.assign(scope, result)
     }
   }
 

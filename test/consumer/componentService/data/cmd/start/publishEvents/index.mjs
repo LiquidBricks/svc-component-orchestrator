@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { create as createBasicSubject } from '@liquid-bricks/lib-nats-subject/create/basic'
 
 import { publishEvents } from '../../../../../../../core/data/cmd/start/publishEvents/index.js'
+import { runHookGroup } from '../../../../../../util/invokeRoute.js'
 
 import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
 
@@ -13,7 +14,7 @@ test('publishEvents emits execution request for data', async () => {
     publish: async (subject, payload) => published.push({ subject, payload: JSON.parse(payload) }),
   }
 
-  await publishEvents({
+  await runHookGroup(publishEvents, {
     rootCtx: { natsContext },
     scope: {
       instanceId: 'instance-data',

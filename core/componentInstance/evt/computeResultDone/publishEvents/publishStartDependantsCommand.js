@@ -9,6 +9,8 @@ export async function publishStartDependantsCommand({
   scope: { instanceId, instanceVertexId, stateEdgeId, type },
   rootCtx: { natsContext, g },
 }) {
+  if (type === 'gate') return
+
   if (g && instanceVertexId) {
     const [gateInstanceRefId] = await g
       .V(instanceVertexId)
