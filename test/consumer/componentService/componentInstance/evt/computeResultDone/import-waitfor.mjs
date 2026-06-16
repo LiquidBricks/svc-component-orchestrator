@@ -15,7 +15,7 @@ import {
   getImportedInstance,
   pickFirst,
   runSpec,
-  runProcessInjectedComputeResultDoneEvents,
+  runInjectResultsCommands,
   computeResultDoneSpec,
   startDependantsSpec,
   startInstanceSpec,
@@ -195,7 +195,7 @@ test('import start preserves injected data when waitFor delays the import', asyn
       },
     })
 
-    const providerInjectedPublishes = await runProcessInjectedComputeResultDoneEvents({
+    const providerInjectedPublishes = await runInjectResultsCommands({
       rootCtx: providerResultRootCtx,
       events: providerResultPublishes,
     })

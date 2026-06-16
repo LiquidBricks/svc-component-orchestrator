@@ -15,7 +15,7 @@ import {
   getImportedInstance,
   pickFirst,
   runSpec,
-  runProcessInjectedComputeResultDoneEvents,
+  runInjectResultsCommands,
   computeResultDoneSpec,
   domain,
 } from './helpers.mjs'
@@ -165,7 +165,7 @@ test('computeResultDone does not publish start_dependants for unstarted gated in
       },
     })
 
-    const firstRunInjectedPublishes = await runProcessInjectedComputeResultDoneEvents({
+    const firstRunInjectedPublishes = await runInjectResultsCommands({
       rootCtx: firstRunRootCtx,
       events: firstRunPublished,
     })
@@ -337,7 +337,7 @@ test('computeResultDone routes gate inject targets by alias when multiple gates 
         },
       })
 
-      const injectedPublishes = await runProcessInjectedComputeResultDoneEvents({ rootCtx, events: published })
+      const injectedPublishes = await runInjectResultsCommands({ rootCtx, events: published })
       const injectedEvents = injectedPublishes.filter(({ subject }) => subject === computeResultDoneSubject)
       assert.equal(injectedEvents.length, 1, `expected one injected result for ${sourceName}`)
       assert.equal(
@@ -437,7 +437,7 @@ test('computeResultDone routes identifier->gate inject to the same pod instance 
         },
       })
 
-      const injectedPublishes = await runProcessInjectedComputeResultDoneEvents({ rootCtx, events: published })
+      const injectedPublishes = await runInjectResultsCommands({ rootCtx, events: published })
       const injectedEvents = injectedPublishes.filter(({ subject, payload }) =>
         subject === computeResultDoneSubject
         && payload?.data?.type === 'data'

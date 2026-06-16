@@ -14,7 +14,7 @@ import {
   getImportedInstance,
   pickFirst,
   runSpec,
-  runProcessInjectedComputeResultDoneEvents,
+  runInjectResultsCommands,
   computeResultDoneSpec,
   STATE_EDGE_STATUS_BY_TYPE,
   domain,
@@ -114,7 +114,7 @@ test('computeResultDone publishes injected events across imports using import in
 
     assert.equal(ackedTargetTask, true)
 
-    const targetTaskInjectedPublishes = await runProcessInjectedComputeResultDoneEvents({ rootCtx, events: published })
+    const targetTaskInjectedPublishes = await runInjectResultsCommands({ rootCtx, events: published })
     const targetTaskInjectedEvents = targetTaskInjectedPublishes.filter(p => p.subject === computeResultDoneSubject).map(p => p.payload.data)
     const sortedTaskInjected = targetTaskInjectedEvents.sort((a, b) => a.name.localeCompare(b.name))
     assert.deepEqual(sortedTaskInjected, [
@@ -145,7 +145,7 @@ test('computeResultDone publishes injected events across imports using import in
 
     assert.equal(ackedTargetData, true)
 
-    const targetDataInjectedPublishes = await runProcessInjectedComputeResultDoneEvents({ rootCtx, events: published })
+    const targetDataInjectedPublishes = await runInjectResultsCommands({ rootCtx, events: published })
     const dataInjectedEvents = targetDataInjectedPublishes.filter(p => p.subject === computeResultDoneSubject).map(p => p.payload.data)
     assert.deepEqual(dataInjectedEvents, [
       { instanceId: providerInstanceId, stateId: providerTaskStateEdgeId, name: 'providerTask', type: 'task', result: resultPayload },
@@ -224,7 +224,7 @@ test('computeResultDone publishes injected computeResultDone to imported compone
       .env('prod')
       .build()
 
-    const injectedPublishes = await runProcessInjectedComputeResultDoneEvents({ rootCtx, events: published })
+    const injectedPublishes = await runInjectResultsCommands({ rootCtx, events: published })
     const injectedEvents = injectedPublishes.filter(p => p.subject === computeResultDoneSubject)
     const startDependantsEvents = published.filter(p => p.subject === startDependantsSubject)
 
@@ -307,7 +307,7 @@ test('computeResultDone skips unreachable injected targets in a different instan
     })
 
     assert.equal(acked, true)
-    const injectedPublishes = await runProcessInjectedComputeResultDoneEvents({ rootCtx, events: published })
+    const injectedPublishes = await runInjectResultsCommands({ rootCtx, events: published })
     const injectedEvents = injectedPublishes.filter((entry) => entry.subject === computeResultDoneSubject)
     assert.equal(injectedEvents.length, 0)
 

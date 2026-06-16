@@ -1,5 +1,4 @@
 export * as createDone from './createDone/index.js'
 export * as startDone from './startDone/index.js'
 export * as computeResultDone from './computeResultDone/index.js'
-export * as processInjectedComputeResultDone from './processInjectedComputeResultDone/index.js'
 export * as state_machine_completed from './state_machine_completed/index.js'

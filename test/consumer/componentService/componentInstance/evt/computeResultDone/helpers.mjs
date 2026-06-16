@@ -52,7 +52,7 @@ export async function withGraphContext(run) {
 const createInstanceSpec = getCreateInstanceSpec()
 const startInstanceSpec = getStartInstanceSpec()
 const computeResultDoneSpec = getComputeResultDoneSpec()
-const processInjectedComputeResultDoneSpec = getProcessInjectedComputeResultDoneSpec()
+const injectResultsSpec = getInjectResultsSpec()
 const stateMachineCompletedSpec = getStateMachineCompletedSpec()
 const startDependantsSpec = getStartDependantsSpec()
 const dataStartSpec = getDataStartSpec()
@@ -105,7 +105,7 @@ function getComputeResultDoneSpec() {
   return route.config
 }
 
-function getProcessInjectedComputeResultDoneSpec() {
+function getInjectResultsSpec() {
   const router = createComponentServiceRouter({
     natsContext: {},
     g: {},
@@ -113,11 +113,11 @@ function getProcessInjectedComputeResultDoneSpec() {
     dataMapper: {},
   })
   const route = router.routes.find(({ values }) =>
-    values.channel === 'evt'
+    values.channel === 'cmd'
     && values.entity === 'componentInstance'
-    && values.action === 'processInjectedComputeResultDone'
+    && values.action === 'injectResults'
   )
-  assert.ok(route, 'processInjectedComputeResultDone route not found')
+  assert.ok(route, 'injectResults route not found')
   return route.config
 }
 
@@ -257,20 +257,20 @@ export async function getImportedInstance({ g, rootInstanceVertexId, aliasPath }
 }
 
 
-export function createProcessInjectedComputeResultDoneSubject() {
-  return createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.processInjectedComputeResultDone.v1['*'])
+export function createInjectResultsSubject() {
+  return createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.injectResults.v1['*'])
     .forPublish()
     .env('prod')
     .build()
 }
 
-export async function runProcessInjectedComputeResultDoneEvents({ rootCtx, events }) {
-  const subject = createProcessInjectedComputeResultDoneSubject()
+export async function runInjectResultsCommands({ rootCtx, events }) {
+  const subject = createInjectResultsSubject()
   const published = []
 
   for (const event of events.filter(entry => entry.subject === subject)) {
     await runSpec({
-      spec: processInjectedComputeResultDoneSpec,
+      spec: injectResultsSpec,
       rootCtx: {
         ...rootCtx,
         natsContext: {
@@ -336,7 +336,7 @@ export {
   createInstanceSpec,
   startInstanceSpec,
   computeResultDoneSpec,
-  processInjectedComputeResultDoneSpec,
+  injectResultsSpec,
   stateMachineCompletedSpec,
   startDependantsSpec,
   dataStartSpec,

@@ -13,8 +13,8 @@ import {
   getStateEdgeId,
   pickFirst,
   runSpec,
-  runProcessInjectedComputeResultDoneEvents,
-  createProcessInjectedComputeResultDoneSubject,
+  runInjectResultsCommands,
+  createInjectResultsSubject,
   computeResultDoneSpec,
   startDependantsSpec,
   STATE_EDGE_STATUS_BY_TYPE,
@@ -90,12 +90,12 @@ test('computeResultDone publishes injected computeResultDone events for injectio
       .env('prod')
       .build()
 
-    const processInjectedSubject = createProcessInjectedComputeResultDoneSubject()
-    const processInjectedEvents = published.filter(p => p.subject === processInjectedSubject)
+    const injectResultsSubject = createInjectResultsSubject()
+    const injectResultsCommands = published.filter(p => p.subject === injectResultsSubject)
     const startDependantsEvents = published.filter(p => p.subject === startDependantsSubject)
 
-    assert.equal(processInjectedEvents.length, 1)
-    assert.deepEqual(processInjectedEvents[0].payload.data, {
+    assert.equal(injectResultsCommands.length, 1)
+    assert.deepEqual(injectResultsCommands[0].payload.data, {
       instanceId,
       instanceVertexId: finalScope.instanceVertexId,
       stateMachineId,
@@ -104,7 +104,7 @@ test('computeResultDone publishes injected computeResultDone events for injectio
       result: resultPayload,
     })
 
-    const injectedPublishes = await runProcessInjectedComputeResultDoneEvents({ rootCtx, events: published })
+    const injectedPublishes = await runInjectResultsCommands({ rootCtx, events: published })
     const injectedEvents = injectedPublishes.filter(p => p.subject === computeResultDoneSubject)
 
     assert.equal(startDependantsEvents.length, 1)
@@ -185,7 +185,7 @@ test('injected result triggers dependant data and task start commands', async ()
       message: initialMessage,
     })
 
-    const initialInjectedPublishes = await runProcessInjectedComputeResultDoneEvents({
+    const initialInjectedPublishes = await runInjectResultsCommands({
       rootCtx: initialRootCtx,
       events: initialPublishes,
     })

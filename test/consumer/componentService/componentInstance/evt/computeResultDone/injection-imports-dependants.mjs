@@ -14,7 +14,7 @@ import {
   getImportedInstance,
   pickFirst,
   runSpec,
-  runProcessInjectedComputeResultDoneEvents,
+  runInjectResultsCommands,
   computeResultDoneSpec,
   startDependantsSpec,
   domain,
@@ -100,7 +100,7 @@ test('imported injection triggers dependant starts inside imported component', a
       },
     })
 
-    const initialInjectedPublishes = await runProcessInjectedComputeResultDoneEvents({
+    const initialInjectedPublishes = await runInjectResultsCommands({
       rootCtx: initialRootCtx,
       events: initialPublishes,
     })
