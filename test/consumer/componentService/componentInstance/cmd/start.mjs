@@ -330,7 +330,7 @@ test('publishEvents starts dependency-free states, imports, and emits startDone'
   assert.deepEqual(startDoneEvents[0].payload.data, { instanceId })
 })
 
-test('publishEvents dispatches gate start command and gate handler emits compute_result', async () => {
+test('publishEvents dispatches gate start command and gate handler emits compute_function', async () => {
   await withGraphContext(async ({ diagnostics, dataMapper, g }) => {
     const gatedComponent = componentBuilder('StartGateTarget')
       .data('ready', { deps: () => { } })
@@ -379,7 +379,7 @@ test('publishEvents dispatches gate start command and gate handler emits compute
     const gateStartSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.gate.start.v1['*']).forPublish()
       .env('prod')
       .build()
-    const gateExecSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].exec.component.compute_result.v1['*']).forPublish()
+    const gateCommandSubject = createBasicSubject(natsEvents['*'].gateway['*']['*'].cmd.component.compute_function.v1['*']).forPublish()
       .env('prod')
       .build()
     const startInstanceSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start.v1['*']).forPublish()
@@ -393,8 +393,8 @@ test('publishEvents dispatches gate start command and gate handler emits compute
       parentInstanceId: instanceId,
     })
 
-    const directComputeEvents = published.filter(({ subject }) => subject === gateExecSubject)
-    assert.equal(directComputeEvents.length, 0, 'gate compute_result should be emitted by gate.cmd.start handler')
+    const directComputeEvents = published.filter(({ subject }) => subject === gateCommandSubject)
+    assert.equal(directComputeEvents.length, 0, 'gate compute_function should be emitted by gate.cmd.start handler')
 
     const directStartEvents = published.filter(({ subject }) => subject === startInstanceSubject)
     assert.equal(directStartEvents.length, 0, 'gated instance should not be started directly by consumer')

@@ -115,7 +115,7 @@ test('concurrent duplicate task starts should emit only one execution request', 
       }),
     ])
 
-    const executionRequestSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].exec.component.compute_result.v1['*']).forPublish()
+    const executionRequestSubject = createBasicSubject(natsEvents['*'].gateway['*']['*'].cmd.component.compute_function.v1['*']).forPublish()
       .env('prod')
       .build()
 

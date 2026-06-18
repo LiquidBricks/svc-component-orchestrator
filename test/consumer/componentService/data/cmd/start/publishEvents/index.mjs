@@ -24,7 +24,7 @@ test('publishEvents emits execution request for data', async () => {
     },
   })
 
-  const subject = createBasicSubject(natsEvents['*'].component_service['*']['*'].exec.component.compute_result.v1['*']).forPublish()
+  const subject = createBasicSubject(natsEvents['*'].gateway['*']['*'].cmd.component.compute_function.v1['*']).forPublish()
     .env('prod')
     .build()
 

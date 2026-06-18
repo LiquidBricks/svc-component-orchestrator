@@ -44,7 +44,7 @@ export async function publishStartCommands({ rootCtx: { natsContext }, scope: {
       )
     }
 
-    const gateSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].exec.component.compute_result.v1['*']).forPublish()
+    const gateSubject = createBasicSubject(natsEvents['*'].gateway['*']['*'].cmd.component.compute_function.v1['*']).forPublish()
       .env('prod')
 
     const normalizedGates = (gateStartRequests ?? [])

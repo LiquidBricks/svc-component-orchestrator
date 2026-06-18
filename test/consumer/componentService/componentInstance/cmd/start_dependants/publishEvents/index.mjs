@@ -79,7 +79,7 @@ test('publishEvents publishes import start commands with parent instance context
   })
 })
 
-test('publishEvents dispatches gate compute_result requests to component execution', async () => {
+test('publishEvents dispatches gate compute_function requests to component execution', async () => {
   const published = []
   const natsContext = {
     publish: async (subject, payload) => published.push({ subject, payload: JSON.parse(payload) }),
@@ -107,7 +107,7 @@ test('publishEvents dispatches gate compute_result requests to component executi
     },
   })
 
-  const gateSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].exec.component.compute_result.v1['*']).forPublish()
+  const gateSubject = createBasicSubject(natsEvents['*'].gateway['*']['*'].cmd.component.compute_function.v1['*']).forPublish()
     .env('prod')
     .build()
   const startInstanceSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start.v1['*']).forPublish()

@@ -4,11 +4,11 @@ import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nat
 
 
 export async function publishExecutionRequest({ scope: { instanceId, componentHash, name, deps }, rootCtx: { natsContext } }) {
-  const execSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].exec.component.compute_result.v1['*']).forPublish()
+  const commandSubject = createBasicSubject(natsEvents['*'].gateway['*']['*'].cmd.component.compute_function.v1['*']).forPublish()
     .env('prod')
 
   await natsContext.publish(
-    execSubject.build(),
+    commandSubject.build(),
     JSON.stringify({ data: { instanceId, deps, componentHash, name, type: 'task' } })
   )
 }
