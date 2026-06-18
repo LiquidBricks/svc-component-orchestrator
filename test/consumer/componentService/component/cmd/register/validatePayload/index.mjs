@@ -6,10 +6,10 @@ import { component as componentBuilder } from '@liquid-bricks/lib-component-buil
 import { validatePayload } from '../../../../../../../core/componentAgent/cmd/registerComponent/validatePayload/index.js'
 import { createHandlerDiagnostics, makeDiagnosticsInstance } from '../helpers.mjs'
 
-function makeArgs(component) {
+function makeArgs(component, { agentID = 'test-agent' } = {}) {
   const diagnostics = makeDiagnosticsInstance()
-  const handlerDiagnostics = createHandlerDiagnostics(diagnostics, { component })
-  return { diagnostics, args: { scope: { handlerDiagnostics, component } } }
+  const handlerDiagnostics = createHandlerDiagnostics(diagnostics, { component, agentID })
+  return { diagnostics, args: { scope: { handlerDiagnostics, component, agentID } } }
 }
 
 test('validatePayload deserializes the registration payload', () => {
