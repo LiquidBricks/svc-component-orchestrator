@@ -16,7 +16,7 @@ import {
   pickFirst,
   runSpec,
   runInjectResultsCommands,
-  computeResultDoneSpec,
+  computeFunctionSpec,
   domain,
 } from './helpers.mjs'
 
@@ -38,7 +38,7 @@ async function getGateInstanceId({ g, rootInstanceVertexId, alias }) {
   return pickFirst(gateInstanceValues?.instanceId ?? gateInstanceValues)
 }
 
-test('computeResultDone with gate=true publishes start for gated instance', async () => {
+test('computeFunction with gate=true publishes start for gated instance', async () => {
   await withGraphContext(async ({ diagnostics, dataMapper, g }) => {
     const targetComponent = componentBuilder('GateResultTarget').toJSON()
     const rootComponent = componentBuilder('GateResultRoot')
@@ -61,14 +61,14 @@ test('computeResultDone with gate=true publishes start for gated instance', asyn
     const gateInstanceId = await getGateInstanceId({ g, rootInstanceVertexId, alias: 'setup' })
     assert.ok(gateInstanceId, 'gated instance id missing')
 
-    const computeResultDoneSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.computeResultDone.v1['*']).forPublish()
+    const computeFunctionSubject = createBasicSubject(natsEvents['*'].component_service['*'].function_result.evt.component.compute_function.v1['*']).forPublish()
       .env('prod')
       .build()
 
     const published = []
     let acked = false
     await runSpec({
-      spec: computeResultDoneSpec,
+      spec: computeFunctionSpec,
       rootCtx: {
         diagnostics,
         g,
@@ -76,7 +76,7 @@ test('computeResultDone with gate=true publishes start for gated instance', asyn
         natsContext: { publish: async (subject, payload) => published.push({ subject, payload: JSON.parse(payload) }) },
       },
       message: {
-        subject: computeResultDoneSubject,
+        subject: computeFunctionSubject,
         ack: () => { acked = true },
         json: () => ({
           data: {
@@ -99,7 +99,7 @@ test('computeResultDone with gate=true publishes start for gated instance', asyn
   })
 })
 
-test('computeResultDone does not publish start_dependants for unstarted gated instances', async () => {
+test('computeFunction does not publish start_dependants for unstarted gated instances', async () => {
   await withGraphContext(async ({ diagnostics, dataMapper, g }) => {
     const targetComponent = componentBuilder('GateInjectUnstartedTarget')
       .data('value', { deps: () => { } })
@@ -133,7 +133,7 @@ test('computeResultDone does not publish start_dependants for unstarted gated in
     const gatedInstanceStarted = await hasInstanceStarted({ g, instanceVertexId: gatedInstanceVertexId })
     assert.equal(gatedInstanceStarted, false)
 
-    const computeResultDoneSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.computeResultDone.v1['*']).forPublish()
+    const computeFunctionSubject = createBasicSubject(natsEvents['*'].component_service['*'].function_result.evt.component.compute_function.v1['*']).forPublish()
       .env('prod')
       .build()
 
@@ -149,10 +149,10 @@ test('computeResultDone does not publish start_dependants for unstarted gated in
       natsContext: { publish: async (subject, payload) => firstRunPublished.push({ subject, payload: JSON.parse(payload) }) },
     }
     await runSpec({
-      spec: computeResultDoneSpec,
+      spec: computeFunctionSpec,
       rootCtx: firstRunRootCtx,
       message: {
-        subject: computeResultDoneSubject,
+        subject: computeFunctionSubject,
         ack: () => { },
         json: () => ({
           data: {
@@ -170,16 +170,16 @@ test('computeResultDone does not publish start_dependants for unstarted gated in
       events: firstRunPublished,
     })
     const injectedGateEvent = firstRunInjectedPublishes.find(({ subject, payload }) =>
-      subject === computeResultDoneSubject
+      subject === computeFunctionSubject
       && payload?.data?.instanceId === gatedInstanceId
       && payload?.data?.type === 'data'
       && payload?.data?.name === 'value'
     )
-    assert.ok(injectedGateEvent, 'expected injected computeResultDone event for gated instance')
+    assert.ok(injectedGateEvent, 'expected injected computeFunction event for gated instance')
 
     const secondRunPublished = []
     await runSpec({
-      spec: computeResultDoneSpec,
+      spec: computeFunctionSpec,
       rootCtx: {
         diagnostics,
         g,
@@ -187,7 +187,7 @@ test('computeResultDone does not publish start_dependants for unstarted gated in
         natsContext: { publish: async (subject, payload) => secondRunPublished.push({ subject, payload: JSON.parse(payload) }) },
       },
       message: {
-        subject: computeResultDoneSubject,
+        subject: computeFunctionSubject,
         ack: () => { },
         json: () => injectedGateEvent.payload,
       },
@@ -198,7 +198,7 @@ test('computeResultDone does not publish start_dependants for unstarted gated in
   })
 })
 
-test('computeResultDone with gate=false does not publish gated instance start', async () => {
+test('computeFunction with gate=false does not publish gated instance start', async () => {
   await withGraphContext(async ({ diagnostics, dataMapper, g }) => {
     const targetComponent = componentBuilder('GateResultTargetFalse').toJSON()
     const rootComponent = componentBuilder('GateResultRootFalse')
@@ -217,14 +217,14 @@ test('computeResultDone with gate=false does not publish gated instance start', 
       { componentHash: rootComponent.hash, componentId: rootComponentId, instanceId: rootInstanceId, imports, gates },
     )
 
-    const computeResultDoneSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.computeResultDone.v1['*']).forPublish()
+    const computeFunctionSubject = createBasicSubject(natsEvents['*'].component_service['*'].function_result.evt.component.compute_function.v1['*']).forPublish()
       .env('prod')
       .build()
 
     const published = []
     let acked = false
     await runSpec({
-      spec: computeResultDoneSpec,
+      spec: computeFunctionSpec,
       rootCtx: {
         diagnostics,
         g,
@@ -232,7 +232,7 @@ test('computeResultDone with gate=false does not publish gated instance start', 
         natsContext: { publish: async (subject, payload) => published.push({ subject, payload: JSON.parse(payload) }) },
       },
       message: {
-        subject: computeResultDoneSubject,
+        subject: computeFunctionSubject,
         ack: () => { acked = true },
         json: () => ({
           data: {
@@ -254,7 +254,7 @@ test('computeResultDone with gate=false does not publish gated instance start', 
   })
 })
 
-test('computeResultDone routes gate inject targets by alias when multiple gates share one component hash', async () => {
+test('computeFunction routes gate inject targets by alias when multiple gates share one component hash', async () => {
   await withGraphContext(async ({ diagnostics, dataMapper, g }) => {
     const targetComponent = componentBuilder('GateInjectAliasTarget')
       .data('value', { deps: () => { } })
@@ -302,7 +302,7 @@ test('computeResultDone routes gate inject targets by alias when multiple gates 
     assert.ok(gateInstanceByAlias.simpleCompFalseGate, 'simpleCompFalseGate instance missing')
     assert.ok(gateInstanceByAlias.simpleCompThirdGate, 'simpleCompThirdGate instance missing')
 
-    const computeResultDoneSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.computeResultDone.v1['*']).forPublish()
+    const computeFunctionSubject = createBasicSubject(natsEvents['*'].component_service['*'].function_result.evt.component.compute_function.v1['*']).forPublish()
       .env('prod')
       .build()
 
@@ -321,10 +321,10 @@ test('computeResultDone routes gate inject targets by alias when multiple gates 
         natsContext: { publish: async (subject, payload) => published.push({ subject, payload: JSON.parse(payload) }) },
       }
       await runSpec({
-        spec: computeResultDoneSpec,
+        spec: computeFunctionSpec,
         rootCtx,
         message: {
-          subject: computeResultDoneSubject,
+          subject: computeFunctionSubject,
           ack: () => { },
           json: () => ({
             data: {
@@ -338,7 +338,7 @@ test('computeResultDone routes gate inject targets by alias when multiple gates 
       })
 
       const injectedPublishes = await runInjectResultsCommands({ rootCtx, events: published })
-      const injectedEvents = injectedPublishes.filter(({ subject }) => subject === computeResultDoneSubject)
+      const injectedEvents = injectedPublishes.filter(({ subject }) => subject === computeFunctionSubject)
       assert.equal(injectedEvents.length, 1, `expected one injected result for ${sourceName}`)
       assert.equal(
         injectedEvents[0].payload.data.instanceId,
@@ -352,7 +352,7 @@ test('computeResultDone routes gate inject targets by alias when multiple gates 
   })
 })
 
-test('computeResultDone routes identifier->gate inject to the same pod instance when pod component is imported twice', async () => {
+test('computeFunction routes identifier->gate inject to the same pod instance when pod component is imported twice', async () => {
   await withGraphContext(async ({ diagnostics, dataMapper, g }) => {
     const identifierComponent = componentBuilder('GateInjectSiblingIdentifier')
       .data('id', { deps: () => { }, fnc: function fnIdentifierId() { } })
@@ -388,7 +388,7 @@ test('computeResultDone routes identifier->gate inject to the same pod instance 
 
     const { instanceVertexId: rootInstanceVertexId } = await getStateMachineId({ g, instanceId: rootInstanceId })
 
-    const computeResultDoneSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.computeResultDone.v1['*']).forPublish()
+    const computeFunctionSubject = createBasicSubject(natsEvents['*'].component_service['*'].function_result.evt.component.compute_function.v1['*']).forPublish()
       .env('prod')
       .build()
 
@@ -421,10 +421,10 @@ test('computeResultDone routes identifier->gate inject to the same pod instance 
         natsContext: { publish: async (subject, payload) => published.push({ subject, payload: JSON.parse(payload) }) },
       }
       await runSpec({
-        spec: computeResultDoneSpec,
+        spec: computeFunctionSpec,
         rootCtx,
         message: {
-          subject: computeResultDoneSubject,
+          subject: computeFunctionSubject,
           ack: () => { },
           json: () => ({
             data: {
@@ -439,7 +439,7 @@ test('computeResultDone routes identifier->gate inject to the same pod instance 
 
       const injectedPublishes = await runInjectResultsCommands({ rootCtx, events: published })
       const injectedEvents = injectedPublishes.filter(({ subject, payload }) =>
-        subject === computeResultDoneSubject
+        subject === computeFunctionSubject
         && payload?.data?.type === 'data'
         && payload?.data?.name === 'id'
       )

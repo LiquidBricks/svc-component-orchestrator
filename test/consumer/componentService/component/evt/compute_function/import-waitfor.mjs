@@ -16,7 +16,7 @@ import {
   pickFirst,
   runSpec,
   runInjectResultsCommands,
-  computeResultDoneSpec,
+  computeFunctionSpec,
   startDependantsSpec,
   startInstanceSpec,
   dataStartSpec,
@@ -79,7 +79,7 @@ test('import start preserves injected data when waitFor delays the import', asyn
     const importStartSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.import.start.v1['*']).forPublish()
       .env('prod')
       .build()
-    const computeResultDoneSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.computeResultDone.v1['*']).forPublish()
+    const computeFunctionSubject = createBasicSubject(natsEvents['*'].component_service['*'].function_result.evt.component.compute_function.v1['*']).forPublish()
       .env('prod')
       .build()
     const startDependantsSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start_dependants.v1['*']).forPublish()
@@ -179,10 +179,10 @@ test('import start preserves injected data when waitFor delays the import', asyn
       natsContext: { publish: async (subject, payload) => providerResultPublishes.push({ subject, payload: JSON.parse(payload) }) },
     }
     await runSpec({
-      spec: computeResultDoneSpec,
+      spec: computeFunctionSpec,
       rootCtx: providerResultRootCtx,
       message: {
-        subject: computeResultDoneSubject,
+        subject: computeFunctionSubject,
         ack: () => { },
         json: () => ({
           data: {
@@ -200,14 +200,14 @@ test('import start preserves injected data when waitFor delays the import', asyn
       events: providerResultPublishes,
     })
     const injectedEvent = providerInjectedPublishes.find(({ subject, payload }) =>
-      subject === computeResultDoneSubject
+      subject === computeFunctionSubject
       && payload?.data?.instanceId === targetInstanceId
       && payload?.data?.name === 'pod'
     )
-    assert.ok(injectedEvent, 'injected computeResultDone not published to target import')
+    assert.ok(injectedEvent, 'injected computeFunction not published to target import')
 
     await runSpec({
-      spec: computeResultDoneSpec,
+      spec: computeFunctionSpec,
       rootCtx: {
         diagnostics,
         g,
@@ -215,7 +215,7 @@ test('import start preserves injected data when waitFor delays the import', asyn
         natsContext: { publish: async () => { } },
       },
       message: {
-        subject: computeResultDoneSubject,
+        subject: computeFunctionSubject,
         ack: () => { },
         json: () => injectedEvent.payload,
       },
@@ -227,7 +227,7 @@ test('import start preserves injected data when waitFor delays the import', asyn
 
     const gatePublishes = []
     await runSpec({
-      spec: computeResultDoneSpec,
+      spec: computeFunctionSpec,
       rootCtx: {
         diagnostics,
         g,
@@ -235,7 +235,7 @@ test('import start preserves injected data when waitFor delays the import', asyn
         natsContext: { publish: async (subject, payload) => gatePublishes.push({ subject, payload: JSON.parse(payload) }) },
       },
       message: {
-        subject: computeResultDoneSubject,
+        subject: computeFunctionSubject,
         ack: () => { },
         json: () => ({
           data: {

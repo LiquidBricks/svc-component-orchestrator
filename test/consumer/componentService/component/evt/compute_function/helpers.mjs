@@ -8,8 +8,8 @@ import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nat
 
 import { createComponentServiceRouter } from '../../../../../../router.js'
 import { path as registerPath } from '../../../../../../core/componentAgent/cmd/registerComponent/index.js'
-import { STATE_EDGE_LABEL_BY_TYPE, STATE_EDGE_STATUS_BY_TYPE } from '../../../../../../core/componentInstance/evt/computeResultDone/constants.js'
-import { validatePayload } from '../../../../../../core/componentInstance/evt/computeResultDone/validatePayload.js'
+import { STATE_EDGE_LABEL_BY_TYPE, STATE_EDGE_STATUS_BY_TYPE } from '../../../../../../core/component/evt/compute_function/constants.js'
+import { validatePayload } from '../../../../../../core/component/evt/compute_function/validatePayload.js'
 import { componentImports } from '../../../../../../core/componentInstance/cmd/create/loadData/componentImports.js'
 import { dataMapper as createDataMapper, domain } from '@liquid-bricks/spec-domain/domain'
 import { serviceConfiguration } from '../../../../../provider/serviceConfiguration/dotenv/index.js'
@@ -51,7 +51,7 @@ export async function withGraphContext(run) {
 
 const createInstanceSpec = getCreateInstanceSpec()
 const startInstanceSpec = getStartInstanceSpec()
-const computeResultDoneSpec = getComputeResultDoneSpec()
+const computeFunctionSpec = getComputeFunctionSpec()
 const injectResultsSpec = getInjectResultsSpec()
 const stateMachineCompletedSpec = getStateMachineCompletedSpec()
 const startDependantsSpec = getStartDependantsSpec()
@@ -89,7 +89,7 @@ function getStartInstanceSpec() {
   return route.config
 }
 
-function getComputeResultDoneSpec() {
+function getComputeFunctionSpec() {
   const router = createComponentServiceRouter({
     natsContext: {},
     g: {},
@@ -97,11 +97,12 @@ function getComputeResultDoneSpec() {
     dataMapper: {},
   })
   const route = router.routes.find(({ values }) =>
-    values.channel === 'evt'
-    && values.entity === 'componentInstance'
-    && values.action === 'computeResultDone'
+    values.context === 'function_result'
+    && values.channel === 'evt'
+    && values.entity === 'component'
+    && values.action === 'compute_function'
   )
-  assert.ok(route, 'computeResultDone route not found')
+  assert.ok(route, 'computeFunction route not found')
   return route.config
 }
 
@@ -326,7 +327,7 @@ export {
   validatePayload,
   createInstanceSpec,
   startInstanceSpec,
-  computeResultDoneSpec,
+  computeFunctionSpec,
   injectResultsSpec,
   stateMachineCompletedSpec,
   startDependantsSpec,

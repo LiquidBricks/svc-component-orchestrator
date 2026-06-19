@@ -21,7 +21,7 @@ export const routes = [
   [importEntity.cmd.start.path, importEntity.cmd.start.spec],
   [task.cmd.start.path, task.cmd.start.spec],
   [componentInstance.evt.createDone.path, componentInstance.evt.createDone.spec],
-  [componentInstance.evt.computeResultDone.path, componentInstance.evt.computeResultDone.spec],
+  [component.evt.compute_function.path, component.evt.compute_function.spec],
   [componentInstance.cmd.injectResults.path, componentInstance.cmd.injectResults.spec],
   [componentInstance.evt.state_machine_completed.path, componentInstance.evt.state_machine_completed.spec],
   [componentInstance.evt.startDone.path, componentInstance.evt.startDone.spec],

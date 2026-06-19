@@ -15,7 +15,7 @@ import {
   pickFirst,
   runSpec,
   runInjectResultsCommands,
-  computeResultDoneSpec,
+  computeFunctionSpec,
   startDependantsSpec,
   domain,
 } from './helpers.mjs'
@@ -63,7 +63,7 @@ test('imported injection triggers dependant starts inside imported component', a
     assert.ok(childDepDataStateEdgeId, 'child data dependant state edge missing')
     assert.ok(childDepTaskStateEdgeId, 'child task dependant state edge missing')
 
-    const computeResultDoneSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.computeResultDone.v1['*']).forPublish()
+    const computeFunctionSubject = createBasicSubject(natsEvents['*'].component_service['*'].function_result.evt.component.compute_function.v1['*']).forPublish()
       .env('prod')
       .build()
     const startDependantsSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start_dependants.v1['*']).forPublish()
@@ -84,10 +84,10 @@ test('imported injection triggers dependant starts inside imported component', a
       natsContext: { publish: async (subject, payload) => initialPublishes.push({ subject, payload: JSON.parse(payload) }) },
     }
     await runSpec({
-      spec: computeResultDoneSpec,
+      spec: computeFunctionSpec,
       rootCtx: initialRootCtx,
       message: {
-        subject: computeResultDoneSubject,
+        subject: computeFunctionSubject,
         ack: () => { },
         json: () => ({
           data: {
@@ -105,7 +105,7 @@ test('imported injection triggers dependant starts inside imported component', a
       events: initialPublishes,
     })
     const injectedEvent = initialInjectedPublishes.find(p =>
-      p.subject === computeResultDoneSubject
+      p.subject === computeFunctionSubject
       && p.payload?.data?.instanceId === childInstanceId
       && p.payload?.data?.name === 'childTarget'
     )
@@ -113,7 +113,7 @@ test('imported injection triggers dependant starts inside imported component', a
 
     const injectedPublishes = []
     await runSpec({
-      spec: computeResultDoneSpec,
+      spec: computeFunctionSpec,
       rootCtx: {
         diagnostics,
         g,
@@ -121,7 +121,7 @@ test('imported injection triggers dependant starts inside imported component', a
         natsContext: { publish: async (subject, payload) => injectedPublishes.push({ subject, payload: JSON.parse(payload) }) },
       },
       message: {
-        subject: computeResultDoneSubject,
+        subject: computeFunctionSubject,
         ack: () => { },
         json: () => injectedEvent.payload,
       },
@@ -155,7 +155,7 @@ test('imported injection triggers dependant starts inside imported component', a
   })
 })
 
-test('computeResultDone triggers parent dependant starts across imports', async () => {
+test('computeFunction triggers parent dependant starts across imports', async () => {
   await withGraphContext(async ({ diagnostics, dataMapper, g }) => {
     const childComponent = component('ParentDependantsChild')
       .data('childTarget', { deps: () => { }, fnc: function fnChildTarget() { } })
@@ -187,12 +187,12 @@ test('computeResultDone triggers parent dependant starts across imports', async 
 
     const published = []
     let resultAcked = false
-    const computeResultDoneSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.computeResultDone.v1['*']).forPublish()
+    const computeFunctionSubject = createBasicSubject(natsEvents['*'].component_service['*'].function_result.evt.component.compute_function.v1['*']).forPublish()
       .env('prod')
       .build()
 
     await runSpec({
-      spec: computeResultDoneSpec,
+      spec: computeFunctionSpec,
       rootCtx: {
         diagnostics,
         g,
@@ -200,7 +200,7 @@ test('computeResultDone triggers parent dependant starts across imports', async 
         natsContext: { publish: async (subject, payload) => published.push({ subject, payload: JSON.parse(payload) }) },
       },
       message: {
-        subject: computeResultDoneSubject,
+        subject: computeFunctionSubject,
         ack: () => { resultAcked = true },
         json: () => ({
           data: {

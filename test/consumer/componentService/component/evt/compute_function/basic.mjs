@@ -12,7 +12,7 @@ import {
   getStateMachineId,
   pickFirst,
   runSpec,
-  computeResultDoneSpec,
+  computeFunctionSpec,
   STATE_EDGE_STATUS_BY_TYPE,
   createHandlerDiagnostics,
   makeDiagnosticsInstance,
@@ -23,7 +23,7 @@ import {
 import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
 
 
-test('computeResultDone stores state result, marks status provided, and publishes start_dependants', async () => {
+test('computeFunction stores state result, marks status provided, and publishes start_dependants', async () => {
   await withGraphContext(async ({ diagnostics, dataMapper, g }) => {
     const component = componentBuilder('ComputeResultDoneComponent')
       .data('dataInput', { deps: () => { } })
@@ -51,7 +51,7 @@ test('computeResultDone stores state result, marks status provided, and publishe
     const published = []
     let acked = false
     const message = {
-      subject: createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.computeResultDone.v1['*']).forPublish()
+      subject: createBasicSubject(natsEvents['*'].component_service['*'].function_result.evt.component.compute_function.v1['*']).forPublish()
         .env('prod')
         .build(),
       ack: () => { acked = true },
@@ -71,7 +71,7 @@ test('computeResultDone stores state result, marks status provided, and publishe
       natsContext: { publish: async (subject, payload) => published.push({ subject, payload: JSON.parse(payload) }) },
     }
 
-    const finalScope = await runSpec({ spec: computeResultDoneSpec, rootCtx, message })
+    const finalScope = await runSpec({ spec: computeFunctionSpec, rootCtx, message })
 
     assert.equal(finalScope.stateEdgeId, stateEdgeId)
     assert.equal(acked, true)

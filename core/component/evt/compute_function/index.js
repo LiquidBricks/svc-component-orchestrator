@@ -7,7 +7,7 @@ import { validatePayload } from './validatePayload.js'
 import { create as createSubject } from '@liquid-bricks/lib-nats-subject/create/basic'
 import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
 
-export const path = createSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.computeResultDone.v1['*'])
+export const path = createSubject(natsEvents['*'].component_service['*'].function_result.evt.component.compute_function.v1['*'])
   .forSubscribe()
   .toObject()
 

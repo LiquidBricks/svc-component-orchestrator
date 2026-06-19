@@ -1,7 +1,7 @@
 import { create as createBasicSubject } from '@liquid-bricks/lib-nats-subject/create/basic'
 import { Errors } from '../../../../../errors.js'
 import { domain } from '@liquid-bricks/spec-domain/domain'
-import { STATE_EDGE_LABEL_BY_TYPE } from '../../../evt/computeResultDone/constants.js'
+import { STATE_EDGE_LABEL_BY_TYPE } from '../../../../component/evt/compute_function/constants.js'
 
 import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
 
@@ -234,7 +234,7 @@ export async function publishInjectedComputeResultDoneEvents({ scope, rootCtx: {
   const injectsIntoEdges = INJECTS_INTO_EDGE_BY_TYPE[type]
   if (!injectsIntoEdges?.length) return
 
-  const computeResultDoneSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.computeResultDone.v1['*']).forPublish()
+  const computeResultDoneSubject = createBasicSubject(natsEvents['*'].component_service['*'].function_result.evt.component.compute_function.v1['*']).forPublish()
     .env('prod')
     .build()
 

@@ -1,5 +1,5 @@
 import { Errors } from '../../../../errors.js'
-import { STATE_EDGE_LABEL_BY_TYPE } from '../../evt/computeResultDone/constants.js'
+import { STATE_EDGE_LABEL_BY_TYPE } from '../../../component/evt/compute_function/constants.js'
 
 export function validatePayload({
   scope: { handlerDiagnostics, instanceId, instanceVertexId, stateMachineId, stateEdgeId, type },

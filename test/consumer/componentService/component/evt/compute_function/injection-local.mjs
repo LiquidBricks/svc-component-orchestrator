@@ -15,7 +15,7 @@ import {
   runSpec,
   runInjectResultsCommands,
   createInjectResultsSubject,
-  computeResultDoneSpec,
+  computeFunctionSpec,
   startDependantsSpec,
   STATE_EDGE_STATUS_BY_TYPE,
 } from './helpers.mjs'
@@ -23,7 +23,7 @@ import {
 import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
 
 
-test('computeResultDone publishes injected computeResultDone events for injection targets', async () => {
+test('computeFunction publishes injected computeFunction events for injection targets', async () => {
   await withGraphContext(async ({ diagnostics, dataMapper, g }) => {
     const component = componentBuilder('ResultInjectionComponent')
       .task('taskB', {})
@@ -54,7 +54,7 @@ test('computeResultDone publishes injected computeResultDone events for injectio
     let acked = false
     const resultPayload = { injected: true }
     const message = {
-      subject: createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.computeResultDone.v1['*']).forPublish()
+      subject: createBasicSubject(natsEvents['*'].component_service['*'].function_result.evt.component.compute_function.v1['*']).forPublish()
         .env('prod')
         .build(),
       ack: () => { acked = true },
@@ -74,7 +74,7 @@ test('computeResultDone publishes injected computeResultDone events for injectio
       natsContext: { publish: async (subject, payload) => published.push({ subject, payload: JSON.parse(payload) }) },
     }
 
-    const finalScope = await runSpec({ spec: computeResultDoneSpec, rootCtx, message })
+    const finalScope = await runSpec({ spec: computeFunctionSpec, rootCtx, message })
 
     assert.equal(finalScope.stateEdgeId, sourceEdgeId)
     assert.equal(acked, true)
@@ -83,7 +83,7 @@ test('computeResultDone publishes injected computeResultDone events for injectio
     assert.equal(pickFirst(updatedValues.status), STATE_EDGE_STATUS_BY_TYPE.data)
     assert.equal(pickFirst(updatedValues.result), JSON.stringify(resultPayload))
 
-    const computeResultDoneSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.computeResultDone.v1['*']).forPublish()
+    const computeFunctionSubject = createBasicSubject(natsEvents['*'].component_service['*'].function_result.evt.component.compute_function.v1['*']).forPublish()
       .env('prod')
       .build()
     const startDependantsSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start_dependants.v1['*']).forPublish()
@@ -105,7 +105,7 @@ test('computeResultDone publishes injected computeResultDone events for injectio
     })
 
     const injectedPublishes = await runInjectResultsCommands({ rootCtx, events: published })
-    const injectedEvents = injectedPublishes.filter(p => p.subject === computeResultDoneSubject)
+    const injectedEvents = injectedPublishes.filter(p => p.subject === computeFunctionSubject)
 
     assert.equal(startDependantsEvents.length, 1)
     assert.deepEqual(startDependantsEvents[0].payload.data, { instanceId, stateEdgeId: sourceEdgeId, type: 'data' })
@@ -147,7 +147,7 @@ test('injected result triggers dependant data and task start commands', async ()
     assert.ok(dependantDataStateEdgeId, 'dataDependent state edge missing')
     assert.ok(dependantTaskStateEdgeId, 'taskDependent state edge missing')
 
-    const computeResultDoneSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.computeResultDone.v1['*']).forPublish()
+    const computeFunctionSubject = createBasicSubject(natsEvents['*'].component_service['*'].function_result.evt.component.compute_function.v1['*']).forPublish()
       .env('prod')
       .build()
     const startDependantsSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start_dependants.v1['*']).forPublish()
@@ -162,7 +162,7 @@ test('injected result triggers dependant data and task start commands', async ()
 
     const initialPublishes = []
     const initialMessage = {
-      subject: computeResultDoneSubject,
+      subject: computeFunctionSubject,
       ack: () => { },
       json: () => ({
         data: {
@@ -180,7 +180,7 @@ test('injected result triggers dependant data and task start commands', async ()
       natsContext: { publish: async (subject, payload) => initialPublishes.push({ subject, payload: JSON.parse(payload) }) },
     }
     await runSpec({
-      spec: computeResultDoneSpec,
+      spec: computeFunctionSpec,
       rootCtx: initialRootCtx,
       message: initialMessage,
     })
@@ -189,18 +189,18 @@ test('injected result triggers dependant data and task start commands', async ()
       rootCtx: initialRootCtx,
       events: initialPublishes,
     })
-    const injectedEvent = initialInjectedPublishes.find(p => p.subject === computeResultDoneSubject && p.payload?.data?.name === 'dataTarget')
+    const injectedEvent = initialInjectedPublishes.find(p => p.subject === computeFunctionSubject && p.payload?.data?.name === 'dataTarget')
     assert.ok(injectedEvent, 'injected result for dataTarget not published')
 
     const injectedPublishes = []
     let injectedAcked = false
     const injectedMessage = {
-      subject: computeResultDoneSubject,
+      subject: computeFunctionSubject,
       ack: () => { injectedAcked = true },
       json: () => injectedEvent.payload,
     }
     await runSpec({
-      spec: computeResultDoneSpec,
+      spec: computeFunctionSpec,
       rootCtx: {
         diagnostics,
         g,

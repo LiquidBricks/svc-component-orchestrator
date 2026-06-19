@@ -15,7 +15,7 @@ import {
   getStateMachineId,
   pickFirst,
   runSpec,
-  computeResultDoneSpec,
+  computeFunctionSpec,
   stateMachineCompletedSpec,
   domain,
 } from './helpers.mjs'
@@ -56,13 +56,13 @@ test('stateMachine state switches to complete once all states are provided', asy
     await startInstance({ diagnostics, g }, { stateMachineId })
 
     const published = []
-    const computeResultDoneSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.computeResultDone.v1['*']).forPublish()
+    const computeFunctionSubject = createBasicSubject(natsEvents['*'].component_service['*'].function_result.evt.component.compute_function.v1['*']).forPublish()
       .env('prod')
       .build()
 
     let dataAcked = false
     await runSpec({
-      spec: computeResultDoneSpec,
+      spec: computeFunctionSpec,
       rootCtx: {
         diagnostics,
         g,
@@ -70,7 +70,7 @@ test('stateMachine state switches to complete once all states are provided', asy
         natsContext: { publish: async (subject, payload) => published.push({ subject, payload: JSON.parse(payload) }) },
       },
       message: {
-        subject: computeResultDoneSubject,
+        subject: computeFunctionSubject,
         ack: () => { dataAcked = true },
         json: () => ({
           data: {
@@ -89,7 +89,7 @@ test('stateMachine state switches to complete once all states are provided', asy
 
     let taskAcked = false
     await runSpec({
-      spec: computeResultDoneSpec,
+      spec: computeFunctionSpec,
       rootCtx: {
         diagnostics,
         g,
@@ -97,7 +97,7 @@ test('stateMachine state switches to complete once all states are provided', asy
         natsContext: { publish: async (subject, payload) => published.push({ subject, payload: JSON.parse(payload) }) },
       },
       message: {
-        subject: computeResultDoneSubject,
+        subject: computeFunctionSubject,
         ack: () => { taskAcked = true },
         json: () => ({
           data: {
@@ -162,7 +162,7 @@ test('componentInstance completes when only imports exist and imports finish', a
     await startInstance({ diagnostics, dataMapper, g }, { stateMachineId: childStateMachineId })
 
     const published = []
-    const computeResultDoneSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.computeResultDone.v1['*']).forPublish()
+    const computeFunctionSubject = createBasicSubject(natsEvents['*'].component_service['*'].function_result.evt.component.compute_function.v1['*']).forPublish()
       .env('prod')
       .build()
     const stateMachineCompletedSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.state_machine_completed.v1['*']).forPublish()
@@ -170,7 +170,7 @@ test('componentInstance completes when only imports exist and imports finish', a
       .build()
 
     await runSpec({
-      spec: computeResultDoneSpec,
+      spec: computeFunctionSpec,
       rootCtx: {
         diagnostics,
         g,
@@ -178,7 +178,7 @@ test('componentInstance completes when only imports exist and imports finish', a
         natsContext: { publish: async (subject, payload) => published.push({ subject, payload: JSON.parse(payload) }) },
       },
       message: {
-        subject: computeResultDoneSubject,
+        subject: computeFunctionSubject,
         ack: () => { },
         json: () => ({
           data: {
@@ -265,7 +265,7 @@ test('componentInstance completes after false gates settle and true gates comple
     })
 
     const published = []
-    const computeResultDoneSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.computeResultDone.v1['*']).forPublish()
+    const computeFunctionSubject = createBasicSubject(natsEvents['*'].component_service['*'].function_result.evt.component.compute_function.v1['*']).forPublish()
       .env('prod')
       .build()
     const startSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start.v1['*']).forPublish()
@@ -279,10 +279,10 @@ test('componentInstance completes after false gates settle and true gates comple
     }
 
     await runSpec({
-      spec: computeResultDoneSpec,
+      spec: computeFunctionSpec,
       rootCtx: { diagnostics, g, dataMapper, natsContext },
       message: {
-        subject: computeResultDoneSubject,
+        subject: computeFunctionSubject,
         ack: () => { },
         json: () => ({
           data: {
@@ -306,10 +306,10 @@ test('componentInstance completes after false gates settle and true gates comple
     assert.equal(passedGateStarted, true, 'passed gate instance should be started')
 
     await runSpec({
-      spec: computeResultDoneSpec,
+      spec: computeFunctionSpec,
       rootCtx: { diagnostics, g, dataMapper, natsContext },
       message: {
-        subject: computeResultDoneSubject,
+        subject: computeFunctionSubject,
         ack: () => { },
         json: () => ({
           data: {
@@ -344,10 +344,10 @@ test('componentInstance completes after false gates settle and true gates comple
     assert.equal(prematureRootCompletionEvent, undefined, 'root should not complete before every gate has settled')
 
     await runSpec({
-      spec: computeResultDoneSpec,
+      spec: computeFunctionSpec,
       rootCtx: { diagnostics, g, dataMapper, natsContext },
       message: {
-        subject: computeResultDoneSubject,
+        subject: computeFunctionSubject,
         ack: () => { },
         json: () => ({
           data: {

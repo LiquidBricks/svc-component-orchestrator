@@ -1,6 +1,6 @@
 import { create as createBasicSubject } from '@liquid-bricks/lib-nats-subject/create/basic'
 import { domain } from '@liquid-bricks/spec-domain/domain'
-import { hasInstanceStarted } from '../../../cmd/dependencyUtils.js'
+import { hasInstanceStarted } from '../../../../componentInstance/cmd/dependencyUtils.js'
 
 import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
 
