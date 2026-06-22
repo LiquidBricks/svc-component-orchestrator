@@ -16,35 +16,21 @@ function normalizeWaitForValues(waitForValues = []) {
   ))
 }
 
-export async function usesImportInstances({ rootCtx: { g }, scope: { instanceVertexId } }) {
+export async function usesImportInstances({ rootCtx: { g, dataMapper }, scope: { instanceVertexId } }) {
   const imports = []
-  const importRefInstanceIds = await g
-    .V(instanceVertexId)
-    .out(domain.edge.uses_import.componentInstance_importInstanceRef.constants.LABEL)
-    .id()
+  const importRefInstanceIds = await dataMapper.query.listImportRefInstanceIds({ vertexId: instanceVertexId })
 
   for (const importRefInstanceId of importRefInstanceIds ?? []) {
-    const [importRefId] = await g
-      .V(importRefInstanceId)
-      .out(domain.edge.uses_import.importInstanceRef_importRef.constants.LABEL)
-      .id()
-    const [edgeValues] = importRefId ? await g.V(importRefId).valueMap('alias') : []
+    const [importRefId] = await dataMapper.query.findImportRefIdForInstanceRef({ vertexId: importRefInstanceId })
+    const [edgeValues] = importRefId ? await dataMapper.query.readImportRefAlias({ vertexId: importRefId }) : []
     const aliasValues = edgeValues?.alias ?? edgeValues
     const alias = Array.isArray(aliasValues) ? aliasValues[0] : aliasValues
     let waitFor = []
 
     if (importRefId) {
-      const taskWaitForIds = await g
-        .V(importRefId)
-        .out(domain.edge.wait_for.importRef_task.constants.LABEL)
-        .id()
-      const dataWaitForIds = await g
-        .V(importRefId)
-        .out(domain.edge.wait_for.importRef_data.constants.LABEL)
-        .id()
-      const [lifecycleWaitForValues] = await g
-        .V(importRefId)
-        .valueMap(LIFECYCLE_WAIT_FOR_PROPERTY)
+      const taskWaitForIds = await dataMapper.query.listImportTaskWaitForIds({ vertexId: importRefId })
+      const dataWaitForIds = await dataMapper.query.listImportDataWaitForIds({ vertexId: importRefId })
+      const [lifecycleWaitForValues] = await dataMapper.query.readLifecycleWaitForValues({ importRefId })
       const lifecycleWaitFor = normalizeLifecycleWaitForValues(
         lifecycleWaitForValues?.[LIFECYCLE_WAIT_FOR_PROPERTY],
       )
@@ -55,12 +41,9 @@ export async function usesImportInstances({ rootCtx: { g }, scope: { instanceVer
       ])
     }
 
-    const [importInstanceVertexId] = await g
-      .V(importRefInstanceId)
-      .out(domain.edge.uses_import.importInstanceRef_componentInstance.constants.LABEL)
-      .id()
+    const [importInstanceVertexId] = await dataMapper.query.findImportInstanceVertexId({ vertexId: importRefInstanceId })
     if (!importInstanceVertexId) continue
-    const [instanceValues] = await g.V(importInstanceVertexId).valueMap('instanceId')
+    const [instanceValues] = await dataMapper.query.readImportInstanceId({ vertexId: importInstanceVertexId })
     const instanceIdValues = instanceValues?.instanceId ?? instanceValues
     const instanceId = Array.isArray(instanceIdValues) ? instanceIdValues[0] : instanceIdValues
     if (!instanceId) continue

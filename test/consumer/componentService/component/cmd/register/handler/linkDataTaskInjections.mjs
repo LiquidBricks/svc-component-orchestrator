@@ -16,30 +16,30 @@ test('handler builds inject edges for data and tasks', async () => {
 
     await registerHandlerComponent({ diagnostics, dataMapper, g }, component)
 
-    const [taskAId] = await g.V().has('label', domain.vertex.task.constants.LABEL).has('name', 'taskA').id()
-    const [taskBId] = await g.V().has('label', domain.vertex.task.constants.LABEL).has('name', 'taskB').id()
-    const [dataOneId] = await g.V().has('label', domain.vertex.data.constants.LABEL).has('name', 'dataOne').id()
-    const [dataTwoId] = await g.V().has('label', domain.vertex.data.constants.LABEL).has('name', 'dataTwo').id()
+    const [taskAId] = await dataMapper.query.findTaskAId()
+    const [taskBId] = await dataMapper.query.findTaskBId()
+    const [dataOneId] = await dataMapper.query.findDataOneId()
+    const [dataTwoId] = await dataMapper.query.findDataTwoId()
 
     assert.ok(taskAId, 'taskA vertex missing')
     assert.ok(taskBId, 'taskB vertex missing')
     assert.ok(dataOneId, 'dataOne vertex missing')
     assert.ok(dataTwoId, 'dataTwo vertex missing')
 
-    const taskADataInjects = await g.V(taskAId).out(domain.edge.injects_into.task_data.constants.LABEL).id()
+    const taskADataInjects = await dataMapper.query.readTaskADataInjects({ vertexId: taskAId })
     assert.deepEqual(taskADataInjects, [dataOneId])
 
-    const taskATaskInjects = await g.V(taskAId).out(domain.edge.injects_into.task_task.constants.LABEL).id()
+    const taskATaskInjects = await dataMapper.query.readTaskATaskInjects({ vertexId: taskAId })
     assert.deepEqual(taskATaskInjects, [taskBId])
 
-    const dataOneDataInjects = await g.V(dataOneId).out(domain.edge.injects_into.data_data.constants.LABEL).id()
+    const dataOneDataInjects = await dataMapper.query.readDataOneDataInjects({ vertexId: dataOneId })
     assert.deepEqual(dataOneDataInjects, [dataTwoId])
 
-    const dataOneTaskInjects = await g.V(dataOneId).out(domain.edge.injects_into.data_task.constants.LABEL).id()
+    const dataOneTaskInjects = await dataMapper.query.readDataOneTaskInjects({ vertexId: dataOneId })
     assert.deepEqual(dataOneTaskInjects, [taskBId])
 
-    assert.deepEqual(await g.V(taskBId).out(domain.edge.injects_into.task_data.constants.LABEL).id(), [])
-    assert.deepEqual(await g.V(dataTwoId).out(domain.edge.injects_into.data_task.constants.LABEL).id(), [])
+    assert.deepEqual(await dataMapper.query.findInjectsIntoTaskData({ vertexId: taskBId }), [])
+    assert.deepEqual(await dataMapper.query.findInjectsIntoDataTask({ vertexId: dataTwoId }), [])
   })
 })
 
@@ -67,25 +67,25 @@ test('handler resolves namespaced inject paths through imports', async () => {
     await registerHandlerComponent({ diagnostics, dataMapper, g }, componentWords)
     await registerHandlerComponent({ diagnostics, dataMapper, g }, componentRoot)
 
-    const [rootComponentId] = await g.V().has('label', domain.vertex.component.constants.LABEL).has('hash', componentRoot.hash).id()
-    const [mainTaskId] = await g.V(rootComponentId).out(domain.edge.has_task.component_task.constants.LABEL).has('name', 'main').id()
+    const [rootComponentId] = await dataMapper.query.findComponentIdByHash({ hash: componentRoot.hash })
+    const [mainTaskId] = await dataMapper.query.findMainTaskId({ vertexId: rootComponentId })
 
-    const [wordsComponentId] = await g.V().has('label', domain.vertex.component.constants.LABEL).has('hash', componentWords.hash).id()
-    const [wordsProcessId] = await g.V(wordsComponentId).out(domain.edge.has_task.component_task.constants.LABEL).has('name', 'process').id()
-    const [wordsVocabId] = await g.V(wordsComponentId).out(domain.edge.has_data.component_data.constants.LABEL).has('name', 'vocab').id()
+    const [wordsComponentId] = await dataMapper.query.findWordsComponentId({ hash: componentWords.hash })
+    const [wordsProcessId] = await dataMapper.query.findWordsProcessId({ vertexId: wordsComponentId })
+    const [wordsVocabId] = await dataMapper.query.findWordsVocabId({ vertexId: wordsComponentId })
 
-    const [firstComponentId] = await g.V().has('label', domain.vertex.component.constants.LABEL).has('hash', componentFirst.hash).id()
-    const [firstInitId] = await g.V(firstComponentId).out(domain.edge.has_task.component_task.constants.LABEL).has('name', 'init').id()
+    const [firstComponentId] = await dataMapper.query.findFirstComponentId({ hash: componentFirst.hash })
+    const [firstInitId] = await dataMapper.query.findFirstInitId({ vertexId: firstComponentId })
 
     assert.ok(mainTaskId, 'main task missing')
     assert.ok(wordsProcessId, 'words process task missing')
     assert.ok(wordsVocabId, 'words vocab data missing')
     assert.ok(firstInitId, 'first init task missing')
 
-    const taskTargets = await g.V(mainTaskId).out(domain.edge.injects_into.task_task.constants.LABEL).id()
+    const taskTargets = await dataMapper.query.readTaskTargets({ vertexId: mainTaskId })
     assert.deepEqual(taskTargets.sort(), [wordsProcessId, firstInitId].sort())
 
-    const dataTargets = await g.V(mainTaskId).out(domain.edge.injects_into.task_data.constants.LABEL).id()
+    const dataTargets = await dataMapper.query.readDataTargets({ vertexId: mainTaskId })
     assert.deepEqual(dataTargets, [wordsVocabId])
   })
 })

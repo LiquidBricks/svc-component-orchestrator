@@ -6,6 +6,7 @@ import { componentGates } from '../../../../../../core/componentInstance/cmd/cre
 import { hasInstanceStarted } from '../../../../../../core/componentInstance/cmd/dependencyUtils.js'
 import {
   createBasicSubject,
+  createComputeFunctionSubject,
   withGraphContext,
   registerComponent,
   createInstance,
@@ -23,18 +24,13 @@ import {
 import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
 
 
-async function loadGates({ g, componentId }) {
-  const { gates = [] } = await componentGates({ rootCtx: { g }, scope: { componentId } })
+async function loadGates({ g, dataMapper, componentId }) {
+  const { gates = [] } = await componentGates({ rootCtx: { g, dataMapper }, scope: { componentId } })
   return gates
 }
 
-async function getGateInstanceId({ g, rootInstanceVertexId, alias }) {
-  const [gateInstanceValues] = await g
-    .V(rootInstanceVertexId)
-    .out(domain.edge.uses_gate.componentInstance_gateInstanceRef.constants.LABEL)
-    .filter(_ => _.out(domain.edge.uses_gate.gateInstanceRef_gateRef.constants.LABEL).has('alias', alias))
-    .out(domain.edge.uses_gate.gateInstanceRef_componentInstance.constants.LABEL)
-    .valueMap('instanceId')
+async function getGateInstanceId({ g, dataMapper, rootInstanceVertexId, alias }) {
+  const [gateInstanceValues] = await dataMapper.query.readGateInstanceValues({ vertexId: rootInstanceVertexId, alias })
   return pickFirst(gateInstanceValues?.instanceId ?? gateInstanceValues)
 }
 
@@ -49,21 +45,19 @@ test('computeFunction with gate=true publishes start for gated instance', async 
     await registerComponent(rootComponent, { diagnostics, dataMapper, g })
 
     const rootInstanceId = 'instance-gate-result-true'
-    const rootComponentId = await getComponentId({ g, diagnostics, componentHash: rootComponent.hash })
-    const imports = await loadImports({ g, componentId: rootComponentId })
-    const gates = await loadGates({ g, componentId: rootComponentId })
+    const rootComponentId = await getComponentId({ g, dataMapper, diagnostics, componentHash: rootComponent.hash })
+    const imports = await loadImports({ g, dataMapper, componentId: rootComponentId })
+    const gates = await loadGates({ g, dataMapper, componentId: rootComponentId })
     await createInstance(
       { diagnostics, dataMapper, g },
       { componentHash: rootComponent.hash, componentId: rootComponentId, instanceId: rootInstanceId, imports, gates },
     )
 
-    const { instanceVertexId: rootInstanceVertexId } = await getStateMachineId({ g, instanceId: rootInstanceId })
-    const gateInstanceId = await getGateInstanceId({ g, rootInstanceVertexId, alias: 'setup' })
+    const { instanceVertexId: rootInstanceVertexId } = await getStateMachineId({ g, dataMapper, instanceId: rootInstanceId })
+    const gateInstanceId = await getGateInstanceId({ g, dataMapper, rootInstanceVertexId, alias: 'setup' })
     assert.ok(gateInstanceId, 'gated instance id missing')
 
-    const computeFunctionSubject = createBasicSubject(natsEvents['*'].component_service['*'].function_result.evt.component.compute_function.v1['*']).forPublish()
-      .env('prod')
-      .build()
+    const computeFunctionSubject = createComputeFunctionSubject('gate')
 
     const published = []
     let acked = false
@@ -117,25 +111,23 @@ test('computeFunction does not publish start_dependants for unstarted gated inst
     await registerComponent(rootComponent, { diagnostics, dataMapper, g })
 
     const rootInstanceId = 'instance-gate-inject-unstarted'
-    const rootComponentId = await getComponentId({ g, diagnostics, componentHash: rootComponent.hash })
-    const imports = await loadImports({ g, componentId: rootComponentId })
-    const gates = await loadGates({ g, componentId: rootComponentId })
+    const rootComponentId = await getComponentId({ g, dataMapper, diagnostics, componentHash: rootComponent.hash })
+    const imports = await loadImports({ g, dataMapper, componentId: rootComponentId })
+    const gates = await loadGates({ g, dataMapper, componentId: rootComponentId })
     await createInstance(
       { diagnostics, dataMapper, g },
       { componentHash: rootComponent.hash, componentId: rootComponentId, instanceId: rootInstanceId, imports, gates },
     )
 
-    const { instanceVertexId: rootInstanceVertexId } = await getStateMachineId({ g, instanceId: rootInstanceId })
-    const gatedInstanceId = await getGateInstanceId({ g, rootInstanceVertexId, alias: 'simpleCompFalseGate' })
+    const { instanceVertexId: rootInstanceVertexId } = await getStateMachineId({ g, dataMapper, instanceId: rootInstanceId })
+    const gatedInstanceId = await getGateInstanceId({ g, dataMapper, rootInstanceVertexId, alias: 'simpleCompFalseGate' })
     assert.ok(gatedInstanceId, 'gated instance id missing')
 
-    const { instanceVertexId: gatedInstanceVertexId } = await getStateMachineId({ g, instanceId: gatedInstanceId })
-    const gatedInstanceStarted = await hasInstanceStarted({ g, instanceVertexId: gatedInstanceVertexId })
+    const { instanceVertexId: gatedInstanceVertexId } = await getStateMachineId({ g, dataMapper, instanceId: gatedInstanceId })
+    const gatedInstanceStarted = await hasInstanceStarted({ g, dataMapper, instanceVertexId: gatedInstanceVertexId })
     assert.equal(gatedInstanceStarted, false)
 
-    const computeFunctionSubject = createBasicSubject(natsEvents['*'].component_service['*'].function_result.evt.component.compute_function.v1['*']).forPublish()
-      .env('prod')
-      .build()
+    const computeFunctionSubject = createComputeFunctionSubject('data')
 
     const startDependantsSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start_dependants.v1['*']).forPublish()
       .env('prod')
@@ -209,17 +201,15 @@ test('computeFunction with gate=false does not publish gated instance start', as
     await registerComponent(rootComponent, { diagnostics, dataMapper, g })
 
     const rootInstanceId = 'instance-gate-result-false'
-    const rootComponentId = await getComponentId({ g, diagnostics, componentHash: rootComponent.hash })
-    const imports = await loadImports({ g, componentId: rootComponentId })
-    const gates = await loadGates({ g, componentId: rootComponentId })
+    const rootComponentId = await getComponentId({ g, dataMapper, diagnostics, componentHash: rootComponent.hash })
+    const imports = await loadImports({ g, dataMapper, componentId: rootComponentId })
+    const gates = await loadGates({ g, dataMapper, componentId: rootComponentId })
     await createInstance(
       { diagnostics, dataMapper, g },
       { componentHash: rootComponent.hash, componentId: rootComponentId, instanceId: rootInstanceId, imports, gates },
     )
 
-    const computeFunctionSubject = createBasicSubject(natsEvents['*'].component_service['*'].function_result.evt.component.compute_function.v1['*']).forPublish()
-      .env('prod')
-      .build()
+    const computeFunctionSubject = createComputeFunctionSubject('gate')
 
     const published = []
     let acked = false
@@ -284,27 +274,25 @@ test('computeFunction routes gate inject targets by alias when multiple gates sh
     await registerComponent(rootComponent, { diagnostics, dataMapper, g })
 
     const rootInstanceId = 'instance-gate-inject-alias-routing'
-    const rootComponentId = await getComponentId({ g, diagnostics, componentHash: rootComponent.hash })
-    const imports = await loadImports({ g, componentId: rootComponentId })
-    const gates = await loadGates({ g, componentId: rootComponentId })
+    const rootComponentId = await getComponentId({ g, dataMapper, diagnostics, componentHash: rootComponent.hash })
+    const imports = await loadImports({ g, dataMapper, componentId: rootComponentId })
+    const gates = await loadGates({ g, dataMapper, componentId: rootComponentId })
     await createInstance(
       { diagnostics, dataMapper, g },
       { componentHash: rootComponent.hash, componentId: rootComponentId, instanceId: rootInstanceId, imports, gates },
     )
 
-    const { instanceVertexId: rootInstanceVertexId } = await getStateMachineId({ g, instanceId: rootInstanceId })
+    const { instanceVertexId: rootInstanceVertexId } = await getStateMachineId({ g, dataMapper, instanceId: rootInstanceId })
     const gateInstanceByAlias = {
-      simpleCompTrueGate: await getGateInstanceId({ g, rootInstanceVertexId, alias: 'simpleCompTrueGate' }),
-      simpleCompFalseGate: await getGateInstanceId({ g, rootInstanceVertexId, alias: 'simpleCompFalseGate' }),
-      simpleCompThirdGate: await getGateInstanceId({ g, rootInstanceVertexId, alias: 'simpleCompThirdGate' }),
+      simpleCompTrueGate: await getGateInstanceId({ g, dataMapper, rootInstanceVertexId, alias: 'simpleCompTrueGate' }),
+      simpleCompFalseGate: await getGateInstanceId({ g, dataMapper, rootInstanceVertexId, alias: 'simpleCompFalseGate' }),
+      simpleCompThirdGate: await getGateInstanceId({ g, dataMapper, rootInstanceVertexId, alias: 'simpleCompThirdGate' }),
     }
     assert.ok(gateInstanceByAlias.simpleCompTrueGate, 'simpleCompTrueGate instance missing')
     assert.ok(gateInstanceByAlias.simpleCompFalseGate, 'simpleCompFalseGate instance missing')
     assert.ok(gateInstanceByAlias.simpleCompThirdGate, 'simpleCompThirdGate instance missing')
 
-    const computeFunctionSubject = createBasicSubject(natsEvents['*'].component_service['*'].function_result.evt.component.compute_function.v1['*']).forPublish()
-      .env('prod')
-      .build()
+    const computeFunctionSubject = createComputeFunctionSubject('data')
 
     const cases = [
       { sourceName: 'simpleCompTrueValue', expectedAlias: 'simpleCompTrueGate', result: 'abc-true-gate' },
@@ -379,38 +367,34 @@ test('computeFunction routes identifier->gate inject to the same pod instance wh
     await registerComponent(rootComponent, { diagnostics, dataMapper, g })
 
     const rootInstanceId = 'instance-gate-inject-sibling-routing'
-    const rootComponentId = await getComponentId({ g, diagnostics, componentHash: rootComponent.hash })
-    const imports = await loadImports({ g, componentId: rootComponentId })
+    const rootComponentId = await getComponentId({ g, dataMapper, diagnostics, componentHash: rootComponent.hash })
+    const imports = await loadImports({ g, dataMapper, componentId: rootComponentId })
     await createInstance(
       { diagnostics, dataMapper, g },
       { componentHash: rootComponent.hash, componentId: rootComponentId, instanceId: rootInstanceId, imports },
     )
 
-    const { instanceVertexId: rootInstanceVertexId } = await getStateMachineId({ g, instanceId: rootInstanceId })
+    const { instanceVertexId: rootInstanceVertexId } = await getStateMachineId({ g, dataMapper, instanceId: rootInstanceId })
 
-    const computeFunctionSubject = createBasicSubject(natsEvents['*'].component_service['*'].function_result.evt.component.compute_function.v1['*']).forPublish()
-      .env('prod')
-      .build()
+    const computeFunctionSubject = createComputeFunctionSubject('data')
 
     const aliases = ['left', 'right']
     for (const alias of aliases) {
-      const podInstanceVertexId = await getImportedInstance({ g, rootInstanceVertexId, aliasPath: [alias] })
+      const podInstanceVertexId = await getImportedInstance({ g, dataMapper, rootInstanceVertexId, aliasPath: [alias] })
       assert.ok(podInstanceVertexId, `${alias} pod instance missing`)
 
       const identifierInstanceVertexId = await getImportedInstance({
-        g,
+        g, dataMapper,
         rootInstanceVertexId: podInstanceVertexId,
         aliasPath: ['identifier'],
       })
       assert.ok(identifierInstanceVertexId, `${alias} identifier instance vertex missing`)
 
-      const [identifierValues] = await g
-        .V(identifierInstanceVertexId)
-        .valueMap('instanceId')
+      const [identifierValues] = await dataMapper.query.readIdentifierValues({ vertexId: identifierInstanceVertexId })
       const identifierInstanceId = pickFirst(identifierValues?.instanceId ?? identifierValues)
       assert.ok(identifierInstanceId, `${alias} identifier instance missing`)
 
-      const createInstanceId = await getGateInstanceId({ g, rootInstanceVertexId: podInstanceVertexId, alias: 'create' })
+      const createInstanceId = await getGateInstanceId({ g, dataMapper, rootInstanceVertexId: podInstanceVertexId, alias: 'create' })
       assert.ok(createInstanceId, `${alias} create gate instance missing`)
 
       const published = []

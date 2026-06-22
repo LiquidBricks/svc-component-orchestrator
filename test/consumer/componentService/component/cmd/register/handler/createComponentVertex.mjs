@@ -13,11 +13,7 @@ test('createComponentVertex creates component vertex', async () => {
     const { componentVID } = await createComponentVertex({ rootCtx: { dataMapper }, scope: { component } })
     assert.ok(componentVID, 'componentVID missing')
 
-    const [componentId] = await g
-      .V()
-      .has('label', domain.vertex.component.constants.LABEL)
-      .has('hash', component.hash)
-      .id()
+    const [componentId] = await dataMapper.query.findComponentIdByHash({ hash: component.hash })
     assert.equal(componentId, componentVID)
   })
 })

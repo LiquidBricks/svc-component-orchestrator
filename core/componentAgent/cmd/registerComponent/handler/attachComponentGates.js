@@ -62,11 +62,7 @@ async function attachComponentGatesHandler({
       { field: 'gate.inject', component: compName, hash, gate: gateName },
     )
 
-    const [gatedComponentId] = await g
-      .V()
-      .has('label', domain.vertex.component.constants.LABEL)
-      .has('hash', gateHash)
-      .id()
+    const [gatedComponentId] = await dataMapper.query.findGatedComponentIdByHash({ hash: gateHash })
 
     handlerDiagnostics.require(
       gatedComponentId,
@@ -99,7 +95,7 @@ async function attachComponentGatesHandler({
       const targetId = await resolveDependencyTargetId({
         handlerDiagnostics,
         dependencyList,
-        g,
+        g, dataMapper,
         componentVID,
         importPath,
         targetType,
@@ -151,7 +147,7 @@ async function attachComponentGatesHandler({
       const targetId = await resolveDependencyTargetId({
         handlerDiagnostics,
         dependencyList,
-        g,
+        g, dataMapper,
         componentVID,
         importPath,
         targetType,

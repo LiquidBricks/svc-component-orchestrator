@@ -4,6 +4,7 @@ import { component as componentBuilder } from '@liquid-bricks/lib-component-buil
 
 import {
   createBasicSubject,
+  createComputeFunctionSubject,
   withGraphContext,
   registerComponent,
   createInstance,
@@ -51,27 +52,27 @@ test('computeFunction publishes injected events across imports using import inje
     await registerComponent(rootComponent, { diagnostics, dataMapper, g })
 
     const rootInstanceId = 'instance-import-inject-root-events'
-    const rootComponentId = await getComponentId({ g, diagnostics, componentHash: rootComponent.hash })
-    const imports = await loadImports({ g, componentId: rootComponentId })
+    const rootComponentId = await getComponentId({ g, dataMapper, diagnostics, componentHash: rootComponent.hash })
+    const imports = await loadImports({ g, dataMapper, componentId: rootComponentId })
     await createInstance({ diagnostics, dataMapper, g }, { componentHash: rootComponent.hash, componentId: rootComponentId, instanceId: rootInstanceId, imports })
 
-    const { instanceVertexId: rootInstanceVertexId, stateMachineId: rootStateMachineId } = await getStateMachineId({ g, instanceId: rootInstanceId })
-    const providerInstanceVertexId = await getImportedInstance({ g, rootInstanceVertexId, aliasPath: ['provider'] })
-    const targetInstanceVertexId = await getImportedInstance({ g, rootInstanceVertexId, aliasPath: ['target'] })
+    const { instanceVertexId: rootInstanceVertexId, stateMachineId: rootStateMachineId } = await getStateMachineId({ g, dataMapper, instanceId: rootInstanceId })
+    const providerInstanceVertexId = await getImportedInstance({ g, dataMapper, rootInstanceVertexId, aliasPath: ['provider'] })
+    const targetInstanceVertexId = await getImportedInstance({ g, dataMapper, rootInstanceVertexId, aliasPath: ['target'] })
 
-    const [providerInstanceValues] = await g.V(providerInstanceVertexId).valueMap('instanceId')
+    const [providerInstanceValues] = await dataMapper.query.readProviderInstanceValues({ vertexId: providerInstanceVertexId })
     const providerInstanceId = pickFirst(providerInstanceValues?.instanceId ?? providerInstanceValues)
-    const [targetInstanceValues] = await g.V(targetInstanceVertexId).valueMap('instanceId')
+    const [targetInstanceValues] = await dataMapper.query.readTargetInstanceValues({ vertexId: targetInstanceVertexId })
     const targetInstanceId = pickFirst(targetInstanceValues?.instanceId ?? targetInstanceValues)
 
-    const { stateMachineId: providerStateMachineId } = await getStateMachineId({ g, instanceId: providerInstanceId })
-    const { stateMachineId: targetStateMachineId } = await getStateMachineId({ g, instanceId: targetInstanceId })
+    const { stateMachineId: providerStateMachineId } = await getStateMachineId({ g, dataMapper, instanceId: providerInstanceId })
+    const { stateMachineId: targetStateMachineId } = await getStateMachineId({ g, dataMapper, instanceId: targetInstanceId })
 
-    const providerDataStateEdgeId = await getStateEdgeId({ g, stateMachineId: providerStateMachineId, type: 'data', name: 'providerData' })
-    const providerTaskStateEdgeId = await getStateEdgeId({ g, stateMachineId: providerStateMachineId, type: 'task', name: 'providerTask' })
-    const targetDataStateEdgeId = await getStateEdgeId({ g, stateMachineId: targetStateMachineId, type: 'data', name: 'targetData' })
-    const targetTaskStateEdgeId = await getStateEdgeId({ g, stateMachineId: targetStateMachineId, type: 'task', name: 'targetTask' })
-    const rootDataStateEdgeId = await getStateEdgeId({ g, stateMachineId: rootStateMachineId, type: 'data', name: 'rootData' })
+    const providerDataStateEdgeId = await getStateEdgeId({ g, dataMapper, stateMachineId: providerStateMachineId, type: 'data', name: 'providerData' })
+    const providerTaskStateEdgeId = await getStateEdgeId({ g, dataMapper, stateMachineId: providerStateMachineId, type: 'task', name: 'providerTask' })
+    const targetDataStateEdgeId = await getStateEdgeId({ g, dataMapper, stateMachineId: targetStateMachineId, type: 'data', name: 'targetData' })
+    const targetTaskStateEdgeId = await getStateEdgeId({ g, dataMapper, stateMachineId: targetStateMachineId, type: 'task', name: 'targetTask' })
+    const rootDataStateEdgeId = await getStateEdgeId({ g, dataMapper, stateMachineId: rootStateMachineId, type: 'data', name: 'rootData' })
 
     assert.ok(providerDataStateEdgeId, 'provider data state edge missing')
     assert.ok(providerTaskStateEdgeId, 'provider task state edge missing')
@@ -82,9 +83,7 @@ test('computeFunction publishes injected events across imports using import inje
     const published = []
     let ackedTargetTask = false
     const resultPayload = { viaImportInject: true }
-    const computeFunctionSubject = createBasicSubject(natsEvents['*'].component_service['*'].function_result.evt.component.compute_function.v1['*']).forPublish()
-      .env('prod')
-      .build()
+    const computeFunctionSubject = createComputeFunctionSubject('data')
 
     const rootCtx = {
       diagnostics,
@@ -167,31 +166,29 @@ test('computeFunction publishes injected computeFunction to imported component i
     await registerComponent(rootComponent, { diagnostics, dataMapper, g })
 
     const rootInstanceId = 'instance-injected-root'
-    const rootComponentId = await getComponentId({ g, diagnostics, componentHash: rootComponent.hash })
-    const imports = await loadImports({ g, rootComponentId })
+    const rootComponentId = await getComponentId({ g, dataMapper, diagnostics, componentHash: rootComponent.hash })
+    const imports = await loadImports({ g, dataMapper, rootComponentId })
     await createInstance({ diagnostics, dataMapper, g }, { componentHash: rootComponent.hash, componentId: rootComponentId, instanceId: rootInstanceId, imports })
 
-    const { stateMachineId: rootStateMachineId, instanceVertexId: rootInstanceVertexId } = await getStateMachineId({ g, instanceId: rootInstanceId })
-    const rootDataStateEdgeId = await getStateEdgeId({ g, stateMachineId: rootStateMachineId, type: 'data', name: 'rootData' })
+    const { stateMachineId: rootStateMachineId, instanceVertexId: rootInstanceVertexId } = await getStateMachineId({ g, dataMapper, instanceId: rootInstanceId })
+    const rootDataStateEdgeId = await getStateEdgeId({ g, dataMapper, stateMachineId: rootStateMachineId, type: 'data', name: 'rootData' })
     assert.ok(rootDataStateEdgeId, 'root data state edge missing')
 
-    const childInstanceVertexId = await getImportedInstance({ g, rootInstanceVertexId, aliasPath: ['child'] })
+    const childInstanceVertexId = await getImportedInstance({ g, dataMapper, rootInstanceVertexId, aliasPath: ['child'] })
     assert.ok(childInstanceVertexId, 'child instance missing')
 
-    const [childInstanceIdValues] = await g.V(childInstanceVertexId).valueMap('instanceId')
+    const [childInstanceIdValues] = await dataMapper.query.readChildInstanceIdValues({ vertexId: childInstanceVertexId })
     const childInstanceId = pickFirst(childInstanceIdValues?.instanceId ?? childInstanceIdValues)
     assert.ok(childInstanceId, 'child instanceId missing')
 
-    const [childStateMachineId] = await g.V(childInstanceVertexId).out(domain.edge.has_stateMachine.componentInstance_stateMachine.constants.LABEL).id()
-    const childDataStateEdgeId = await getStateEdgeId({ g, stateMachineId: childStateMachineId, type: 'data', name: 'childData' })
+    const [childStateMachineId] = await dataMapper.query.readChildStateMachineId({ vertexId: childInstanceVertexId })
+    const childDataStateEdgeId = await getStateEdgeId({ g, dataMapper, stateMachineId: childStateMachineId, type: 'data', name: 'childData' })
 
     const published = []
     let acked = false
     const resultPayload = { sentToImport: true }
     const message = {
-      subject: createBasicSubject(natsEvents['*'].component_service['*'].function_result.evt.component.compute_function.v1['*']).forPublish()
-        .env('prod')
-        .build(),
+      subject: createComputeFunctionSubject('data'),
       ack: () => { acked = true },
       json: () => ({
         data: {
@@ -213,13 +210,11 @@ test('computeFunction publishes injected computeFunction to imported component i
     assert.equal(finalScope.stateEdgeId, rootDataStateEdgeId)
     assert.equal(acked, true)
 
-    const [updatedValues] = await g.E(rootDataStateEdgeId).valueMap('status', 'result')
+    const [updatedValues] = await dataMapper.query.readStateEdgeStatusAndResult({ edgeId: rootDataStateEdgeId })
     assert.equal(pickFirst(updatedValues.status), STATE_EDGE_STATUS_BY_TYPE.data)
     assert.equal(pickFirst(updatedValues.result), JSON.stringify(resultPayload))
 
-    const computeFunctionSubject = createBasicSubject(natsEvents['*'].component_service['*'].function_result.evt.component.compute_function.v1['*']).forPublish()
-      .env('prod')
-      .build()
+    const computeFunctionSubject = createComputeFunctionSubject('data')
     const startDependantsSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start_dependants.v1['*']).forPublish()
       .env('prod')
       .build()
@@ -263,20 +258,18 @@ test('computeFunction skips unreachable injected targets in a different instance
     await registerComponent(rootComponent, { diagnostics, dataMapper, g })
 
     const providerInstanceId = 'instance-import-inject-provider-context-skip'
-    const providerComponentId = await getComponentId({ g, diagnostics, componentHash: providerComponent.hash })
-    const providerImports = await loadImports({ g, componentId: providerComponentId })
+    const providerComponentId = await getComponentId({ g, dataMapper, diagnostics, componentHash: providerComponent.hash })
+    const providerImports = await loadImports({ g, dataMapper, componentId: providerComponentId })
     await createInstance(
       { diagnostics, dataMapper, g },
       { componentHash: providerComponent.hash, componentId: providerComponentId, instanceId: providerInstanceId, imports: providerImports }
     )
 
-    const { stateMachineId: providerStateMachineId } = await getStateMachineId({ g, instanceId: providerInstanceId })
-    const providerDataStateEdgeId = await getStateEdgeId({ g, stateMachineId: providerStateMachineId, type: 'data', name: 'id' })
+    const { stateMachineId: providerStateMachineId } = await getStateMachineId({ g, dataMapper, instanceId: providerInstanceId })
+    const providerDataStateEdgeId = await getStateEdgeId({ g, dataMapper, stateMachineId: providerStateMachineId, type: 'data', name: 'id' })
     assert.ok(providerDataStateEdgeId, 'provider data state edge missing')
 
-    const computeFunctionSubject = createBasicSubject(natsEvents['*'].component_service['*'].function_result.evt.component.compute_function.v1['*']).forPublish()
-      .env('prod')
-      .build()
+    const computeFunctionSubject = createComputeFunctionSubject('data')
     const startDependantsSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start_dependants.v1['*']).forPublish()
       .env('prod')
       .build()

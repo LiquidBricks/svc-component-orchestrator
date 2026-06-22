@@ -20,11 +20,7 @@ test('componentAgent register route creates componentAgent vertex', async () => 
     assert.equal(message.acked, true)
     assert.equal(scope.componentAgentAlreadyRegistered, false)
 
-    const [componentAgentVID] = await g
-      .V()
-      .has('label', 'domain.vertex.componentAgent')
-      .has('agentID', agentID)
-      .id()
+    const [componentAgentVID] = await dataMapper.query.findComponentAgentVertexId({ agentID })
     assert.equal(componentAgentVID, scope.componentAgentVID)
   })
 })

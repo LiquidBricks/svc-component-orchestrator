@@ -4,6 +4,7 @@ import { component as componentBuilder } from '@liquid-bricks/lib-component-buil
 
 import {
   createBasicSubject,
+  createComputeFunctionSubject,
   withGraphContext,
   registerComponent,
   createInstance,
@@ -37,14 +38,14 @@ test('computeFunction publishes injected computeFunction events for injection ta
     await registerComponent(component, { diagnostics, dataMapper, g })
 
     const instanceId = 'instance-result-injection'
-    const componentId = await getComponentId({ g, diagnostics, componentHash: component.hash })
-    const imports = await loadImports({ g, componentId })
+    const componentId = await getComponentId({ g, dataMapper, diagnostics, componentHash: component.hash })
+    const imports = await loadImports({ g, dataMapper, componentId })
     await createInstance({ diagnostics, dataMapper, g }, { componentHash: component.hash, componentId, instanceId, imports })
 
-    const { stateMachineId } = await getStateMachineId({ g, instanceId })
-    const sourceEdgeId = await getStateEdgeId({ g, stateMachineId, type: 'data', name: 'dataSource' })
-    const dataTargetStateEdgeId = await getStateEdgeId({ g, stateMachineId, type: 'data', name: 'dataTarget' })
-    const taskTargetStateEdgeId = await getStateEdgeId({ g, stateMachineId, type: 'task', name: 'taskB' })
+    const { stateMachineId } = await getStateMachineId({ g, dataMapper, instanceId })
+    const sourceEdgeId = await getStateEdgeId({ g, dataMapper, stateMachineId, type: 'data', name: 'dataSource' })
+    const dataTargetStateEdgeId = await getStateEdgeId({ g, dataMapper, stateMachineId, type: 'data', name: 'dataTarget' })
+    const taskTargetStateEdgeId = await getStateEdgeId({ g, dataMapper, stateMachineId, type: 'task', name: 'taskB' })
 
     assert.ok(sourceEdgeId, 'source data state edge missing')
     assert.ok(dataTargetStateEdgeId, 'dataTarget state edge missing')
@@ -54,9 +55,7 @@ test('computeFunction publishes injected computeFunction events for injection ta
     let acked = false
     const resultPayload = { injected: true }
     const message = {
-      subject: createBasicSubject(natsEvents['*'].component_service['*'].function_result.evt.component.compute_function.v1['*']).forPublish()
-        .env('prod')
-        .build(),
+      subject: createComputeFunctionSubject('data'),
       ack: () => { acked = true },
       json: () => ({
         data: {
@@ -79,13 +78,11 @@ test('computeFunction publishes injected computeFunction events for injection ta
     assert.equal(finalScope.stateEdgeId, sourceEdgeId)
     assert.equal(acked, true)
 
-    const [updatedValues] = await g.E(sourceEdgeId).valueMap('status', 'result')
+    const [updatedValues] = await dataMapper.query.readStateEdgeStatusAndResult({ edgeId: sourceEdgeId })
     assert.equal(pickFirst(updatedValues.status), STATE_EDGE_STATUS_BY_TYPE.data)
     assert.equal(pickFirst(updatedValues.result), JSON.stringify(resultPayload))
 
-    const computeFunctionSubject = createBasicSubject(natsEvents['*'].component_service['*'].function_result.evt.component.compute_function.v1['*']).forPublish()
-      .env('prod')
-      .build()
+    const computeFunctionSubject = createComputeFunctionSubject('data')
     const startDependantsSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start_dependants.v1['*']).forPublish()
       .env('prod')
       .build()
@@ -134,22 +131,20 @@ test('injected result triggers dependant data and task start commands', async ()
     await registerComponent(component, { diagnostics, dataMapper, g })
 
     const instanceId = 'instance-injected-dependants'
-    const componentId = await getComponentId({ g, diagnostics, componentHash: component.hash })
-    const imports = await loadImports({ g, componentId })
+    const componentId = await getComponentId({ g, dataMapper, diagnostics, componentHash: component.hash })
+    const imports = await loadImports({ g, dataMapper, componentId })
     await createInstance({ diagnostics, dataMapper, g }, { componentHash: component.hash, componentId, instanceId, imports })
 
-    const { stateMachineId } = await getStateMachineId({ g, instanceId })
-    const dataTargetStateEdgeId = await getStateEdgeId({ g, stateMachineId, type: 'data', name: 'dataTarget' })
-    const dependantDataStateEdgeId = await getStateEdgeId({ g, stateMachineId, type: 'data', name: 'dataDependent' })
-    const dependantTaskStateEdgeId = await getStateEdgeId({ g, stateMachineId, type: 'task', name: 'taskDependent' })
+    const { stateMachineId } = await getStateMachineId({ g, dataMapper, instanceId })
+    const dataTargetStateEdgeId = await getStateEdgeId({ g, dataMapper, stateMachineId, type: 'data', name: 'dataTarget' })
+    const dependantDataStateEdgeId = await getStateEdgeId({ g, dataMapper, stateMachineId, type: 'data', name: 'dataDependent' })
+    const dependantTaskStateEdgeId = await getStateEdgeId({ g, dataMapper, stateMachineId, type: 'task', name: 'taskDependent' })
 
     assert.ok(dataTargetStateEdgeId, 'dataTarget state edge missing')
     assert.ok(dependantDataStateEdgeId, 'dataDependent state edge missing')
     assert.ok(dependantTaskStateEdgeId, 'taskDependent state edge missing')
 
-    const computeFunctionSubject = createBasicSubject(natsEvents['*'].component_service['*'].function_result.evt.component.compute_function.v1['*']).forPublish()
-      .env('prod')
-      .build()
+    const computeFunctionSubject = createComputeFunctionSubject('data')
     const startDependantsSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start_dependants.v1['*']).forPublish()
       .env('prod')
       .build()
@@ -226,7 +221,7 @@ test('injected result triggers dependant data and task start commands', async ()
       spec: startDependantsSpec,
       rootCtx: {
         diagnostics,
-        g,
+        g, dataMapper,
         natsContext: { publish: async (subject, payload) => dependantPublishes.push({ subject, payload: JSON.parse(payload) }) },
       },
       message: startDependantsMessage,

@@ -4,6 +4,7 @@ import { component as componentBuilder } from '@liquid-bricks/lib-component-buil
 
 import {
   createBasicSubject,
+  createComputeFunctionSubject,
   withGraphContext,
   registerComponent,
   createInstance,
@@ -50,26 +51,26 @@ test('import start preserves injected data when waitFor delays the import', asyn
     await registerComponent(rootComponent, { diagnostics, dataMapper, g })
 
     const rootInstanceId = 'instance-preserve-root'
-    const rootComponentId = await getComponentId({ g, diagnostics, componentHash: rootComponent.hash })
-    const imports = await loadImports({ g, componentId: rootComponentId })
+    const rootComponentId = await getComponentId({ g, dataMapper, diagnostics, componentHash: rootComponent.hash })
+    const imports = await loadImports({ g, dataMapper, componentId: rootComponentId })
     await createInstance({ diagnostics, dataMapper, g }, { componentHash: rootComponent.hash, componentId: rootComponentId, instanceId: rootInstanceId, imports })
 
-    const { instanceVertexId: rootInstanceVertexId, stateMachineId: rootStateMachineId } = await getStateMachineId({ g, instanceId: rootInstanceId })
-    const providerInstanceVertexId = await getImportedInstance({ g, rootInstanceVertexId, aliasPath: ['provider'] })
-    const targetInstanceVertexId = await getImportedInstance({ g, rootInstanceVertexId, aliasPath: ['start'] })
+    const { instanceVertexId: rootInstanceVertexId, stateMachineId: rootStateMachineId } = await getStateMachineId({ g, dataMapper, instanceId: rootInstanceId })
+    const providerInstanceVertexId = await getImportedInstance({ g, dataMapper, rootInstanceVertexId, aliasPath: ['provider'] })
+    const targetInstanceVertexId = await getImportedInstance({ g, dataMapper, rootInstanceVertexId, aliasPath: ['start'] })
     assert.ok(providerInstanceVertexId, 'provider instance missing')
     assert.ok(targetInstanceVertexId, 'target instance missing')
 
-    const [providerInstanceValues] = await g.V(providerInstanceVertexId).valueMap('instanceId')
+    const [providerInstanceValues] = await dataMapper.query.readProviderInstanceValues({ vertexId: providerInstanceVertexId })
     const providerInstanceId = pickFirst(providerInstanceValues?.instanceId ?? providerInstanceValues)
-    const [targetInstanceValues] = await g.V(targetInstanceVertexId).valueMap('instanceId')
+    const [targetInstanceValues] = await dataMapper.query.readTargetInstanceValues({ vertexId: targetInstanceVertexId })
     const targetInstanceId = pickFirst(targetInstanceValues?.instanceId ?? targetInstanceValues)
     assert.ok(providerInstanceId, 'provider instanceId missing')
     assert.ok(targetInstanceId, 'target instanceId missing')
 
-    const { stateMachineId: targetStateMachineId } = await getStateMachineId({ g, instanceId: targetInstanceId })
-    const targetDataStateEdgeId = await getStateEdgeId({ g, stateMachineId: targetStateMachineId, type: 'data', name: 'pod' })
-    const gateStateEdgeId = await getStateEdgeId({ g, stateMachineId: rootStateMachineId, type: 'data', name: 'gate' })
+    const { stateMachineId: targetStateMachineId } = await getStateMachineId({ g, dataMapper, instanceId: targetInstanceId })
+    const targetDataStateEdgeId = await getStateEdgeId({ g, dataMapper, stateMachineId: targetStateMachineId, type: 'data', name: 'pod' })
+    const gateStateEdgeId = await getStateEdgeId({ g, dataMapper, stateMachineId: rootStateMachineId, type: 'data', name: 'gate' })
     assert.ok(targetDataStateEdgeId, 'target data state edge missing')
     assert.ok(gateStateEdgeId, 'gate state edge missing')
 
@@ -79,9 +80,7 @@ test('import start preserves injected data when waitFor delays the import', asyn
     const importStartSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.import.start.v1['*']).forPublish()
       .env('prod')
       .build()
-    const computeFunctionSubject = createBasicSubject(natsEvents['*'].component_service['*'].function_result.evt.component.compute_function.v1['*']).forPublish()
-      .env('prod')
-      .build()
+    const computeFunctionSubject = createComputeFunctionSubject('data')
     const startDependantsSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start_dependants.v1['*']).forPublish()
       .env('prod')
       .build()
@@ -221,7 +220,7 @@ test('import start preserves injected data when waitFor delays the import', asyn
       },
     })
 
-    const [beforeStartValues] = await g.E(targetDataStateEdgeId).valueMap('status', 'result')
+    const [beforeStartValues] = await dataMapper.query.readBeforeStartValues({ edgeId: targetDataStateEdgeId })
     assert.equal(pickFirst(beforeStartValues.status), STATE_EDGE_STATUS_BY_TYPE.data)
     assert.equal(pickFirst(beforeStartValues.result), JSON.stringify(podNameResult))
 
@@ -259,7 +258,7 @@ test('import start preserves injected data when waitFor delays the import', asyn
       spec: startDependantsSpec,
       rootCtx: {
         diagnostics,
-        g,
+        g, dataMapper,
         natsContext: { publish: async (subject, payload) => dependantsPublishes.push({ subject, payload: JSON.parse(payload) }) },
       },
       message: {
@@ -318,7 +317,7 @@ test('import start preserves injected data when waitFor delays the import', asyn
       })
     }
 
-    const [afterStartValues] = await g.E(targetDataStateEdgeId).valueMap('status', 'result')
+    const [afterStartValues] = await dataMapper.query.readAfterStartValues({ edgeId: targetDataStateEdgeId })
     assert.equal(pickFirst(afterStartValues.status), STATE_EDGE_STATUS_BY_TYPE.data)
     assert.equal(pickFirst(afterStartValues.result), JSON.stringify(podNameResult))
   })

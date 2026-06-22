@@ -22,21 +22,21 @@ test('component loadData resolves componentId', async () => {
 
     const handlerDiagnostics = createHandlerDiagnostics(diagnostics, { componentHash: componentSpec.hash })
     const { componentId } = await component({
-      rootCtx: { g },
+      rootCtx: { g, dataMapper },
       scope: { handlerDiagnostics, componentHash: componentSpec.hash },
     })
 
-    const [row] = await g.V(componentId).valueMap('hash')
+    const [row] = await dataMapper.query.readComponentHash({ vertexId: componentId })
     assert.equal(pickFirst(row.hash), componentSpec.hash)
   })
 })
 
 test('component loadData rejects unknown componentHash', async () => {
-  await withGraphContext(async ({ diagnostics, g }) => {
+  await withGraphContext(async ({ diagnostics, g, dataMapper }) => {
     const handlerDiagnostics = createHandlerDiagnostics(diagnostics, { componentHash: 'missing-hash' })
 
     await assert.rejects(
-      component({ rootCtx: { g }, scope: { handlerDiagnostics, componentHash: 'missing-hash' } }),
+      component({ rootCtx: { g, dataMapper }, scope: { handlerDiagnostics, componentHash: 'missing-hash' } }),
       diagnostics.DiagnosticError,
     )
   })

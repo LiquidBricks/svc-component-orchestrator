@@ -32,7 +32,7 @@ export async function attachImportWaitFor({
       const targetId = await resolveDependencyTargetId({
         handlerDiagnostics,
         dependencyList,
-        g,
+        g, dataMapper,
         componentVID,
         importPath,
         targetType,
@@ -61,11 +61,7 @@ export async function attachImportWaitFor({
       }
     }
 
-    const [importRefId] = await g
-      .V(componentVID)
-      .out(domain.edge.has_import.component_importRef.constants.LABEL)
-      .has('alias', importName)
-      .id()
+    const [importRefId] = await dataMapper.query.findImportRefIdByAlias({ alias: importName, vertexId: componentVID })
 
     handlerDiagnostics.require(
       importRefId,
@@ -81,9 +77,7 @@ export async function attachImportWaitFor({
       await dataMapper.edge.wait_for.importRef_data.create({ fromId: importRefId, toId: targetId })
     }
     if (waitForTargets.lifecycle.size) {
-      await g
-        .V(importRefId)
-        .property(LIFECYCLE_WAIT_FOR_PROPERTY, JSON.stringify(Array.from(waitForTargets.lifecycle)))
+      await dataMapper.mutation.updateImportRefLifecycleWaitFor({ importRefId, waitFor: JSON.stringify(Array.from(waitForTargets.lifecycle)) })
     }
   }
 }

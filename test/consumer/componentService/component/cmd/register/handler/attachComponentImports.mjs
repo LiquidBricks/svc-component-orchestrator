@@ -15,24 +15,15 @@ test('handler links imports to existing components', async () => {
 
     await registerHandlerComponent({ diagnostics, dataMapper, g }, component)
 
-    const [componentId] = await g
-      .V()
-      .has('label', domain.vertex.component.constants.LABEL)
-      .has('hash', component.hash)
-      .id()
+    const [componentId] = await dataMapper.query.findComponentIdByHash({ hash: component.hash })
 
-    const importRefIds = await g.V(componentId)
-      .out(domain.edge.has_import.component_importRef.constants.LABEL)
-      .id()
+    const importRefIds = await dataMapper.query.listImportRefIds({ vertexId: componentId })
     assert.equal(importRefIds.length, 1)
 
-    const [importedComponentId] = await g
-      .V(importRefIds[0])
-      .out(domain.edge.import_of.importRef_component.constants.LABEL)
-      .id()
+    const [importedComponentId] = await dataMapper.query.findImportedComponentIdForImportRef({ vertexId: importRefIds[0] })
     assert.equal(importedComponentId, sharedComponentId)
 
-    const [importRefValues] = await g.V(importRefIds[0]).valueMap('alias')
+    const [importRefValues] = await dataMapper.query.readImportRefValues({ vertexId: importRefIds[0] })
     assert.ok(importRefValues, 'import ref missing')
     const aliasValue = Array.isArray(importRefValues.alias) ? importRefValues.alias[0] : importRefValues.alias
     assert.equal(aliasValue, component.imports[0].name)

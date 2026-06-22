@@ -5,7 +5,7 @@ import { domain } from '@liquid-bricks/spec-domain/domain'
 
 export async function republishIfGatesMissing({
   message,
-  rootCtx: { g, natsContext },
+  rootCtx: { g, dataMapper, natsContext },
   scope: { handlerDiagnostics, component, componentAlreadyRegistered, [s.scope.ac]: abortCtl },
 }) {
   if (componentAlreadyRegistered) return
@@ -29,11 +29,7 @@ export async function republishIfGatesMissing({
       { field: 'gate.hash', component: compName, hash, gate: gateName },
     )
 
-    const [gatedComponentId] = await g
-      .V()
-      .has('label', domain.vertex.component.constants.LABEL)
-      .has('hash', gateHash)
-      .id()
+    const [gatedComponentId] = await dataMapper.query.findGatedComponentIdByHash({ hash: gateHash })
 
     if (!gatedComponentId) {
       missingGates.push({ name: gateName, hash: gateHash })

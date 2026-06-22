@@ -15,44 +15,40 @@ test('handler builds component graph and dependency edges', async () => {
 
     await registerHandlerComponent({ diagnostics, dataMapper, g }, component)
 
-    const [componentId] = await g
-      .V()
-      .has('label', domain.vertex.component.constants.LABEL)
-      .has('hash', component.hash)
-      .id()
+    const [componentId] = await dataMapper.query.findComponentIdByHash({ hash: component.hash })
     assert.ok(componentId, 'component vertex missing')
 
-    const [task1Id] = await g.V().has('label', domain.vertex.task.constants.LABEL).has('name', 'task1').id()
-    const [task2Id] = await g.V().has('label', domain.vertex.task.constants.LABEL).has('name', 'task2').id()
-    const [data1Id] = await g.V().has('label', domain.vertex.data.constants.LABEL).has('name', 'data1').id()
-    const [deferredId] = await g.V().has('label', domain.vertex.deferred.constants.LABEL).has('name', 'deferred').id()
+    const [task1Id] = await dataMapper.query.findTask1Id()
+    const [task2Id] = await dataMapper.query.findTask2Id()
+    const [data1Id] = await dataMapper.query.findData1Id()
+    const [deferredId] = await dataMapper.query.findDeferredId()
 
     assert.ok(task1Id, 'task1 vertex missing')
     assert.ok(task2Id, 'task2 vertex missing')
     assert.ok(data1Id, 'data1 vertex missing')
     assert.ok(deferredId, 'deferred vertex missing')
 
-    const componentTasks = await g.V(componentId).out(domain.edge.has_task.component_task.constants.LABEL).id()
+    const componentTasks = await dataMapper.query.readComponentTasks({ vertexId: componentId })
     assert.deepEqual(componentTasks.sort(), [task1Id, task2Id].sort())
 
-    const componentData = await g.V(componentId).out(domain.edge.has_data.component_data.constants.LABEL).id()
+    const componentData = await dataMapper.query.readComponentData({ vertexId: componentId })
     assert.deepEqual(componentData, [data1Id])
 
-    const componentDeferred = await g.V(componentId).out(domain.edge.has_deferred.component_deferred.constants.LABEL).id()
+    const componentDeferred = await dataMapper.query.readComponentDeferred({ vertexId: componentId })
     assert.deepEqual(componentDeferred, [deferredId])
 
-    const task1DataDeps = await g.V(task1Id).out(domain.edge.has_dependency.task_data.constants.LABEL).id()
+    const task1DataDeps = await dataMapper.query.readTask1DataDeps({ vertexId: task1Id })
     assert.deepEqual(task1DataDeps, [data1Id])
 
-    const task1DeferredDeps = await g.V(task1Id).out(domain.edge.has_dependency.task_deferred.constants.LABEL).id()
+    const task1DeferredDeps = await dataMapper.query.readTask1DeferredDeps({ vertexId: task1Id })
     assert.deepEqual(task1DeferredDeps, [deferredId])
 
-    const dataTaskDeps = await g.V(data1Id).out(domain.edge.has_dependency.data_task.constants.LABEL).id()
+    const dataTaskDeps = await dataMapper.query.readDataTaskDeps({ vertexId: data1Id })
     assert.deepEqual(dataTaskDeps, [task2Id])
 
-    assert.deepEqual(await g.V(task1Id).out(domain.edge.has_dependency.task_task.constants.LABEL).id(), [])
-    assert.deepEqual(await g.V(data1Id).out(domain.edge.has_dependency.data_data.constants.LABEL).id(), [])
-    assert.deepEqual(await g.V(data1Id).out(domain.edge.has_dependency.data_deferred.constants.LABEL).id(), [])
+    assert.deepEqual(await dataMapper.query.findHasDependencyTaskTask({ vertexId: task1Id }), [])
+    assert.deepEqual(await dataMapper.query.findHasDependencyDataData({ vertexId: data1Id }), [])
+    assert.deepEqual(await dataMapper.query.findHasDependencyDataDeferred({ vertexId: data1Id }), [])
   })
 })
 
@@ -80,28 +76,28 @@ test('handler resolves namespaced dependency paths through imports', async () =>
     await registerHandlerComponent({ diagnostics, dataMapper, g }, componentWords)
     await registerHandlerComponent({ diagnostics, dataMapper, g }, componentRoot)
 
-    const [rootComponentId] = await g.V().has('label', domain.vertex.component.constants.LABEL).has('hash', componentRoot.hash).id()
-    const [mainTaskId] = await g.V(rootComponentId).out(domain.edge.has_task.component_task.constants.LABEL).has('name', 'main').id()
+    const [rootComponentId] = await dataMapper.query.findComponentIdByHash({ hash: componentRoot.hash })
+    const [mainTaskId] = await dataMapper.query.findMainTaskId({ vertexId: rootComponentId })
 
-    const [wordsComponentId] = await g.V().has('label', domain.vertex.component.constants.LABEL).has('hash', componentWords.hash).id()
-    const [wordsProcessId] = await g.V(wordsComponentId).out(domain.edge.has_task.component_task.constants.LABEL).has('name', 'process').id()
-    const [wordsVocabId] = await g.V(wordsComponentId).out(domain.edge.has_data.component_data.constants.LABEL).has('name', 'vocab').id()
+    const [wordsComponentId] = await dataMapper.query.findWordsComponentId({ hash: componentWords.hash })
+    const [wordsProcessId] = await dataMapper.query.findWordsProcessId({ vertexId: wordsComponentId })
+    const [wordsVocabId] = await dataMapper.query.findWordsVocabId({ vertexId: wordsComponentId })
 
-    const [firstComponentId] = await g.V().has('label', domain.vertex.component.constants.LABEL).has('hash', componentFirst.hash).id()
-    const [firstInitId] = await g.V(firstComponentId).out(domain.edge.has_task.component_task.constants.LABEL).has('name', 'init').id()
+    const [firstComponentId] = await dataMapper.query.findFirstComponentId({ hash: componentFirst.hash })
+    const [firstInitId] = await dataMapper.query.findFirstInitId({ vertexId: firstComponentId })
 
     assert.ok(mainTaskId, 'main task missing')
     assert.ok(wordsProcessId, 'words process task missing')
     assert.ok(wordsVocabId, 'words vocab data missing')
     assert.ok(firstInitId, 'first init task missing')
 
-    const taskDeps = await g.V(mainTaskId).out(domain.edge.has_dependency.task_task.constants.LABEL).id()
+    const taskDeps = await dataMapper.query.readTaskDeps({ vertexId: mainTaskId })
     assert.deepEqual(taskDeps.sort(), [wordsProcessId, firstInitId].sort())
 
-    const dataDeps = await g.V(mainTaskId).out(domain.edge.has_dependency.task_data.constants.LABEL).id()
+    const dataDeps = await dataMapper.query.readDataDeps({ vertexId: mainTaskId })
     assert.deepEqual(dataDeps, [wordsVocabId])
 
-    assert.deepEqual(await g.V(mainTaskId).out(domain.edge.has_dependency.task_deferred.constants.LABEL).id(), [])
+    assert.deepEqual(await dataMapper.query.findHasDependencyTaskDeferred({ vertexId: mainTaskId }), [])
   })
 })
 
@@ -115,20 +111,13 @@ test('handler accepts agentFn deps without creating graph dependency edges', asy
 
     await registerHandlerComponent({ diagnostics, dataMapper, g }, component)
 
-    const [componentId] = await g
-      .V()
-      .has('label', domain.vertex.component.constants.LABEL)
-      .has('hash', component.hash)
-      .id()
-    const [bootstrapTaskId] = await g.V(componentId)
-      .out(domain.edge.has_task.component_task.constants.LABEL)
-      .has('name', 'bootstrap')
-      .id()
+    const [componentId] = await dataMapper.query.findComponentIdByHash({ hash: component.hash })
+    const [bootstrapTaskId] = await dataMapper.query.findBootstrapTaskId({ vertexId: componentId })
 
     assert.ok(bootstrapTaskId, 'bootstrap task missing')
-    assert.deepEqual(await g.V(bootstrapTaskId).out(domain.edge.has_dependency.task_task.constants.LABEL).id(), [])
-    assert.deepEqual(await g.V(bootstrapTaskId).out(domain.edge.has_dependency.task_data.constants.LABEL).id(), [])
-    assert.deepEqual(await g.V(bootstrapTaskId).out(domain.edge.has_dependency.task_deferred.constants.LABEL).id(), [])
+    assert.deepEqual(await dataMapper.query.findHasDependencyTaskTask({ vertexId: bootstrapTaskId }), [])
+    assert.deepEqual(await dataMapper.query.findHasDependencyTaskData({ vertexId: bootstrapTaskId }), [])
+    assert.deepEqual(await dataMapper.query.findHasDependencyTaskDeferred({ vertexId: bootstrapTaskId }), [])
   })
 })
 

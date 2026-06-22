@@ -22,34 +22,26 @@ function normalizeWaitForValues(waitForValues = []) {
   ))
 }
 
-async function resolveInstanceVertexId({ g, instanceId }) {
+async function resolveInstanceVertexId({ g, dataMapper, instanceId }) {
   if (!g || !instanceId) return null
-  const [instanceVertexId] = await g
-    .V()
-    .has('label', domain.vertex.componentInstance.constants.LABEL)
-    .has('instanceId', instanceId)
-    .id()
+  const [instanceVertexId] = await dataMapper.query.findInstanceVertexId({ instanceId })
   return instanceVertexId ?? null
 }
 
-async function resolveParentInstanceVertexIds({ g, importInstanceVertexId, parentInstanceId }) {
+async function resolveParentInstanceVertexIds({ g, dataMapper, importInstanceVertexId, parentInstanceId }) {
   if (!g || !importInstanceVertexId) return []
   if (parentInstanceId) {
-    const parentInstanceVertexId = await resolveInstanceVertexId({ g, instanceId: parentInstanceId })
+    const parentInstanceVertexId = await resolveInstanceVertexId({ g, dataMapper, instanceId: parentInstanceId })
     return parentInstanceVertexId ? [parentInstanceVertexId] : []
   }
-  return g
-    .V(importInstanceVertexId)
-    .in(domain.edge.uses_import.importInstanceRef_componentInstance.constants.LABEL)
-    .in(domain.edge.uses_import.componentInstance_importInstanceRef.constants.LABEL)
-    .id()
+  return dataMapper.query.findUsesImportImportInstanceRefComponentInstance({ vertexId: importInstanceVertexId })
 }
 
-async function areWaitForsProvided({ g, rootInstanceVertexId, waitFor = [], stateEdgeCache, pathResolutionCache }) {
+async function areWaitForsProvided({ g, dataMapper, rootInstanceVertexId, waitFor = [], stateEdgeCache, pathResolutionCache }) {
   if (!waitFor?.length) return true
   for (const targetNodeId of waitFor) {
     const ready = await isNodeProvided({
-      g,
+      g, dataMapper,
       rootInstanceVertexId,
       targetNodeId,
       stateEdgeCache,
@@ -61,33 +53,26 @@ async function areWaitForsProvided({ g, rootInstanceVertexId, waitFor = [], stat
 }
 
 async function isImportReadyForParent({
-  g,
+  g, dataMapper,
   parentInstanceVertexId,
   importInstanceVertexId,
   stateEdgeCache,
   pathResolutionCache,
 }) {
-  const importRefInstanceIds = await g
-    .V(parentInstanceVertexId)
-    .out(domain.edge.uses_import.componentInstance_importInstanceRef.constants.LABEL)
-    .filter(_ => _.out(domain.edge.uses_import.importInstanceRef_componentInstance.constants.LABEL).has('id', importInstanceVertexId))
-    .id()
+  const importRefInstanceIds = await dataMapper.query.findImportInstanceRefIdForInstance({ vertexId: parentInstanceVertexId, id: importInstanceVertexId })
 
   if (!importRefInstanceIds?.length) return false
 
   for (const importRefInstanceId of importRefInstanceIds) {
-    const [importRefId] = await g
-      .V(importRefInstanceId)
-      .out(domain.edge.uses_import.importInstanceRef_importRef.constants.LABEL)
-      .id()
+    const [importRefId] = await dataMapper.query.findImportRefIdForInstanceRef({ vertexId: importRefInstanceId })
     const taskWaitForIds = importRefId
-      ? await g.V(importRefId).out(domain.edge.wait_for.importRef_task.constants.LABEL).id()
+      ? await dataMapper.query.listImportTaskWaitForIds({ vertexId: importRefId })
       : []
     const dataWaitForIds = importRefId
-      ? await g.V(importRefId).out(domain.edge.wait_for.importRef_data.constants.LABEL).id()
+      ? await dataMapper.query.listImportDataWaitForIds({ vertexId: importRefId })
       : []
     const [lifecycleWaitForValues] = importRefId
-      ? await g.V(importRefId).valueMap(LIFECYCLE_WAIT_FOR_PROPERTY)
+      ? await dataMapper.query.readLifecycleWaitForValues({ importRefId })
       : []
     const lifecycleWaitFor = normalizeLifecycleWaitForValues(
       lifecycleWaitForValues?.[LIFECYCLE_WAIT_FOR_PROPERTY],
@@ -99,7 +84,7 @@ async function isImportReadyForParent({
     ])
 
     const ready = await areWaitForsProvided({
-      g,
+      g, dataMapper,
       rootInstanceVertexId: parentInstanceVertexId,
       waitFor,
       stateEdgeCache,
@@ -111,14 +96,14 @@ async function isImportReadyForParent({
   return false
 }
 
-async function shouldStartImport({ g, importInstanceVertexId, parentInstanceId }) {
+async function shouldStartImport({ g, dataMapper, importInstanceVertexId, parentInstanceId }) {
   if (!g || !importInstanceVertexId) return true
 
-  const alreadyStarted = await hasInstanceStarted({ g, instanceVertexId: importInstanceVertexId })
+  const alreadyStarted = await hasInstanceStarted({ g, dataMapper, instanceVertexId: importInstanceVertexId })
   if (alreadyStarted) return false
 
   const parentInstanceVertexIds = await resolveParentInstanceVertexIds({
-    g,
+    g, dataMapper,
     importInstanceVertexId,
     parentInstanceId,
   })
@@ -129,7 +114,7 @@ async function shouldStartImport({ g, importInstanceVertexId, parentInstanceId }
   for (const parentInstanceVertexId of new Set(parentInstanceVertexIds)) {
     if (!parentInstanceVertexId) continue
     const ready = await isImportReadyForParent({
-      g,
+      g, dataMapper,
       parentInstanceVertexId,
       importInstanceVertexId,
       stateEdgeCache,
@@ -141,14 +126,14 @@ async function shouldStartImport({ g, importInstanceVertexId, parentInstanceId }
   return false
 }
 
-export async function handler({ rootCtx: { natsContext, g }, scope: { instanceId, parentInstanceId } }) {
+export async function handler({ rootCtx: { natsContext, g, dataMapper }, scope: { instanceId, parentInstanceId } }) {
   if (!instanceId) return
 
   let readyToStart = true
   if (g) {
-    const importInstanceVertexId = await resolveInstanceVertexId({ g, instanceId })
+    const importInstanceVertexId = await resolveInstanceVertexId({ g, dataMapper, instanceId })
     readyToStart = await shouldStartImport({
-      g,
+      g, dataMapper,
       importInstanceVertexId,
       parentInstanceId,
     })

@@ -5,7 +5,7 @@ import { domain } from '@liquid-bricks/spec-domain/domain'
 
 export async function republishIfImportsMissing({
   message,
-  rootCtx: { g, natsContext },
+  rootCtx: { g, dataMapper, natsContext },
   scope: { handlerDiagnostics, component, componentAlreadyRegistered, [s.scope.ac]: abortCtl },
 }) {
   if (componentAlreadyRegistered) return
@@ -29,11 +29,7 @@ export async function republishIfImportsMissing({
       { field: 'import.hash', component: compName, hash, importName },
     )
 
-    const [importedComponentId] = await g
-      .V()
-      .has('label', domain.vertex.component.constants.LABEL)
-      .has('hash', importHash)
-      .id()
+    const [importedComponentId] = await dataMapper.query.findImportedComponentIdByHash({ hash: importHash })
 
     if (!importedComponentId) {
       missingImports.push({ name: importName, hash: importHash })

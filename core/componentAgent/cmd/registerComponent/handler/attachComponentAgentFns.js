@@ -1,47 +1,11 @@
 import { Errors } from '../../../../../errors.js'
 
-const AGENT_FN_VERTEX_LABEL = 'domain.vertex.agentFn'
-const HAS_AGENT_FN_EDGE_LABEL = 'domain.edge.has_agentFn.component__agentFn'
-
-async function createAgentFnVertex({ g, dataMapper, agentFn }) {
-  const createAgentFn = dataMapper?.vertex?.agentFn?.create
-  if (typeof createAgentFn === 'function') {
-    return createAgentFn(agentFn)
-  }
-
-  const { name, portAddr, hash, codeRef } = agentFn
-  const now = new Date().toISOString()
-  let vertex = g
-    .addV(AGENT_FN_VERTEX_LABEL)
-    .property('name', name)
-    .property('portAddr', portAddr)
-    .property('createdAt', now)
-    .property('updatedAt', now)
-
-  if (hash !== undefined) {
-    vertex = vertex.property('hash', hash)
-  }
-
-  if (codeRef) {
-    const { file, line, column } = codeRef
-    vertex = vertex.property('codeRef', { file, line, column })
-  }
-
-  const [id] = await vertex.id()
-  return { id }
+async function createAgentFnVertex({ dataMapper, agentFn }) {
+  return dataMapper.vertex.agentFn.create(agentFn)
 }
 
-async function createComponentAgentFnEdge({ g, dataMapper, fromId, toId }) {
-  const createComponentAgentFn = dataMapper?.edge?.has_agentFn?.component_agentFn?.create
-  if (typeof createComponentAgentFn === 'function') {
-    return createComponentAgentFn({ fromId, toId })
-  }
-
-  const now = new Date().toISOString()
-  await g
-    .addE(HAS_AGENT_FN_EDGE_LABEL, fromId, toId)
-    .property('createdAt', now)
-    .property('updatedAt', now)
+async function createComponentAgentFnEdge({ dataMapper, fromId, toId }) {
+  return dataMapper.edge.has_agentFn.component_agentFn.create({ fromId, toId })
 }
 
 export async function attachComponentAgentFns({

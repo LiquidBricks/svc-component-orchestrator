@@ -1,36 +1,31 @@
 import { domain } from '@liquid-bricks/spec-domain/domain'
 
-export async function componentGates({ rootCtx: { g }, scope: { componentId } }) {
+export async function componentGates({ rootCtx: { g, dataMapper }, scope: { componentId } }) {
   const gates = []
-  const gateRefIds = await g.V(componentId)
-    .out(domain.edge.has_gate.component_gateRef.constants.LABEL)
-    .id()
+  const gateRefIds = await dataMapper.query.listGateRefIds({ vertexId: componentId })
 
   for (const gateRefId of gateRefIds ?? []) {
-    const [edgeValues] = await g.V(gateRefId).valueMap('alias', 'fnc')
+    const [edgeValues] = await dataMapper.query.readGateRefAliasAndFunction({ vertexId: gateRefId })
     const aliasValues = edgeValues?.alias ?? edgeValues
     const fncValues = edgeValues?.fnc ?? edgeValues
     const alias = Array.isArray(aliasValues) ? aliasValues[0] : aliasValues
     const fnc = Array.isArray(fncValues) ? fncValues[0] : fncValues
 
-    const [gatedComponentId] = await g
-      .V(gateRefId)
-      .out(domain.edge.gate_of.gateRef_component.constants.LABEL)
-      .id()
-    const [gatedComponentValues] = gatedComponentId ? await g.V(gatedComponentId).valueMap('hash') : []
+    const [gatedComponentId] = await dataMapper.query.findGatedComponentIdForGateRef({ vertexId: gateRefId })
+    const [gatedComponentValues] = gatedComponentId ? await dataMapper.query.readGatedComponentValues({ vertexId: gatedComponentId }) : []
     const gatedHashValues = gatedComponentValues?.hash ?? gatedComponentValues
 
     const taskWaitForIds = gateRefId
-      ? await g.V(gateRefId).out(domain.edge.wait_for.gateRef_task.constants.LABEL).id()
+      ? await dataMapper.query.listGateTaskWaitForIds({ vertexId: gateRefId })
       : []
     const dataWaitForIds = gateRefId
-      ? await g.V(gateRefId).out(domain.edge.wait_for.gateRef_data.constants.LABEL).id()
+      ? await dataMapper.query.listGateDataWaitForIds({ vertexId: gateRefId })
       : []
     const depsTaskIds = gateRefId
-      ? await g.V(gateRefId).out(domain.edge.has_dependency.gateRef_task.constants.LABEL).id()
+      ? await dataMapper.query.listDepsTaskIds({ vertexId: gateRefId })
       : []
     const depsDataIds = gateRefId
-      ? await g.V(gateRefId).out(domain.edge.has_dependency.gateRef_data.constants.LABEL).id()
+      ? await dataMapper.query.listDepsDataIds({ vertexId: gateRefId })
       : []
     const waitFor = Array.from(new Set(
       [...(taskWaitForIds ?? []), ...(dataWaitForIds ?? [])]

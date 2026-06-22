@@ -30,30 +30,13 @@ function validatePayload({ scope: { agentID }, rootCtx: { diagnostics } }) {
 }
 
 async function registerComponentAgent({ scope: { agentID }, rootCtx: { g, dataMapper } }) {
-  const componentAgentLabel = 'domain.vertex.componentAgent'
 
-  const [existingComponentAgentVID] = await g
-    .V()
-    .has('label', componentAgentLabel)
-    .has('agentID', agentID)
-    .id()
+  const [existingComponentAgentVID] = await dataMapper.query.findComponentAgentVertexId({ agentID })
 
   if (existingComponentAgentVID) {
     return { componentAgentVID: existingComponentAgentVID, componentAgentAlreadyRegistered: true }
   }
 
-  const createComponentAgent = dataMapper.vertex.componentAgent && dataMapper.vertex.componentAgent.create
-  if (typeof createComponentAgent === 'function') {
-    const { id: componentAgentVID } = await createComponentAgent({ agentID })
-    return { componentAgentVID, componentAgentAlreadyRegistered: false }
-  }
-
-  const now = new Date().toISOString()
-  const [componentAgentVID] = await g
-    .addV(componentAgentLabel)
-    .property('agentID', agentID)
-    .property('createdAt', now)
-    .property('updatedAt', now)
-    .id()
+  const { id: componentAgentVID } = await dataMapper.vertex.componentAgent.create({ agentID })
   return { componentAgentVID, componentAgentAlreadyRegistered: false }
 }

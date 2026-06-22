@@ -1,5 +1,11 @@
 import { Errors } from '../../../../errors.js'
-import { STATE_EDGE_LABEL_BY_TYPE } from '../../../component/evt/compute_function/constants.js'
+import { DATA_STATE_EDGE_LABEL } from '../../../component/evt/compute_function/data/constants.js'
+import { TASK_STATE_EDGE_LABEL } from '../../../component/evt/compute_function/task/constants.js'
+
+const STATE_EDGE_LABEL_BY_TYPE = Object.freeze({
+  data: DATA_STATE_EDGE_LABEL,
+  task: TASK_STATE_EDGE_LABEL,
+})
 
 export function validatePayload({
   scope: { handlerDiagnostics, instanceId, instanceVertexId, stateMachineId, stateEdgeId, type },

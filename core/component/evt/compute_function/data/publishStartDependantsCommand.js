@@ -6,19 +6,14 @@ import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nat
 
 
 export async function publishStartDependantsCommand({
-  scope: { instanceId, instanceVertexId, stateEdgeId, type },
-  rootCtx: { natsContext, g },
+  scope: { instanceId, instanceVertexId, stateEdgeId },
+  rootCtx: { natsContext, g, dataMapper },
 }) {
-  if (type === 'gate') return
-
   if (g && instanceVertexId) {
-    const [gateInstanceRefId] = await g
-      .V(instanceVertexId)
-      .in(domain.edge.uses_gate.gateInstanceRef_componentInstance.constants.LABEL)
-      .id()
+    const [gateInstanceRefId] = await dataMapper.query.findOwningGateInstanceRefId({ vertexId: instanceVertexId })
 
     if (gateInstanceRefId) {
-      const isStarted = await hasInstanceStarted({ g, instanceVertexId })
+      const isStarted = await hasInstanceStarted({ g, dataMapper, instanceVertexId })
       if (!isStarted) return
     }
   }
@@ -28,6 +23,6 @@ export async function publishStartDependantsCommand({
 
   await natsContext.publish(
     subject.build(),
-    JSON.stringify({ data: { instanceId, stateEdgeId, type } })
+    JSON.stringify({ data: { instanceId, stateEdgeId, type: 'data' } })
   )
 }

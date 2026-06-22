@@ -24,13 +24,9 @@ test('componentImports returns imported component metadata', async () => {
     await registerComponent({ diagnostics, dataMapper, g }, imported)
     await registerComponent({ diagnostics, dataMapper, g }, parent)
 
-    const [parentId] = await g
-      .V()
-      .has('label', domain.vertex.component.constants.LABEL)
-      .has('hash', parent.hash)
-      .id()
+    const [parentId] = await dataMapper.query.findParentId({ hash: parent.hash })
 
-    const { imports } = await componentImports({ rootCtx: { g }, scope: { componentId: parentId } })
+    const { imports } = await componentImports({ rootCtx: { g, dataMapper }, scope: { componentId: parentId } })
 
     assert.equal(imports.length, 1)
     assert.equal(pickFirst(imports[0].alias), 'aliasA')
@@ -44,13 +40,9 @@ test('componentImports returns empty array when no imports exist', async () => {
 
     await registerComponent({ diagnostics, dataMapper, g }, component)
 
-    const [componentId] = await g
-      .V()
-      .has('label', domain.vertex.component.constants.LABEL)
-      .has('hash', component.hash)
-      .id()
+    const [componentId] = await dataMapper.query.findComponentIdByHash({ hash: component.hash })
 
-    const { imports } = await componentImports({ rootCtx: { g }, scope: { componentId } })
+    const { imports } = await componentImports({ rootCtx: { g, dataMapper }, scope: { componentId } })
     assert.deepEqual(imports, [])
   })
 })

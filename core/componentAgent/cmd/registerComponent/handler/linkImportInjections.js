@@ -37,20 +37,15 @@ function parseImportInjectionPath({ handlerDiagnostics, path, compName, hash, im
   }
 }
 
-async function resolveImportedComponent({ g, handlerDiagnostics, startComponentId, importPath, compName, hash, importName, pathType, pathValue, refType = 'import' }) {
+async function resolveImportedComponent({ g, dataMapper, handlerDiagnostics, startComponentId, importPath, compName, hash, importName, pathType, pathValue, refType = 'import' }) {
   let componentId = startComponentId
   for (const alias of importPath) {
-    const [importRefId] = await g
-      .V(componentId)
-      .out(domain.edge.has_import.component_importRef.constants.LABEL)
-      .has('alias', alias)
-      .id()
+    const [importRefId] = await dataMapper.query.findImportRefIdByAlias({ alias, vertexId: componentId })
 
-    const [gateRefId] = importRefId ? [] : await g
-      .V(componentId)
-      .out(domain.edge.has_gate.component_gateRef.constants.LABEL)
-      .has('alias', alias)
-      .id()
+    const [gateRefId] = importRefId ? [] : await dataMapper.query.findGateRefIdByAlias({ alias, vertexId: componentId })
+    const [nextComponentId] = importRefId
+      ? await dataMapper.query.findImportedComponentIdForImportRef({ vertexId: importRefId })
+      : await dataMapper.query.findGatedComponentIdForGateRef({ vertexId: gateRefId })
 
     handlerDiagnostics.require(
       importRefId || gateRefId,
@@ -59,10 +54,6 @@ async function resolveImportedComponent({ g, handlerDiagnostics, startComponentI
       { component: compName, hash, importName, pathType, pathValue, alias, refType },
     )
 
-    const [nextComponentId] = await g
-      .V(importRefId ?? gateRefId)
-      .out(importRefId ? domain.edge.import_of.importRef_component.constants.LABEL : domain.edge.gate_of.gateRef_component.constants.LABEL)
-      .id()
     handlerDiagnostics.require(
       nextComponentId,
       Errors.PRECONDITION_INVALID,
@@ -79,7 +70,7 @@ async function resolveImportedComponent({ g, handlerDiagnostics, startComponentI
 async function resolveInjectionNodeId({
   handlerDiagnostics,
   dependencyList,
-  g,
+  g, dataMapper,
   componentVID,
   importPath,
   type,
@@ -111,7 +102,7 @@ async function resolveInjectionNodeId({
   )
 
   const targetComponentId = await resolveImportedComponent({
-    g,
+    g, dataMapper,
     handlerDiagnostics,
     startComponentId: componentVID,
     importPath,
@@ -127,11 +118,7 @@ async function resolveInjectionNodeId({
     ? domain.edge.has_task.component_task.constants.LABEL
     : domain.edge.has_data.component_data.constants.LABEL
 
-  const [nodeId] = await g
-    .V(targetComponentId)
-    .out(edgeLabel)
-    .has('name', name)
-    .id()
+  const [nodeId] = await dataMapper.query.findImportInjectionTargetNodeId({ name, edgeLabel, vertexId: targetComponentId })
 
   handlerDiagnostics.require(
     nodeId,
@@ -160,10 +147,8 @@ function createEdgeFactory({ g, dataMapper }) {
     if (!edgeLabel) return
 
     const hasTargetImportPath = Array.isArray(targetImportPath) && targetImportPath.length > 0
-    if (g && hasTargetImportPath) {
-      await g
-        .addE(edgeLabel, fromId, toId)
-        .property('targetAliasPath', JSON.stringify(targetImportPath))
+    if (hasTargetImportPath) {
+      await dataMapper.mutation.createInjectionEdgeWithTargetAliasPath({ edgeLabel, fromId, toId, targetAliasPath: JSON.stringify(targetImportPath) })
       return
     }
 
@@ -228,7 +213,7 @@ export async function linkImportInjections({
       const sourceId = await resolveInjectionNodeId({
         handlerDiagnostics,
         dependencyList,
-        g,
+        g, dataMapper,
         componentVID,
         importPath: sourceImportPath,
         type: sourceType,
@@ -256,7 +241,7 @@ export async function linkImportInjections({
         const targetId = await resolveInjectionNodeId({
           handlerDiagnostics,
           dependencyList,
-          g,
+          g, dataMapper,
           componentVID,
           importPath: targetImportPath,
           type: targetType,

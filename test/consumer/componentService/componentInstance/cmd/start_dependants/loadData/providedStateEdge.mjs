@@ -23,13 +23,9 @@ test('providedStateEdge resolves provided node id', async () => {
 
     await registerComponent({ diagnostics, dataMapper, g }, component)
 
-    const [componentId] = await g
-      .V()
-      .has('label', domain.vertex.component.constants.LABEL)
-      .has('hash', component.hash)
-      .id()
+    const [componentId] = await dataMapper.query.findComponentIdByHash({ hash: component.hash })
 
-    const { imports } = await componentImports({ rootCtx: { g }, scope: { componentId } })
+    const { imports } = await componentImports({ rootCtx: { g, dataMapper }, scope: { componentId } })
 
     const instanceId = 'instance-provided-edge'
     await createInstance({ diagnostics, dataMapper, g }, {
@@ -39,42 +35,32 @@ test('providedStateEdge resolves provided node id', async () => {
       imports,
     })
 
-    const [instanceVertexId] = await g
-      .V()
-      .has('label', domain.vertex.componentInstance.constants.LABEL)
-      .has('instanceId', instanceId)
-      .id()
+    const [instanceVertexId] = await dataMapper.query.findInstanceVertexId({ instanceId })
 
-    const [stateMachineId] = await g
-      .V(instanceVertexId)
-      .out(domain.edge.has_stateMachine.componentInstance_stateMachine.constants.LABEL)
-      .id()
+    const [stateMachineId] = await dataMapper.query.readStateMachineId({ vertexId: instanceVertexId })
 
     const stateEdgeLabel = STATE_EDGE_LABEL_BY_TYPE.data
-    const [stateEdgeId] = await g
-      .V(stateMachineId)
-      .outE(stateEdgeLabel)
-      .id()
+    const [stateEdgeId] = await dataMapper.query.listStateEdgeIds({ edgeLabel: stateEdgeLabel, vertexId: stateMachineId })
 
     const handlerDiagnostics = createHandlerDiagnostics(diagnostics, { instanceId, stateEdgeId, type: 'data' })
     const { providedNodeId } = await providedStateEdge({
-      rootCtx: { g },
+      rootCtx: { g, dataMapper },
       scope: { handlerDiagnostics, stateMachineId, stateEdgeLabel, stateEdgeId, instanceId, type: 'data' },
     })
 
-    const [row] = await g.V(providedNodeId).valueMap('name')
+    const [row] = await dataMapper.query.readNodeName({ vertexId: providedNodeId })
     const value = Array.isArray(row.name) ? row.name[0] : row.name
     assert.equal(value, 'inputData')
   })
 })
 
 test('providedStateEdge rejects missing stateEdge', async () => {
-  await withGraphContext(async ({ diagnostics, g }) => {
+  await withGraphContext(async ({ diagnostics, g, dataMapper }) => {
     const handlerDiagnostics = createHandlerDiagnostics(diagnostics, { instanceId: 'instance', stateEdgeId: 'missing', type: 'data' })
 
     await assert.rejects(
       providedStateEdge({
-        rootCtx: { g },
+        rootCtx: { g, dataMapper },
         scope: {
           handlerDiagnostics,
           stateMachineId: 'missing-state-machine',

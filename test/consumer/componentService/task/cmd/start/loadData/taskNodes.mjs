@@ -24,13 +24,9 @@ test('taskNodes returns task and component details for state edge', async () => 
 
     await registerComponent({ diagnostics, dataMapper, g }, component)
 
-    const [componentId] = await g
-      .V()
-      .has('label', domain.vertex.component.constants.LABEL)
-      .has('hash', component.hash)
-      .id()
+    const [componentId] = await dataMapper.query.findComponentIdByHash({ hash: component.hash })
 
-    const { imports } = await componentImports({ rootCtx: { g }, scope: { componentId } })
+    const { imports } = await componentImports({ rootCtx: { g, dataMapper }, scope: { componentId } })
 
     const instanceId = 'instance-task-nodes'
     await createInstance({ diagnostics, dataMapper, g }, {
@@ -40,24 +36,14 @@ test('taskNodes returns task and component details for state edge', async () => 
       imports,
     })
 
-    const [instanceVertexId] = await g
-      .V()
-      .has('label', domain.vertex.componentInstance.constants.LABEL)
-      .has('instanceId', instanceId)
-      .id()
+    const [instanceVertexId] = await dataMapper.query.findInstanceVertexId({ instanceId })
 
-    const [stateMachineId] = await g
-      .V(instanceVertexId)
-      .out(domain.edge.has_stateMachine.componentInstance_stateMachine.constants.LABEL)
-      .id()
+    const [stateMachineId] = await dataMapper.query.readStateMachineId({ vertexId: instanceVertexId })
 
-    const [taskStateEdgeId] = await g
-      .V(stateMachineId)
-      .outE(domain.edge.has_task_state.stateMachine_task.constants.LABEL)
-      .id()
+    const [taskStateEdgeId] = await dataMapper.query.readTaskStateEdgeId({ vertexId: stateMachineId })
 
     const result = await taskNodes({
-      rootCtx: { g },
+      rootCtx: { g, dataMapper },
       scope: { instanceId, stateId: taskStateEdgeId },
     })
 
@@ -66,7 +52,7 @@ test('taskNodes returns task and component details for state edge', async () => 
     assert.equal(pickFirst(result.componentHash), component.hash)
     assert.equal(pickFirst(result.name), 'taskA')
 
-    const [taskRow] = await g.V(result.taskNodeId).valueMap('name')
+    const [taskRow] = await dataMapper.query.readTaskRow({ vertexId: result.taskNodeId })
     assert.equal(pickFirst(taskRow.name), 'taskA')
   })
 })

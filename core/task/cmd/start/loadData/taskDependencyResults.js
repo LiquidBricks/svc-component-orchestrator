@@ -7,16 +7,10 @@ const DEPENDENCY_EDGE_LABELS = Object.freeze([
   domain.edge.has_dependency.task_deferred.constants.LABEL,
 ])
 
-export async function taskDependencyResults({ rootCtx: { g }, scope: { instanceVertexId, taskNodeId } }) {
-  const [dependentComponentId] = await g
-    .V(instanceVertexId)
-    .out(domain.edge.instance_of.componentInstance_component.constants.LABEL)
-    .id()
+export async function taskDependencyResults({ rootCtx: { g, dataMapper }, scope: { instanceVertexId, taskNodeId } }) {
+  const [dependentComponentId] = await dataMapper.query.findDependentComponentId({ vertexId: instanceVertexId })
 
-  const dependencyNodeIds = await g
-    .V(taskNodeId)
-    .out(...DEPENDENCY_EDGE_LABELS)
-    .id()
+  const dependencyNodeIds = await dataMapper.query.listDependencyNodeIds({ edgeLabels: DEPENDENCY_EDGE_LABELS, vertexId: taskNodeId })
 
   const deps = {}
   const seen = new Set()
@@ -28,14 +22,14 @@ export async function taskDependencyResults({ rootCtx: { g }, scope: { instanceV
     seen.add(depNodeId)
 
     const stateEdgeInfo = await findStateEdgeForNodeInInstanceTree({
-      g,
+      g, dataMapper,
       rootInstanceVertexId: instanceVertexId,
       targetNodeId: depNodeId,
       stateEdgeCache,
     })
     if (!stateEdgeInfo) continue
 
-    const [depValues] = await g.V(depNodeId).valueMap('label', 'name')
+    const [depValues] = await dataMapper.query.readDepValues({ vertexId: depNodeId })
     const depLabelValues = depValues?.label ?? depValues
     const depLabel = vertexLabelToType(Array.isArray(depLabelValues) ? depLabelValues[0] : depLabelValues)
     const depNameValues = depValues?.name ?? depValues
@@ -43,11 +37,11 @@ export async function taskDependencyResults({ rootCtx: { g }, scope: { instanceV
 
     let depComponentId
     if (depLabel === 'task') {
-      [depComponentId] = await g.V(depNodeId).in(domain.edge.has_task.component_task.constants.LABEL).id()
+      [depComponentId] = await dataMapper.query.findComponentIdForTask({ vertexId: depNodeId })
     } else if (depLabel === 'data') {
-      [depComponentId] = await g.V(depNodeId).in(domain.edge.has_data.component_data.constants.LABEL).id()
+      [depComponentId] = await dataMapper.query.findComponentIdForData({ vertexId: depNodeId })
     } else {
-      [depComponentId] = await g.V(depNodeId).in(domain.edge.has_deferred.component_deferred.constants.LABEL).id()
+      [depComponentId] = await dataMapper.query.findComponentIdForDeferred({ vertexId: depNodeId })
     }
 
     let aliasPath = []
@@ -56,7 +50,7 @@ export async function taskDependencyResults({ rootCtx: { g }, scope: { instanceV
         aliasPath = importPathCache.get(depComponentId) ?? []
       } else {
         aliasPath = await findImportPathBetweenComponents({
-          g,
+          g, dataMapper,
           fromComponentId: dependentComponentId,
           toComponentId: depComponentId,
         }) ?? []
@@ -64,7 +58,7 @@ export async function taskDependencyResults({ rootCtx: { g }, scope: { instanceV
       }
     }
 
-    const [stateValues] = await g.E(stateEdgeInfo.stateEdgeId).valueMap('result')
+    const [stateValues] = await dataMapper.query.readDependencyStateResult({ edgeId: stateEdgeInfo.stateEdgeId })
     const resultValues = stateValues?.result ?? stateValues
     const result = normalizeResult(Array.isArray(resultValues) ? resultValues[0] : resultValues)
     const path = [...aliasPath, depLabel, depName].join('.')

@@ -23,13 +23,9 @@ test('stateMachine resolves stateMachineId for instance', async () => {
 
     await registerComponent({ diagnostics, dataMapper, g }, component)
 
-    const [componentId] = await g
-      .V()
-      .has('label', domain.vertex.component.constants.LABEL)
-      .has('hash', component.hash)
-      .id()
+    const [componentId] = await dataMapper.query.findComponentIdByHash({ hash: component.hash })
 
-    const { imports } = await componentImports({ rootCtx: { g }, scope: { componentId } })
+    const { imports } = await componentImports({ rootCtx: { g, dataMapper }, scope: { componentId } })
 
     const instanceId = 'instance-state-machine'
     await createInstance({ diagnostics, dataMapper, g }, {
@@ -39,29 +35,25 @@ test('stateMachine resolves stateMachineId for instance', async () => {
       imports,
     })
 
-    const [instanceVertexId] = await g
-      .V()
-      .has('label', domain.vertex.componentInstance.constants.LABEL)
-      .has('instanceId', instanceId)
-      .id()
+    const [instanceVertexId] = await dataMapper.query.findInstanceVertexId({ instanceId })
 
     const handlerDiagnostics = createHandlerDiagnostics(diagnostics, { instanceId })
     const { stateMachineId } = await stateMachine({
-      rootCtx: { g },
+      rootCtx: { g, dataMapper },
       scope: { handlerDiagnostics, instanceVertexId, instanceId },
     })
 
-    const [row] = await g.V(stateMachineId).valueMap('state')
+    const [row] = await dataMapper.query.readStateMachineState({ vertexId: stateMachineId })
     assert.equal(pickFirst(row.state), domain.vertex.stateMachine.constants.STATES.CREATED)
   })
 })
 
 test('stateMachine rejects missing stateMachine', async () => {
-  await withGraphContext(async ({ diagnostics, g }) => {
+  await withGraphContext(async ({ diagnostics, g, dataMapper }) => {
     const handlerDiagnostics = createHandlerDiagnostics(diagnostics, { instanceId: 'missing-instance' })
 
     await assert.rejects(
-      stateMachine({ rootCtx: { g }, scope: { handlerDiagnostics, instanceVertexId: 'missing-vertex', instanceId: 'missing-instance' } }),
+      stateMachine({ rootCtx: { g, dataMapper }, scope: { handlerDiagnostics, instanceVertexId: 'missing-vertex', instanceId: 'missing-instance' } }),
       diagnostics.DiagnosticError,
     )
   })

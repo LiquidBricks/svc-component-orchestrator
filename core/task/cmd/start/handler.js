@@ -6,14 +6,11 @@ function getStatus(value) {
   return Array.isArray(statusValue) ? statusValue[0] : statusValue
 }
 
-export async function handler({ rootCtx: { g }, scope: { handlerDiagnostics, stateId } }) {
+export async function handler({ rootCtx: { g, dataMapper }, scope: { handlerDiagnostics, stateId } }) {
   let currentStatus = null
   try {
-    const vertex = g?.V?.(stateId)
-    if (vertex && typeof vertex.valueMap === 'function') {
-      const [statusValues] = await vertex.valueMap('status')
-      currentStatus = getStatus(statusValues)
-    }
+    const statusValues = await dataMapper.query.readTaskStateStatus({ stateId })
+    currentStatus = getStatus(statusValues)
   } catch {
     // best-effort read; fall through to set running
   }
@@ -24,8 +21,5 @@ export async function handler({ rootCtx: { g }, scope: { handlerDiagnostics, sta
 
   const now = new Date().toISOString()
 
-  await g
-    .V(stateId)
-    .property('status', domain.edge.has_task_state.stateMachine_task.constants.Status.RUNNING)
-    .property('updatedAt', now)
+  await dataMapper.mutation.markTaskStateRunning({ updatedAt: now, vertexId: stateId })
 }

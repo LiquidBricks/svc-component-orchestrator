@@ -1,9 +1,15 @@
 import { create as createBasicSubject } from '@liquid-bricks/lib-nats-subject/create/basic'
 import { Errors } from '../../../../../errors.js'
 import { domain } from '@liquid-bricks/spec-domain/domain'
-import { STATE_EDGE_LABEL_BY_TYPE } from '../../../../component/evt/compute_function/constants.js'
+import { DATA_STATE_EDGE_LABEL } from '../../../../component/evt/compute_function/data/constants.js'
+import { TASK_STATE_EDGE_LABEL } from '../../../../component/evt/compute_function/task/constants.js'
 
 import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
+
+const STATE_EDGE_LABEL_BY_TYPE = Object.freeze({
+  data: DATA_STATE_EDGE_LABEL,
+  task: TASK_STATE_EDGE_LABEL,
+})
 
 
 const INJECTS_INTO_EDGE_BY_TYPE = Object.freeze({
@@ -17,16 +23,16 @@ const INJECTS_INTO_EDGE_BY_TYPE = Object.freeze({
   ],
 })
 
-async function findComponentIdForNode({ g, nodeId, type }) {
+async function findComponentIdForNode({ g, dataMapper, nodeId, type }) {
   const edgeLabel = type === 'task'
     ? domain.edge.has_task.component_task.constants.LABEL
     : domain.edge.has_data.component_data.constants.LABEL
-  const [componentId] = await g.V(nodeId).in(edgeLabel).id()
+  const [componentId] = await dataMapper.query.findOwningComponentId({ edgeLabel, vertexId: nodeId })
   return componentId
 }
 
-async function findNodeName({ g, nodeId }) {
-  const [values] = await g.V(nodeId).valueMap('name')
+async function findNodeName({ g, dataMapper, nodeId }) {
+  const [values] = await dataMapper.query.readNodeName({ vertexId: nodeId })
   const nameValues = values?.name ?? values
   return Array.isArray(nameValues) ? nameValues[0] : nameValues
 }
@@ -53,7 +59,7 @@ function normalizeAliasPath(value) {
   return trimmed.split('.').filter(Boolean)
 }
 
-async function findImportPath({ g, fromComponentId, toComponentId }) {
+async function findImportPath({ g, dataMapper, fromComponentId, toComponentId }) {
   const visited = new Set()
   const queue = [{ componentId: fromComponentId, path: [] }]
 
@@ -63,33 +69,23 @@ async function findImportPath({ g, fromComponentId, toComponentId }) {
     if (visited.has(componentId)) continue
     visited.add(componentId)
 
-    const importRefIds = await g.V(componentId)
-      .out(domain.edge.has_import.component_importRef.constants.LABEL)
-      .id()
+    const importRefIds = await dataMapper.query.listImportRefIds({ vertexId: componentId })
 
     for (const importRefId of importRefIds ?? []) {
-      const [edgeValues] = await g.V(importRefId).valueMap('alias')
+      const [edgeValues] = await dataMapper.query.readImportRefAlias({ vertexId: importRefId })
       const aliasValues = edgeValues?.alias ?? edgeValues
       const alias = Array.isArray(aliasValues) ? aliasValues[0] : aliasValues
-      const [nextComponentId] = await g
-        .V(importRefId)
-        .out(domain.edge.import_of.importRef_component.constants.LABEL)
-        .id()
+      const [nextComponentId] = await dataMapper.query.findImportedComponentIdForImportRef({ vertexId: importRefId })
       if (!alias || !nextComponentId) continue
       queue.push({ componentId: nextComponentId, path: [...path, alias] })
     }
 
-    const gateRefIds = await g.V(componentId)
-      .out(domain.edge.has_gate.component_gateRef.constants.LABEL)
-      .id()
+    const gateRefIds = await dataMapper.query.listGateRefIds({ vertexId: componentId })
     for (const gateRefId of gateRefIds ?? []) {
-      const [edgeValues] = await g.V(gateRefId).valueMap('alias')
+      const [edgeValues] = await dataMapper.query.readGateRefAlias({ vertexId: gateRefId })
       const aliasValues = edgeValues?.alias ?? edgeValues
       const alias = Array.isArray(aliasValues) ? aliasValues[0] : aliasValues
-      const [nextComponentId] = await g
-        .V(gateRefId)
-        .out(domain.edge.gate_of.gateRef_component.constants.LABEL)
-        .id()
+      const [nextComponentId] = await dataMapper.query.findGatedComponentIdForGateRef({ vertexId: gateRefId })
       if (!alias || !nextComponentId) continue
       queue.push({ componentId: nextComponentId, path: [...path, alias] })
     }
@@ -97,64 +93,44 @@ async function findImportPath({ g, fromComponentId, toComponentId }) {
   return null
 }
 
-async function findInstanceForImportPath({ g, rootInstanceVertexId, aliasPath }) {
+async function findInstanceForImportPath({ g, dataMapper, rootInstanceVertexId, aliasPath }) {
   let currentInstanceVertexId = rootInstanceVertexId
   for (const alias of aliasPath ?? []) {
-    const [importInstanceRefId] = await g
-      .V(currentInstanceVertexId)
-      .out(domain.edge.uses_import.componentInstance_importInstanceRef.constants.LABEL)
-      .filter(_ => _.out(domain.edge.uses_import.importInstanceRef_importRef.constants.LABEL).has('alias', alias))
-      .id()
-    const [gateInstanceRefId] = importInstanceRefId ? [] : await g
-      .V(currentInstanceVertexId)
-      .out(domain.edge.uses_gate.componentInstance_gateInstanceRef.constants.LABEL)
-      .filter(_ => _.out(domain.edge.uses_gate.gateInstanceRef_gateRef.constants.LABEL).has('alias', alias))
-      .id()
+    const [importInstanceRefId] = await dataMapper.query.findImportInstanceRefIdByAlias({ vertexId: currentInstanceVertexId, alias })
+    const [gateInstanceRefId] = importInstanceRefId ? [] : await dataMapper.query.findGateInstanceRefIdByAlias({ vertexId: currentInstanceVertexId, alias })
     const refId = importInstanceRefId ?? gateInstanceRefId
     if (!refId) return null
-    const [nextInstanceVertexId] = await g
-      .V(refId)
-      .out(importInstanceRefId ? domain.edge.uses_import.importInstanceRef_componentInstance.constants.LABEL : domain.edge.uses_gate.gateInstanceRef_componentInstance.constants.LABEL)
-      .id()
+    const [nextInstanceVertexId] = await dataMapper.query.findNextInstanceVertexId({ edgeLabel: importInstanceRefId ? domain.edge.uses_import.importInstanceRef_componentInstance.constants.LABEL : domain.edge.uses_gate.gateInstanceRef_componentInstance.constants.LABEL, vertexId: refId })
     if (!nextInstanceVertexId) return null
     currentInstanceVertexId = nextInstanceVertexId
   }
   return currentInstanceVertexId
 }
 
-async function findComponentIdForInstance({ g, instanceVertexId }) {
-  const [componentId] = await g
-    .V(instanceVertexId)
-    .out(domain.edge.instance_of.componentInstance_component.constants.LABEL)
-    .id()
+async function findComponentIdForInstance({ g, dataMapper, instanceVertexId }) {
+  const [componentId] = await dataMapper.query.findComponentIdForInstance({ vertexId: instanceVertexId })
   return componentId
 }
 
-async function findParentInstanceVertexId({ g, instanceVertexId }) {
-  const [parentImportId] = await g.V(instanceVertexId)
-    .in(domain.edge.uses_import.importInstanceRef_componentInstance.constants.LABEL)
-    .in(domain.edge.uses_import.componentInstance_importInstanceRef.constants.LABEL)
-    .id()
+async function findParentInstanceVertexId({ g, dataMapper, instanceVertexId }) {
+  const [parentImportId] = await dataMapper.query.findParentImportId({ vertexId: instanceVertexId })
   if (parentImportId) return parentImportId
 
-  const [parentGateId] = await g.V(instanceVertexId)
-    .in(domain.edge.uses_gate.gateInstanceRef_componentInstance.constants.LABEL)
-    .in(domain.edge.uses_gate.componentInstance_gateInstanceRef.constants.LABEL)
-    .id()
+  const [parentGateId] = await dataMapper.query.findParentGateId({ vertexId: instanceVertexId })
   return parentGateId ?? null
 }
 
-async function findInstanceForAliasPathInAncestors({ g, instanceVertexId, aliasPath, targetComponentId }) {
+async function findInstanceForAliasPathInAncestors({ g, dataMapper, instanceVertexId, aliasPath, targetComponentId }) {
   let currentInstanceId = instanceVertexId
   while (currentInstanceId) {
     const resolvedInstanceVertexId = await findInstanceForImportPath({
-      g,
+      g, dataMapper,
       rootInstanceVertexId: currentInstanceId,
       aliasPath,
     })
     if (resolvedInstanceVertexId) {
       const resolvedComponentId = await findComponentIdForInstance({
-        g,
+        g, dataMapper,
         instanceVertexId: resolvedInstanceVertexId,
       })
       if (!targetComponentId || resolvedComponentId === targetComponentId) {
@@ -162,28 +138,25 @@ async function findInstanceForAliasPathInAncestors({ g, instanceVertexId, aliasP
       }
     }
 
-    currentInstanceId = await findParentInstanceVertexId({ g, instanceVertexId: currentInstanceId })
+    currentInstanceId = await findParentInstanceVertexId({ g, dataMapper, instanceVertexId: currentInstanceId })
   }
 
   return { resolvedInstanceVertexId: null, importRootInstanceVertexId: null }
 }
 
-async function findRootInstanceVertexId({ g, instanceVertexId }) {
+async function findRootInstanceVertexId({ g, dataMapper, instanceVertexId }) {
   let current = instanceVertexId
   while (true) {
-    const parentInstanceVertexId = await findParentInstanceVertexId({ g, instanceVertexId: current })
+    const parentInstanceVertexId = await findParentInstanceVertexId({ g, dataMapper, instanceVertexId: current })
     if (!parentInstanceVertexId) break
     current = parentInstanceVertexId
   }
   return current
 }
 
-async function findRootComponentContext({ g, handlerDiagnostics, instanceVertexId, instanceId }) {
-  const rootInstanceVertexId = await findRootInstanceVertexId({ g, instanceVertexId })
-  const [rootComponentId] = await g
-    .V(rootInstanceVertexId)
-    .out(domain.edge.instance_of.componentInstance_component.constants.LABEL)
-    .id()
+async function findRootComponentContext({ g, dataMapper, handlerDiagnostics, instanceVertexId, instanceId }) {
+  const rootInstanceVertexId = await findRootInstanceVertexId({ g, dataMapper, instanceVertexId })
+  const [rootComponentId] = await dataMapper.query.findComponentIdForInstance({ vertexId: rootInstanceVertexId })
 
   handlerDiagnostics.require(
     rootComponentId,
@@ -195,24 +168,15 @@ async function findRootComponentContext({ g, handlerDiagnostics, instanceVertexI
   return { rootInstanceVertexId, rootComponentId }
 }
 
-async function findStateEdgeForNode({ g, stateMachineId, targetNodeId, targetStateEdgeLabel }) {
-  const [stateEdgeId] = await g
-    .V(stateMachineId)
-    .outE(targetStateEdgeLabel)
-    .filter(_ => _.inV().has('id', targetNodeId))
-    .id()
+async function findStateEdgeForNode({ g, dataMapper, stateMachineId, targetNodeId, targetStateEdgeLabel }) {
+  const [stateEdgeId] = await dataMapper.query.findStateEdgeIdForTargetNode({ edgeLabel: targetStateEdgeLabel, vertexId: stateMachineId, id: targetNodeId })
   return stateEdgeId
 }
 
-export async function publishInjectedComputeResultDoneEvents({ scope, rootCtx: { g, natsContext } }) {
+export async function publishInjectedComputeResultDoneEvents({ scope, rootCtx: { g, dataMapper, natsContext } }) {
   const { handlerDiagnostics, instanceId, instanceVertexId, stateMachineId, stateEdgeId, stateEdgeLabel, type, result } = scope
 
-  const [providedNodeId] = await g
-    .V(stateMachineId)
-    .outE(stateEdgeLabel)
-    .has('id', stateEdgeId)
-    .inV()
-    .id()
+  const [providedNodeId] = await dataMapper.query.findStateEdgeTargetNodeId({ id: stateEdgeId, edgeLabel: stateEdgeLabel, vertexId: stateMachineId })
 
   handlerDiagnostics.require(
     providedNodeId,
@@ -221,7 +185,7 @@ export async function publishInjectedComputeResultDoneEvents({ scope, rootCtx: {
     { instanceId, stateEdgeId, type }
   )
 
-  const providedComponentId = await findComponentIdForNode({ g, nodeId: providedNodeId, type })
+  const providedComponentId = await findComponentIdForNode({ g, dataMapper, nodeId: providedNodeId, type })
   handlerDiagnostics.require(
     providedComponentId,
     Errors.PRECONDITION_INVALID,
@@ -229,35 +193,31 @@ export async function publishInjectedComputeResultDoneEvents({ scope, rootCtx: {
     { instanceId, stateEdgeId, type }
   )
 
-  const fromName = await findNodeName({ g, nodeId: providedNodeId })
+  const fromName = await findNodeName({ g, dataMapper, nodeId: providedNodeId })
 
   const injectsIntoEdges = INJECTS_INTO_EDGE_BY_TYPE[type]
   if (!injectsIntoEdges?.length) return
-
-  const computeResultDoneSubject = createBasicSubject(natsEvents['*'].component_service['*'].function_result.evt.component.compute_function.v1['*']).forPublish()
-    .env('prod')
-    .build()
 
   const publishedTargets = new Set()
   let rootContext = null
 
   for (const { edgeLabel, targetType } of injectsIntoEdges) {
-    const targetEdgeIds = await g.V(providedNodeId).outE(edgeLabel).id()
+    const targetEdgeIds = await dataMapper.query.listTargetEdgeIds({ edgeLabel, vertexId: providedNodeId })
     if (!targetEdgeIds?.length) continue
 
     const targetStateEdgeLabel = STATE_EDGE_LABEL_BY_TYPE[targetType]
 
     for (const targetEdgeId of targetEdgeIds) {
-      const [targetNodeId] = await g.E(targetEdgeId).inV().id()
+      const [targetNodeId] = await dataMapper.query.findEdgeTargetNodeId({ edgeId: targetEdgeId })
       if (!targetNodeId) continue
-      const [targetEdgeValues] = await g.E(targetEdgeId).valueMap('targetAliasPath')
+      const [targetEdgeValues] = await dataMapper.query.readTargetEdgeValues({ edgeId: targetEdgeId })
       const targetAliasPathValues = targetEdgeValues?.targetAliasPath ?? targetEdgeValues
       const targetAliasPathRaw = Array.isArray(targetAliasPathValues) ? targetAliasPathValues[0] : targetAliasPathValues
       const targetAliasPath = normalizeAliasPath(targetAliasPathRaw)
 
-      const targetName = await findNodeName({ g, nodeId: targetNodeId })
+      const targetName = await findNodeName({ g, dataMapper, nodeId: targetNodeId })
       let targetInstanceId = null
-      const targetComponentId = await findComponentIdForNode({ g, nodeId: targetNodeId, type: targetType })
+      const targetComponentId = await findComponentIdForNode({ g, dataMapper, nodeId: targetNodeId, type: targetType })
 
       const buildDiagnostics = (additional = {}) => ({
         from: { instanceId, type, name: fromName },
@@ -281,7 +241,7 @@ export async function publishInjectedComputeResultDoneEvents({ scope, rootCtx: {
         if (targetAliasPath.length) {
           importPath = targetAliasPath
           const aliasPathResolution = await findInstanceForAliasPathInAncestors({
-            g,
+            g, dataMapper,
             instanceVertexId,
             aliasPath: targetAliasPath,
             targetComponentId,
@@ -291,11 +251,11 @@ export async function publishInjectedComputeResultDoneEvents({ scope, rootCtx: {
 
           if (!resolvedInstanceVertexId) {
             if (!rootContext) {
-              rootContext = await findRootComponentContext({ g, handlerDiagnostics, instanceVertexId, instanceId })
+              rootContext = await findRootComponentContext({ g, dataMapper, handlerDiagnostics, instanceVertexId, instanceId })
             }
             importRootInstanceVertexId = rootContext.rootInstanceVertexId
             resolvedInstanceVertexId = await findInstanceForImportPath({
-              g,
+              g, dataMapper,
               rootInstanceVertexId: importRootInstanceVertexId,
               aliasPath: importPath,
             })
@@ -304,18 +264,18 @@ export async function publishInjectedComputeResultDoneEvents({ scope, rootCtx: {
 
         if (!resolvedInstanceVertexId) {
           importPath = await findImportPath({
-            g,
+            g, dataMapper,
             fromComponentId: providedComponentId,
             toComponentId: targetComponentId,
           })
 
           if (!importPath) {
             if (!rootContext) {
-              rootContext = await findRootComponentContext({ g, handlerDiagnostics, instanceVertexId, instanceId })
+              rootContext = await findRootComponentContext({ g, dataMapper, handlerDiagnostics, instanceVertexId, instanceId })
             }
             importRootInstanceVertexId = rootContext.rootInstanceVertexId
             importPath = await findImportPath({
-              g,
+              g, dataMapper,
               fromComponentId: rootContext.rootComponentId,
               toComponentId: targetComponentId,
             })
@@ -332,7 +292,7 @@ export async function publishInjectedComputeResultDoneEvents({ scope, rootCtx: {
           }
 
           resolvedInstanceVertexId = await findInstanceForImportPath({
-            g,
+            g, dataMapper,
             rootInstanceVertexId: importRootInstanceVertexId,
             aliasPath: importPath,
           })
@@ -348,7 +308,7 @@ export async function publishInjectedComputeResultDoneEvents({ scope, rootCtx: {
         targetInstanceVertexId = resolvedInstanceVertexId
       }
 
-      const [targetInstanceMap] = await g.V(targetInstanceVertexId).valueMap('instanceId')
+      const [targetInstanceMap] = await dataMapper.query.readTargetInstanceMap({ vertexId: targetInstanceVertexId })
       const targetInstanceValues = targetInstanceMap?.instanceId ?? targetInstanceMap
       targetInstanceId = Array.isArray(targetInstanceValues) ? targetInstanceValues[0] : targetInstanceValues
 
@@ -359,10 +319,7 @@ export async function publishInjectedComputeResultDoneEvents({ scope, rootCtx: {
         buildDiagnostics({ targetInstanceVertexId, importPath, targetAliasPath })
       )
 
-      const [targetStateMachineId] = await g
-        .V(targetInstanceVertexId)
-        .out(domain.edge.has_stateMachine.componentInstance_stateMachine.constants.LABEL)
-        .id()
+      const [targetStateMachineId] = await dataMapper.query.readTargetStateMachineId({ vertexId: targetInstanceVertexId })
 
       handlerDiagnostics.require(
         targetStateMachineId,
@@ -372,7 +329,7 @@ export async function publishInjectedComputeResultDoneEvents({ scope, rootCtx: {
       )
 
       const targetStateEdgeId = await findStateEdgeForNode({
-        g,
+        g, dataMapper,
         stateMachineId: targetStateMachineId,
         targetNodeId,
         targetStateEdgeLabel,
@@ -395,8 +352,12 @@ export async function publishInjectedComputeResultDoneEvents({ scope, rootCtx: {
         buildDiagnostics({ targetStateEdgeId })
       )
 
+      const computeFunctionSubject = createBasicSubject(
+        natsEvents['*'].component_service['*'].function_result.evt.component.compute_function.v1[targetType],
+      ).forPublish().env('prod').build()
+
       await natsContext.publish(
-        computeResultDoneSubject,
+        computeFunctionSubject,
         JSON.stringify({
           data: {
             instanceId: targetInstanceId,

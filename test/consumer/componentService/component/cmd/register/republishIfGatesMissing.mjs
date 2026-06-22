@@ -12,7 +12,7 @@ const republishIfGatesMissing = registerSpec.pre.find(fn => fn.name === 'republi
 test('republishIfGatesMissing republishes and aborts when a gate component is missing', async () => {
   assert.ok(republishIfGatesMissing, 'republishIfGatesMissing pre hook missing')
 
-  await withGraphContext(async ({ diagnostics, g }) => {
+  await withGraphContext(async ({ diagnostics, g, dataMapper }) => {
     const component = componentBuilder('MissingGateComponent')
       .gate('setup', { hash: 'missing-gate-hash' })
       .toJSON()
@@ -29,7 +29,7 @@ test('republishIfGatesMissing republishes and aborts when a gate component is mi
 
     await republishIfGatesMissing({
       message,
-      rootCtx: { g, natsContext },
+      rootCtx: { g, dataMapper, natsContext },
       scope: { handlerDiagnostics, component, [s.scope.ac]: abortCtl },
     })
 
@@ -49,7 +49,7 @@ test('republishIfGatesMissing republishes and aborts when a gate component is mi
 test('republishIfGatesMissing rejects missing gate name', async () => {
   assert.ok(republishIfGatesMissing, 'republishIfGatesMissing pre hook missing')
 
-  await withGraphContext(async ({ diagnostics, g }) => {
+  await withGraphContext(async ({ diagnostics, g, dataMapper }) => {
     const component = componentBuilder('MissingGateNameComponent')
       .gate('setup', { hash: 'some-hash' })
       .toJSON()
@@ -65,7 +65,7 @@ test('republishIfGatesMissing rejects missing gate name', async () => {
     await assert.rejects(
       republishIfGatesMissing({
         message,
-        rootCtx: { g, natsContext: { publish: async () => { } } },
+        rootCtx: { g, dataMapper, natsContext: { publish: async () => { } } },
         scope: { handlerDiagnostics, component, [s.scope.ac]: abortCtl },
       }),
       diagnostics.DiagnosticError,
@@ -76,7 +76,7 @@ test('republishIfGatesMissing rejects missing gate name', async () => {
 test('republishIfGatesMissing rejects missing gate hash', async () => {
   assert.ok(republishIfGatesMissing, 'republishIfGatesMissing pre hook missing')
 
-  await withGraphContext(async ({ diagnostics, g }) => {
+  await withGraphContext(async ({ diagnostics, g, dataMapper }) => {
     const component = componentBuilder('MissingGateHashComponent')
       .gate('setup', { hash: 'some-hash' })
       .toJSON()
@@ -92,7 +92,7 @@ test('republishIfGatesMissing rejects missing gate hash', async () => {
     await assert.rejects(
       republishIfGatesMissing({
         message,
-        rootCtx: { g, natsContext: { publish: async () => { } } },
+        rootCtx: { g, dataMapper, natsContext: { publish: async () => { } } },
         scope: { handlerDiagnostics, component, [s.scope.ac]: abortCtl },
       }),
       diagnostics.DiagnosticError,
@@ -123,7 +123,7 @@ test('republishIfGatesMissing no-ops when gate components already registered', a
 
     await republishIfGatesMissing({
       message,
-      rootCtx: { g, natsContext },
+      rootCtx: { g, dataMapper, natsContext },
       scope: { handlerDiagnostics, component, [s.scope.ac]: abortCtl },
     })
 

@@ -1,6 +1,6 @@
 import { domain } from '@liquid-bricks/spec-domain/domain'
 
-export const LIFECYCLE_WAIT_FOR_PROPERTY = 'lifecycleWaitFor'
+export const LIFECYCLE_WAIT_FOR_PROPERTY = domain.vertex.importRef.constants.LIFECYCLE_WAIT_FOR_PROPERTY
 
 const STATE_EDGE_LABELS = Object.freeze([
   domain.edge.has_task_state.stateMachine_task.constants.LABEL,
@@ -100,7 +100,7 @@ function parseLifecycleDependencyPath(targetPath) {
 }
 
 async function resolveDependencyPathTargetId({
-  g,
+  g, dataMapper,
   rootInstanceVertexId,
   targetPath,
   pathResolutionCache,
@@ -118,10 +118,7 @@ async function resolveDependencyPathTargetId({
     return null
   }
 
-  const [rootComponentId] = await g
-    .V(rootInstanceVertexId)
-    .out(domain.edge.instance_of.componentInstance_component.constants.LABEL)
-    .id()
+  const [rootComponentId] = await dataMapper.query.findComponentIdForInstance({ vertexId: rootInstanceVertexId })
   if (!rootComponentId) {
     pathResolutionCache?.set(cacheKey, null)
     return null
@@ -129,27 +126,18 @@ async function resolveDependencyPathTargetId({
 
   let componentId = rootComponentId
   for (const alias of parsed.importPath ?? []) {
-    const [importRefId] = await g
-      .V(componentId)
-      .out(domain.edge.has_import.component_importRef.constants.LABEL)
-      .has('alias', alias)
-      .id()
+    const [importRefId] = await dataMapper.query.findImportRefIdByAlias({ alias, vertexId: componentId })
 
-    const [gateRefId] = importRefId ? [] : await g
-      .V(componentId)
-      .out(domain.edge.has_gate.component_gateRef.constants.LABEL)
-      .has('alias', alias)
-      .id()
+    const [gateRefId] = importRefId ? [] : await dataMapper.query.findGateRefIdByAlias({ alias, vertexId: componentId })
+    const [nextComponentId] = importRefId
+      ? await dataMapper.query.findImportedComponentIdForImportRef({ vertexId: importRefId })
+      : await dataMapper.query.findGatedComponentIdForGateRef({ vertexId: gateRefId })
 
     if (!importRefId && !gateRefId) {
       pathResolutionCache?.set(cacheKey, null)
       return null
     }
 
-    const [nextComponentId] = await g
-      .V(importRefId ?? gateRefId)
-      .out(importRefId ? domain.edge.import_of.importRef_component.constants.LABEL : domain.edge.gate_of.gateRef_component.constants.LABEL)
-      .id()
     if (!nextComponentId) {
       pathResolutionCache?.set(cacheKey, null)
       return null
@@ -158,11 +146,7 @@ async function resolveDependencyPathTargetId({
   }
 
   const edgeLabel = DEPENDENCY_NODE_EDGE_LABELS[parsed.targetType]
-  const [nodeId] = await g
-    .V(componentId)
-    .out(edgeLabel)
-    .has('name', parsed.targetName)
-    .id()
+  const [nodeId] = await dataMapper.query.findDependencyTargetNodeId({ name: parsed.targetName, edgeLabel, vertexId: componentId })
 
   const resolved = nodeId ?? null
   pathResolutionCache?.set(cacheKey, resolved)
@@ -170,7 +154,7 @@ async function resolveDependencyPathTargetId({
 }
 
 export async function findStateEdgeForNodeInInstanceTree({
-  g,
+  g, dataMapper,
   rootInstanceVertexId,
   targetNodeId,
   stateEdgeCache = new Map(),
@@ -195,17 +179,10 @@ export async function findStateEdgeForNodeInInstanceTree({
     if (!instanceVertexId || visited.has(instanceVertexId)) continue
     visited.add(instanceVertexId)
 
-    const [stateMachineId] = await g
-      .V(instanceVertexId)
-      .out(domain.edge.has_stateMachine.componentInstance_stateMachine.constants.LABEL)
-      .id()
+    const [stateMachineId] = await dataMapper.query.readStateMachineId({ vertexId: instanceVertexId })
     if (stateMachineId) {
       for (const stateEdgeLabel of STATE_EDGE_LABELS) {
-        const [stateEdgeId] = await g
-          .V(stateMachineId)
-          .outE(stateEdgeLabel)
-          .filter(_ => _.inV().has('id', targetNodeId))
-          .id()
+        const [stateEdgeId] = await dataMapper.query.findStateEdgeIdForTargetNode({ edgeLabel: stateEdgeLabel, vertexId: stateMachineId, id: targetNodeId })
         if (stateEdgeId) {
           const result = { stateMachineId, stateEdgeId, stateEdgeLabel, instanceVertexId }
           stateEdgeCache.set(cacheKey, result)
@@ -214,21 +191,13 @@ export async function findStateEdgeForNodeInInstanceTree({
       }
     }
 
-    const importedInstanceIds = await g
-      .V(instanceVertexId)
-      .out(domain.edge.uses_import.componentInstance_importInstanceRef.constants.LABEL)
-      .out(domain.edge.uses_import.importInstanceRef_componentInstance.constants.LABEL)
-      .id()
+    const importedInstanceIds = await dataMapper.query.listImportedInstanceIds({ vertexId: instanceVertexId })
     for (const importedInstanceId of importedInstanceIds ?? []) {
       if (!importedInstanceId || visited.has(importedInstanceId)) continue
       queue.push(importedInstanceId)
     }
 
-    const gatedInstanceIds = await g
-      .V(instanceVertexId)
-      .out(domain.edge.uses_gate.componentInstance_gateInstanceRef.constants.LABEL)
-      .out(domain.edge.uses_gate.gateInstanceRef_componentInstance.constants.LABEL)
-      .id()
+    const gatedInstanceIds = await dataMapper.query.listGatedInstanceIds({ vertexId: instanceVertexId })
     for (const gatedInstanceId of gatedInstanceIds ?? []) {
       if (!gatedInstanceId || visited.has(gatedInstanceId)) continue
       queue.push(gatedInstanceId)
@@ -239,7 +208,7 @@ export async function findStateEdgeForNodeInInstanceTree({
   return null
 }
 
-export async function findImportPathBetweenComponents({ g, fromComponentId, toComponentId }) {
+export async function findImportPathBetweenComponents({ g, dataMapper, fromComponentId, toComponentId }) {
   const visited = new Set()
   const queue = [{ componentId: fromComponentId, path: [] }]
 
@@ -249,33 +218,23 @@ export async function findImportPathBetweenComponents({ g, fromComponentId, toCo
     if (visited.has(componentId)) continue
     visited.add(componentId)
 
-    const importRefIds = await g.V(componentId)
-      .out(domain.edge.has_import.component_importRef.constants.LABEL)
-      .id()
+    const importRefIds = await dataMapper.query.listImportRefIds({ vertexId: componentId })
 
     for (const importRefId of importRefIds ?? []) {
-      const [edgeValues] = await g.V(importRefId).valueMap('alias')
+      const [edgeValues] = await dataMapper.query.readImportRefAlias({ vertexId: importRefId })
       const aliasValues = edgeValues?.alias ?? edgeValues
       const alias = Array.isArray(aliasValues) ? aliasValues[0] : aliasValues
-      const [nextComponentId] = await g
-        .V(importRefId)
-        .out(domain.edge.import_of.importRef_component.constants.LABEL)
-        .id()
+      const [nextComponentId] = await dataMapper.query.findImportedComponentIdForImportRef({ vertexId: importRefId })
       if (!alias || !nextComponentId) continue
       queue.push({ componentId: nextComponentId, path: [...path, alias] })
     }
 
-    const gateRefIds = await g.V(componentId)
-      .out(domain.edge.has_gate.component_gateRef.constants.LABEL)
-      .id()
+    const gateRefIds = await dataMapper.query.listGateRefIds({ vertexId: componentId })
     for (const gateRefId of gateRefIds ?? []) {
-      const [edgeValues] = await g.V(gateRefId).valueMap('alias')
+      const [edgeValues] = await dataMapper.query.readGateRefAlias({ vertexId: gateRefId })
       const aliasValues = edgeValues?.alias ?? edgeValues
       const alias = Array.isArray(aliasValues) ? aliasValues[0] : aliasValues
-      const [nextComponentId] = await g
-        .V(gateRefId)
-        .out(domain.edge.gate_of.gateRef_component.constants.LABEL)
-        .id()
+      const [nextComponentId] = await dataMapper.query.findGatedComponentIdForGateRef({ vertexId: gateRefId })
       if (!alias || !nextComponentId) continue
       queue.push({ componentId: nextComponentId, path: [...path, alias] })
     }
@@ -283,30 +242,20 @@ export async function findImportPathBetweenComponents({ g, fromComponentId, toCo
   return null
 }
 
-export async function getStateEdgeStatus({ g, stateEdgeId }) {
-  const [statusValues] = await g.E(stateEdgeId).valueMap('status')
+export async function getStateEdgeStatus({ g, dataMapper, stateEdgeId }) {
+  const [statusValues] = await dataMapper.query.readStateEdgeStatus({ edgeId: stateEdgeId })
   const statusMap = Array.isArray(statusValues) ? statusValues[0] : statusValues
   const statusValuesMap = statusMap?.status ?? statusMap
   return Array.isArray(statusValuesMap) ? statusValuesMap[0] : statusValuesMap
 }
 
-async function resolveInstancePath({ g, rootInstanceVertexId, importPath = [] }) {
+async function resolveInstancePath({ g, dataMapper, rootInstanceVertexId, importPath = [] }) {
   let currentInstanceVertexId = rootInstanceVertexId
 
   for (const alias of importPath ?? []) {
-    const [importedInstanceVertexId] = await g
-      .V(currentInstanceVertexId)
-      .out(domain.edge.uses_import.componentInstance_importInstanceRef.constants.LABEL)
-      .filter(_ => _.out(domain.edge.uses_import.importInstanceRef_importRef.constants.LABEL).has('alias', alias))
-      .out(domain.edge.uses_import.importInstanceRef_componentInstance.constants.LABEL)
-      .id()
+    const [importedInstanceVertexId] = await dataMapper.query.findImportedInstanceVertexIdByAlias({ vertexId: currentInstanceVertexId, alias })
 
-    const [gatedInstanceVertexId] = importedInstanceVertexId ? [] : await g
-      .V(currentInstanceVertexId)
-      .out(domain.edge.uses_gate.componentInstance_gateInstanceRef.constants.LABEL)
-      .filter(_ => _.out(domain.edge.uses_gate.gateInstanceRef_gateRef.constants.LABEL).has('alias', alias))
-      .out(domain.edge.uses_gate.gateInstanceRef_componentInstance.constants.LABEL)
-      .id()
+    const [gatedInstanceVertexId] = importedInstanceVertexId ? [] : await dataMapper.query.findGatedInstanceVertexIdByAlias({ vertexId: currentInstanceVertexId, alias })
 
     currentInstanceVertexId = importedInstanceVertexId ?? gatedInstanceVertexId
     if (!currentInstanceVertexId) return null
@@ -315,24 +264,24 @@ async function resolveInstancePath({ g, rootInstanceVertexId, importPath = [] })
   return currentInstanceVertexId
 }
 
-async function isLifecycleProvided({ g, rootInstanceVertexId, targetPath }) {
+async function isLifecycleProvided({ g, dataMapper, rootInstanceVertexId, targetPath }) {
   const parsed = parseLifecycleDependencyPath(targetPath)
   if (!parsed) return null
   if (parsed.targetName !== 'done' || !parsed.importPath.length) return false
 
   const instanceVertexId = await resolveInstancePath({
-    g,
+    g, dataMapper,
     rootInstanceVertexId,
     importPath: parsed.importPath,
   })
   if (!instanceVertexId) return false
 
-  const state = await getInstanceState({ g, instanceVertexId })
+  const state = await getInstanceState({ g, dataMapper, instanceVertexId })
   return state === domain.vertex.stateMachine.constants.STATES.COMPLETE
 }
 
 export async function isNodeProvided({
-  g,
+  g, dataMapper,
   rootInstanceVertexId,
   targetNodeId,
   stateEdgeCache,
@@ -340,7 +289,7 @@ export async function isNodeProvided({
 }) {
   if (typeof targetNodeId === 'string') {
     const lifecycleProvided = await isLifecycleProvided({
-      g,
+      g, dataMapper,
       rootInstanceVertexId,
       targetPath: targetNodeId,
     })
@@ -349,7 +298,7 @@ export async function isNodeProvided({
 
   const resolvedTargetNodeId = (typeof targetNodeId === 'string' && targetNodeId.includes('.'))
     ? await resolveDependencyPathTargetId({
-      g,
+      g, dataMapper,
       rootInstanceVertexId,
       targetPath: targetNodeId,
       pathResolutionCache,
@@ -358,32 +307,29 @@ export async function isNodeProvided({
   if (!resolvedTargetNodeId) return false
 
   const stateEdgeInfo = await findStateEdgeForNodeInInstanceTree({
-    g,
+    g, dataMapper,
     rootInstanceVertexId,
     targetNodeId: resolvedTargetNodeId,
     stateEdgeCache,
   })
   if (!stateEdgeInfo) return false
 
-  const status = await getStateEdgeStatus({ g, stateEdgeId: stateEdgeInfo.stateEdgeId })
+  const status = await getStateEdgeStatus({ g, dataMapper, stateEdgeId: stateEdgeInfo.stateEdgeId })
   return status === PROVIDED_STATUS
 }
 
-export async function getInstanceState({ g, instanceVertexId }) {
-  const [stateMachineId] = await g
-    .V(instanceVertexId)
-    .out(domain.edge.has_stateMachine.componentInstance_stateMachine.constants.LABEL)
-    .id()
+export async function getInstanceState({ g, dataMapper, instanceVertexId }) {
+  const [stateMachineId] = await dataMapper.query.readStateMachineId({ vertexId: instanceVertexId })
   if (!stateMachineId) return null
 
-  const [stateValues] = await g.V(stateMachineId).valueMap('state')
+  const [stateValues] = await dataMapper.query.readStateMachineState({ vertexId: stateMachineId })
   const stateMap = Array.isArray(stateValues) ? stateValues[0] : stateValues
   const stateValuesMap = stateMap?.state ?? stateMap
   return Array.isArray(stateValuesMap) ? stateValuesMap[0] : stateValuesMap
 }
 
-export async function hasInstanceStarted({ g, instanceVertexId }) {
-  const state = await getInstanceState({ g, instanceVertexId })
+export async function hasInstanceStarted({ g, dataMapper, instanceVertexId }) {
+  const state = await getInstanceState({ g, dataMapper, instanceVertexId })
   if (!state) return false
   return state === domain.vertex.stateMachine.constants.STATES.RUNNING
     || state === domain.vertex.stateMachine.constants.STATES.COMPLETE

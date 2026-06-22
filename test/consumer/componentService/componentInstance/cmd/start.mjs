@@ -115,22 +115,18 @@ async function startInstance(ctx, scope) {
   return startInstanceSpec.handler({ rootCtx: ctx, scope: { ...scope, handlerDiagnostics } })
 }
 
-async function loadImports({ g, componentId }) {
-  const { imports = [] } = await componentImports({ rootCtx: { g }, scope: { componentId } })
+async function loadImports({ g, dataMapper, componentId }) {
+  const { imports = [] } = await componentImports({ rootCtx: { g, dataMapper }, scope: { componentId } })
   return imports
 }
 
-async function loadGates({ g, componentId }) {
-  const { gates = [] } = await componentGates({ rootCtx: { g }, scope: { componentId } })
+async function loadGates({ g, dataMapper, componentId }) {
+  const { gates = [] } = await componentGates({ rootCtx: { g, dataMapper }, scope: { componentId } })
   return gates
 }
 
-async function getComponentId({ g, diagnostics, componentHash }) {
-  const [componentId] = await g
-    .V()
-    .has('label', domain.vertex.component.constants.LABEL)
-    .has('hash', componentHash)
-    .id()
+async function getComponentId({ g, dataMapper, diagnostics, componentHash }) {
+  const [componentId] = await dataMapper.query.findComponentIdByHash({ hash: componentHash })
   diagnostics.require(
     componentId,
     diagnostics.DiagnosticError,
@@ -144,25 +140,18 @@ function pickFirst(values) {
   return values ?? null
 }
 
-async function getStateMachineIdForInstance({ g, instanceId }) {
-  const [instanceVertexId] = await g
-    .V()
-    .has('label', domain.vertex.componentInstance.constants.LABEL)
-    .has('instanceId', instanceId)
-    .id()
+async function getStateMachineIdForInstance({ g, dataMapper, instanceId }) {
+  const [instanceVertexId] = await dataMapper.query.findInstanceVertexId({ instanceId })
   assert.ok(instanceVertexId, `componentInstance ${instanceId} missing`)
 
-  const [stateMachineId] = await g
-    .V(instanceVertexId)
-    .out(domain.edge.has_stateMachine.componentInstance_stateMachine.constants.LABEL)
-    .id()
+  const [stateMachineId] = await dataMapper.query.readStateMachineId({ vertexId: instanceVertexId })
   return { stateMachineId, instanceVertexId }
 }
 
-async function namesForStateEdges(g, edgeIds) {
+async function namesForStateEdges(dataMapper, edgeIds) {
   const names = []
   for (const edgeId of edgeIds ?? []) {
-    const [row] = await g.E(edgeId).inV().valueMap('name')
+    const [row] = await dataMapper.query.readStateEdgeTargetName({ edgeId })
     names.push(pickFirst(row?.name ?? row))
   }
   return names
@@ -175,18 +164,18 @@ test('handler marks stateMachine running and updates timestamp', async () => {
     await registerComponent(component, { diagnostics, dataMapper, g })
 
     const instanceId = 'instance-start-running'
-    const componentId = await getComponentId({ g, diagnostics, componentHash: component.hash })
-    const imports = await loadImports({ g, componentId })
+    const componentId = await getComponentId({ g, dataMapper, diagnostics, componentHash: component.hash })
+    const imports = await loadImports({ g, dataMapper, componentId })
     await createInstance({ diagnostics, dataMapper, g }, { componentHash: component.hash, componentId, instanceId, imports })
 
-    const { stateMachineId } = await getStateMachineIdForInstance({ g, instanceId })
-    const [initialState] = await g.V(stateMachineId).valueMap('state', 'updatedAt')
+    const { stateMachineId } = await getStateMachineIdForInstance({ g, dataMapper, instanceId })
+    const [initialState] = await dataMapper.query.readInitialState({ vertexId: stateMachineId })
     const initialUpdatedAt = pickFirst(initialState.updatedAt)
     assert.equal(pickFirst(initialState.state), domain.vertex.stateMachine.constants.STATES.CREATED)
 
-    await startInstance({ diagnostics, g }, { stateMachineId })
+    await startInstance({ diagnostics, g, dataMapper }, { stateMachineId })
 
-    const [stateRow] = await g.V(stateMachineId).valueMap('state', 'updatedAt')
+    const [stateRow] = await dataMapper.query.readStateMachineStateAndUpdatedAt({ vertexId: stateMachineId })
     assert.equal(pickFirst(stateRow.state), domain.vertex.stateMachine.constants.STATES.RUNNING)
     assert.notEqual(pickFirst(stateRow.updatedAt), initialUpdatedAt)
   })
@@ -204,15 +193,15 @@ test('findDependencyFreeStates returns only nodes without dependencies', async (
     await registerComponent(component, { diagnostics, dataMapper, g })
 
     const instanceId = 'instance-dependency-free'
-    const componentId = await getComponentId({ g, diagnostics, componentHash: component.hash })
-    const imports = await loadImports({ g, componentId })
+    const componentId = await getComponentId({ g, dataMapper, diagnostics, componentHash: component.hash })
+    const imports = await loadImports({ g, dataMapper, componentId })
     await createInstance({ diagnostics, dataMapper, g }, { componentHash: component.hash, componentId, instanceId, imports })
 
-    const { stateMachineId } = await getStateMachineIdForInstance({ g, instanceId })
-    const { dataStateIds, taskStateIds } = await findDependencyFreeStates({ rootCtx: { g }, scope: { stateMachineId } })
+    const { stateMachineId } = await getStateMachineIdForInstance({ g, dataMapper, instanceId })
+    const { dataStateIds, taskStateIds } = await findDependencyFreeStates({ rootCtx: { g, dataMapper }, scope: { stateMachineId } })
 
-    const dataNames = await namesForStateEdges(g, dataStateIds)
-    const taskNames = await namesForStateEdges(g, taskStateIds)
+    const dataNames = await namesForStateEdges(dataMapper, dataStateIds)
+    const taskNames = await namesForStateEdges(dataMapper, taskStateIds)
 
     assert.deepEqual(dataNames.sort(), ['inputData'])
     assert.deepEqual(taskNames.sort(), ['taskIndependent'])
@@ -230,43 +219,33 @@ test('doesInstanceExist validates presence and usesImportInstances returns impor
     await registerComponent(component, { diagnostics, dataMapper, g })
 
     const instanceId = 'instance-with-import'
-    const componentId = await getComponentId({ g, diagnostics, componentHash: component.hash })
-    const imports = await loadImports({ g, componentId })
+    const componentId = await getComponentId({ g, dataMapper, diagnostics, componentHash: component.hash })
+    const imports = await loadImports({ g, dataMapper, componentId })
     await createInstance({ diagnostics, dataMapper, g }, { componentHash: component.hash, componentId, instanceId, imports })
 
-    const [instanceVertexId] = await g
-      .V()
-      .has('label', domain.vertex.componentInstance.constants.LABEL)
-      .has('instanceId', instanceId)
-      .id()
+    const [instanceVertexId] = await dataMapper.query.findInstanceVertexId({ instanceId })
     assert.ok(instanceVertexId, 'componentInstance vertex missing')
 
     const handlerDiagnostics = createHandlerDiagnostics(diagnostics, { instanceId })
-    const exists = await doesInstanceExist({ rootCtx: { diagnostics, g }, scope: { handlerDiagnostics, instanceId } })
+    const exists = await doesInstanceExist({ rootCtx: { diagnostics, g, dataMapper }, scope: { handlerDiagnostics, instanceId } })
     assert.equal(exists.instanceVertexId, instanceVertexId)
 
-    const { stateMachineId } = await getStateMachine({ rootCtx: { g }, scope: { instanceVertexId } })
+    const { stateMachineId } = await getStateMachine({ rootCtx: { g, dataMapper }, scope: { instanceVertexId } })
     assert.ok(stateMachineId, 'stateMachine missing')
 
     await assert.rejects(
       doesInstanceExist({
-        rootCtx: { diagnostics, g },
+        rootCtx: { diagnostics, g, dataMapper },
         scope: { handlerDiagnostics: createHandlerDiagnostics(diagnostics, { instanceId: 'missing-instance' }), instanceId: 'missing-instance' }
       }),
       diagnostics.DiagnosticError,
     )
 
-    const importsHook = await usesImportInstances({ rootCtx: { g }, scope: { instanceVertexId } })
+    const importsHook = await usesImportInstances({ rootCtx: { g, dataMapper }, scope: { instanceVertexId } })
     assert.equal(importsHook.usesImportInstances.length, 1)
 
-    const [importInstanceRefId] = await g
-      .V(instanceVertexId)
-      .out(domain.edge.uses_import.componentInstance_importInstanceRef.constants.LABEL)
-      .id()
-    const [importedInstanceRow] = await g
-      .V(importInstanceRefId)
-      .out(domain.edge.uses_import.importInstanceRef_componentInstance.constants.LABEL)
-      .valueMap('instanceId')
+    const [importInstanceRefId] = await dataMapper.query.listImportInstanceRefIds({ vertexId: instanceVertexId })
+    const [importedInstanceRow] = await dataMapper.query.readImportedInstanceIdForRef({ vertexId: importInstanceRefId })
     const importedInstanceId = pickFirst(importedInstanceRow.instanceId)
 
     const importInstanceIds = importsHook.usesImportInstances.map(({ instanceId }) => instanceId)
@@ -343,29 +322,25 @@ test('publishEvents dispatches gate start command and gate handler emits compute
     await registerComponent(rootComponent, { diagnostics, dataMapper, g })
 
     const instanceId = 'instance-start-gate-compute'
-    const componentId = await getComponentId({ g, diagnostics, componentHash: rootComponent.hash })
-    const imports = await loadImports({ g, componentId })
-    const gates = await loadGates({ g, componentId })
+    const componentId = await getComponentId({ g, dataMapper, diagnostics, componentHash: rootComponent.hash })
+    const imports = await loadImports({ g, dataMapper, componentId })
+    const gates = await loadGates({ g, dataMapper, componentId })
     await createInstance(
       { diagnostics, dataMapper, g },
       { componentHash: rootComponent.hash, componentId, instanceId, imports, gates },
     )
 
-    const [instanceVertexId] = await g
-      .V()
-      .has('label', domain.vertex.componentInstance.constants.LABEL)
-      .has('instanceId', instanceId)
-      .id()
+    const [instanceVertexId] = await dataMapper.query.findInstanceVertexId({ instanceId })
     assert.ok(instanceVertexId, 'root instance vertex missing')
 
-    const { usesGateInstances: gateInstances } = await usesGateInstances({ rootCtx: { g }, scope: { instanceVertexId } })
+    const { usesGateInstances: gateInstances } = await usesGateInstances({ rootCtx: { g, dataMapper }, scope: { instanceVertexId } })
     assert.equal(gateInstances.length, 1)
 
     const published = []
     const natsContext = { publish: async (subject, payload) => published.push({ subject, payload: JSON.parse(payload) }) }
 
     await runHookGroup(publishStartInstanceEvents, {
-      rootCtx: { natsContext, g },
+      rootCtx: { natsContext, g, dataMapper },
       scope: {
         instanceId,
         instanceVertexId,
@@ -403,7 +378,7 @@ test('publishEvents dispatches gate start command and gate handler emits compute
     await startGateHandler({
       rootCtx: {
         natsContext: { publish: async (subject, payload) => gatePublishes.push({ subject, payload: JSON.parse(payload) }) },
-        g,
+        g, dataMapper,
       },
       scope: gateStartEvents[0].payload.data,
     })

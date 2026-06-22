@@ -24,13 +24,9 @@ test('nodes returns component, instance, and data details for state edge', async
 
     await registerComponent({ diagnostics, dataMapper, g }, component)
 
-    const [componentId] = await g
-      .V()
-      .has('label', domain.vertex.component.constants.LABEL)
-      .has('hash', component.hash)
-      .id()
+    const [componentId] = await dataMapper.query.findComponentIdByHash({ hash: component.hash })
 
-    const { imports } = await componentImports({ rootCtx: { g }, scope: { componentId } })
+    const { imports } = await componentImports({ rootCtx: { g, dataMapper }, scope: { componentId } })
 
     const instanceId = 'instance-data-nodes'
     await createInstance({ diagnostics, dataMapper, g }, {
@@ -40,24 +36,14 @@ test('nodes returns component, instance, and data details for state edge', async
       imports,
     })
 
-    const [instanceVertexId] = await g
-      .V()
-      .has('label', domain.vertex.componentInstance.constants.LABEL)
-      .has('instanceId', instanceId)
-      .id()
+    const [instanceVertexId] = await dataMapper.query.findInstanceVertexId({ instanceId })
 
-    const [stateMachineVertexId] = await g
-      .V(instanceVertexId)
-      .out(domain.edge.has_stateMachine.componentInstance_stateMachine.constants.LABEL)
-      .id()
+    const [stateMachineVertexId] = await dataMapper.query.readStateMachineVertexId({ vertexId: instanceVertexId })
 
-    const [dataStateEdgeId] = await g
-      .V(stateMachineVertexId)
-      .outE(domain.edge.has_data_state.stateMachine_data.constants.LABEL)
-      .id()
+    const [dataStateEdgeId] = await dataMapper.query.readDataStateEdgeId({ vertexId: stateMachineVertexId })
 
     const result = await nodes({
-      rootCtx: { g },
+      rootCtx: { g, dataMapper },
       scope: { instanceId, stateId: dataStateEdgeId },
     })
 
@@ -67,7 +53,7 @@ test('nodes returns component, instance, and data details for state edge', async
     assert.equal(pickFirst(result.name), 'inputData')
     assert.equal(pickFirst(result.componentHash), component.hash)
 
-    const [dataRow] = await g.V(result.dataVertexId).valueMap('name')
+    const [dataRow] = await dataMapper.query.readDataRow({ vertexId: result.dataVertexId })
     assert.equal(pickFirst(dataRow.name), 'inputData')
   })
 })

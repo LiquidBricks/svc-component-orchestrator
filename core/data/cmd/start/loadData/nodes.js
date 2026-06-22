@@ -1,26 +1,16 @@
 import { domain } from '@liquid-bricks/spec-domain/domain'
 
-export async function nodes({ rootCtx: { g }, scope: { instanceId, stateId } }) {
-  const [componentInstanceVertexId] = await g.V()
-    .has('label', domain.vertex.componentInstance.constants.LABEL)
-    .has('instanceId', instanceId)
-    .id()
+export async function nodes({ rootCtx: { g, dataMapper }, scope: { instanceId, stateId } }) {
+  const [componentInstanceVertexId] = await dataMapper.query.findComponentInstanceVertexId({ instanceId })
 
-  const [dataVertexId] = await g
-    .E(stateId)
-    .inV()
-    .id()
+  const [dataVertexId] = await dataMapper.query.findDataVertexId({ edgeId: stateId })
 
-  const [componentVertexId] = await g.V(componentInstanceVertexId)
-    .out(domain.edge.instance_of.componentInstance_component.constants.LABEL)
-    .id()
+  const [componentVertexId] = await dataMapper.query.findComponentVertexId({ vertexId: componentInstanceVertexId })
 
-  const [stateMachineVertexId] = await g.V(componentInstanceVertexId)
-    .out(domain.edge.has_stateMachine.componentInstance_stateMachine.constants.LABEL)
-    .id()
+  const [stateMachineVertexId] = await dataMapper.query.readStateMachineVertexId({ vertexId: componentInstanceVertexId })
 
-  const [dataRow] = await g.V(dataVertexId).valueMap('name')
-  const [componentRow] = await g.V(componentVertexId).valueMap('hash')
+  const [dataRow] = await dataMapper.query.readDataRow({ vertexId: dataVertexId })
+  const [componentRow] = await dataMapper.query.readComponentRow({ vertexId: componentVertexId })
 
   return {
     componentInstanceVertexId,

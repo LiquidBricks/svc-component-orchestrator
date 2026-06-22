@@ -85,7 +85,7 @@ export function validateAgentFnDependency({
 }
 
 async function resolveImportedComponent({
-  g,
+  g, dataMapper,
   handlerDiagnostics,
   startComponentId,
   importPath,
@@ -98,17 +98,12 @@ async function resolveImportedComponent({
 }) {
   let componentId = startComponentId
   for (const alias of importPath) {
-    const [importRefId] = await g
-      .V(componentId)
-      .out(domain.edge.has_import.component_importRef.constants.LABEL)
-      .has('alias', alias)
-      .id()
+    const [importRefId] = await dataMapper.query.findImportRefIdByAlias({ alias, vertexId: componentId })
 
-    const [gateRefId] = importRefId ? [] : await g
-      .V(componentId)
-      .out(domain.edge.has_gate.component_gateRef.constants.LABEL)
-      .has('alias', alias)
-      .id()
+    const [gateRefId] = importRefId ? [] : await dataMapper.query.findGateRefIdByAlias({ alias, vertexId: componentId })
+    const [nextComponentId] = importRefId
+      ? await dataMapper.query.findImportedComponentIdForImportRef({ vertexId: importRefId })
+      : await dataMapper.query.findGatedComponentIdForGateRef({ vertexId: gateRefId })
 
     handlerDiagnostics.require(
       importRefId || gateRefId,
@@ -117,10 +112,6 @@ async function resolveImportedComponent({
       { component: compName, hash, dependencyType, dependencyName, pathType, pathValue, alias },
     )
 
-    const [nextComponentId] = await g
-      .V(importRefId ?? gateRefId)
-      .out(importRefId ? domain.edge.import_of.importRef_component.constants.LABEL : domain.edge.gate_of.gateRef_component.constants.LABEL)
-      .id()
     handlerDiagnostics.require(
       nextComponentId,
       Errors.PRECONDITION_INVALID,
@@ -137,7 +128,7 @@ async function resolveImportedComponent({
 export async function resolveDependencyTargetId({
   handlerDiagnostics,
   dependencyList,
-  g,
+  g, dataMapper,
   componentVID,
   importPath,
   targetType,
@@ -157,7 +148,7 @@ export async function resolveDependencyTargetId({
     )
 
     await resolveImportedComponent({
-      g,
+      g, dataMapper,
       handlerDiagnostics,
       startComponentId: componentVID,
       importPath,
@@ -198,7 +189,7 @@ export async function resolveDependencyTargetId({
   )
 
   const targetComponentId = await resolveImportedComponent({
-    g,
+    g, dataMapper,
     handlerDiagnostics,
     startComponentId: componentVID,
     importPath,
@@ -224,11 +215,7 @@ export async function resolveDependencyTargetId({
     { type: targetType, dep, component: compName, hash },
   )
 
-  const [targetNodeId] = await g
-    .V(targetComponentId)
-    .out(edgeLabel)
-    .has('name', targetName)
-    .id()
+  const [targetNodeId] = await dataMapper.query.findComponentNodeIdByName({ name: targetName, edgeLabel, vertexId: targetComponentId })
 
   handlerDiagnostics.require(
     targetNodeId,

@@ -9,25 +9,20 @@ function pickFirst(values) {
   return Array.isArray(values) ? values[0] : values
 }
 
-export async function publishGateStartIfPassed({
-  scope: { type, result, name, instanceVertexId },
-  rootCtx: { g, natsContext },
+export async function publishStartIfPassed({
+  scope: { result, name, instanceVertexId },
+  rootCtx: { g, dataMapper, natsContext },
 }) {
-  if (type !== 'gate' || result !== true) return
+  if (result !== true) return
   if (!name || !instanceVertexId) return
 
-  const [gateInstanceVertexId] = await g
-    .V(instanceVertexId)
-    .out(domain.edge.uses_gate.componentInstance_gateInstanceRef.constants.LABEL)
-    .filter(_ => _.out(domain.edge.uses_gate.gateInstanceRef_gateRef.constants.LABEL).has('alias', name))
-    .out(domain.edge.uses_gate.gateInstanceRef_componentInstance.constants.LABEL)
-    .id()
+  const [gateInstanceVertexId] = await dataMapper.query.findGateInstanceVertexIdByAlias({ vertexId: instanceVertexId, alias: name })
   if (!gateInstanceVertexId) return
 
-  const alreadyRunning = await hasInstanceStarted({ g, instanceVertexId: gateInstanceVertexId })
+  const alreadyRunning = await hasInstanceStarted({ g, dataMapper, instanceVertexId: gateInstanceVertexId })
   if (alreadyRunning) return
 
-  const [instanceValues] = await g.V(gateInstanceVertexId).valueMap('instanceId')
+  const [instanceValues] = await dataMapper.query.readGateInstanceId({ vertexId: gateInstanceVertexId })
   const gateInstanceId = pickFirst(instanceValues?.instanceId ?? instanceValues)
   if (!gateInstanceId) return
 

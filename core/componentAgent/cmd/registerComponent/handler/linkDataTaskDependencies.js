@@ -69,7 +69,7 @@ export async function linkDataTaskDependencies({
       const targetId = await resolveDependencyTargetId({
         handlerDiagnostics,
         dependencyList,
-        g,
+        g, dataMapper,
         componentVID,
         importPath,
         targetType,

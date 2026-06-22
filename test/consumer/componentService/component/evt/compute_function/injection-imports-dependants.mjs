@@ -4,6 +4,7 @@ import { component } from '@liquid-bricks/lib-component-builder'
 
 import {
   createBasicSubject,
+  createComputeFunctionSubject,
   withGraphContext,
   registerComponent,
   createInstance,
@@ -41,31 +42,29 @@ test('imported injection triggers dependant starts inside imported component', a
     await registerComponent(rootContract, { diagnostics, dataMapper, g })
 
     const rootInstanceId = 'instance-imported-dependants-root'
-    const rootComponentId = await getComponentId({ g, diagnostics, componentHash: rootContract.hash })
-    const imports = await loadImports({ g, rootComponentId })
+    const rootComponentId = await getComponentId({ g, dataMapper, diagnostics, componentHash: rootContract.hash })
+    const imports = await loadImports({ g, dataMapper, rootComponentId })
     await createInstance({ diagnostics, dataMapper, g }, { componentHash: rootContract.hash, componentId: rootComponentId, instanceId: rootInstanceId, imports })
 
-    const { instanceVertexId: rootInstanceVertexId, stateMachineId: rootStateMachineId } = await getStateMachineId({ g, instanceId: rootInstanceId })
-    const rootDataStateEdgeId = await getStateEdgeId({ g, stateMachineId: rootStateMachineId, type: 'data', name: 'rootData' })
+    const { instanceVertexId: rootInstanceVertexId, stateMachineId: rootStateMachineId } = await getStateMachineId({ g, dataMapper, instanceId: rootInstanceId })
+    const rootDataStateEdgeId = await getStateEdgeId({ g, dataMapper, stateMachineId: rootStateMachineId, type: 'data', name: 'rootData' })
 
-    const childInstanceVertexId = await getImportedInstance({ g, rootInstanceVertexId, aliasPath: ['child'] })
+    const childInstanceVertexId = await getImportedInstance({ g, dataMapper, rootInstanceVertexId, aliasPath: ['child'] })
     assert.ok(childInstanceVertexId, 'child instance missing')
-    const [childInstanceIdValues] = await g.V(childInstanceVertexId).valueMap('instanceId')
+    const [childInstanceIdValues] = await dataMapper.query.readChildInstanceIdValues({ vertexId: childInstanceVertexId })
     const childInstanceId = pickFirst(childInstanceIdValues?.instanceId ?? childInstanceIdValues)
-    const [childStateMachineId] = await g.V(childInstanceVertexId).out(domain.edge.has_stateMachine.componentInstance_stateMachine.constants.LABEL).id()
+    const [childStateMachineId] = await dataMapper.query.readChildStateMachineId({ vertexId: childInstanceVertexId })
 
-    const childTargetStateEdgeId = await getStateEdgeId({ g, stateMachineId: childStateMachineId, type: 'data', name: 'childTarget' })
-    const childDepDataStateEdgeId = await getStateEdgeId({ g, stateMachineId: childStateMachineId, type: 'data', name: 'childDataDep' })
-    const childDepTaskStateEdgeId = await getStateEdgeId({ g, stateMachineId: childStateMachineId, type: 'task', name: 'childTaskDep' })
+    const childTargetStateEdgeId = await getStateEdgeId({ g, dataMapper, stateMachineId: childStateMachineId, type: 'data', name: 'childTarget' })
+    const childDepDataStateEdgeId = await getStateEdgeId({ g, dataMapper, stateMachineId: childStateMachineId, type: 'data', name: 'childDataDep' })
+    const childDepTaskStateEdgeId = await getStateEdgeId({ g, dataMapper, stateMachineId: childStateMachineId, type: 'task', name: 'childTaskDep' })
 
     assert.ok(rootDataStateEdgeId, 'root data state edge missing')
     assert.ok(childTargetStateEdgeId, 'child target state edge missing')
     assert.ok(childDepDataStateEdgeId, 'child data dependant state edge missing')
     assert.ok(childDepTaskStateEdgeId, 'child task dependant state edge missing')
 
-    const computeFunctionSubject = createBasicSubject(natsEvents['*'].component_service['*'].function_result.evt.component.compute_function.v1['*']).forPublish()
-      .env('prod')
-      .build()
+    const computeFunctionSubject = createComputeFunctionSubject('data')
     const startDependantsSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start_dependants.v1['*']).forPublish()
       .env('prod')
       .build()
@@ -136,7 +135,7 @@ test('imported injection triggers dependant starts inside imported component', a
       spec: startDependantsSpec,
       rootCtx: {
         diagnostics,
-        g,
+        g, dataMapper,
         natsContext: { publish: async (subject, payload) => dependantPublishes.push({ subject, payload: JSON.parse(payload) }) },
       },
       message: {
@@ -172,24 +171,22 @@ test('computeFunction triggers parent dependant starts across imports', async ()
     await registerComponent(parentContract, { diagnostics, dataMapper, g })
 
     const parentInstanceId = 'instance-parent-dependants'
-    const parentComponentId = await getComponentId({ g, diagnostics, componentHash: parentContract.hash })
-    const imports = await loadImports({ g, parentComponentId })
+    const parentComponentId = await getComponentId({ g, dataMapper, diagnostics, componentHash: parentContract.hash })
+    const imports = await loadImports({ g, dataMapper, parentComponentId })
     await createInstance({ diagnostics, dataMapper, g }, { componentHash: parentContract.hash, componentId: parentComponentId, instanceId: parentInstanceId, imports })
 
-    const { stateMachineId: parentStateMachineId, instanceVertexId: parentInstanceVertexId } = await getStateMachineId({ g, instanceId: parentInstanceId })
-    const parentDataStateEdgeId = await getStateEdgeId({ g, stateMachineId: parentStateMachineId, type: 'data', name: 'parentData' })
-    const parentTaskStateEdgeId = await getStateEdgeId({ g, stateMachineId: parentStateMachineId, type: 'task', name: 'parentTask' })
+    const { stateMachineId: parentStateMachineId, instanceVertexId: parentInstanceVertexId } = await getStateMachineId({ g, dataMapper, instanceId: parentInstanceId })
+    const parentDataStateEdgeId = await getStateEdgeId({ g, dataMapper, stateMachineId: parentStateMachineId, type: 'data', name: 'parentData' })
+    const parentTaskStateEdgeId = await getStateEdgeId({ g, dataMapper, stateMachineId: parentStateMachineId, type: 'task', name: 'parentTask' })
 
-    const childInstanceVertexId = await getImportedInstance({ g, rootInstanceVertexId: parentInstanceVertexId, aliasPath: ['child'] })
+    const childInstanceVertexId = await getImportedInstance({ g, dataMapper, rootInstanceVertexId: parentInstanceVertexId, aliasPath: ['child'] })
     assert.ok(childInstanceVertexId, 'child instance missing')
-    const [childInstanceIdValues] = await g.V(childInstanceVertexId).valueMap('instanceId')
+    const [childInstanceIdValues] = await dataMapper.query.readChildInstanceIdValues({ vertexId: childInstanceVertexId })
     const childInstanceId = pickFirst(childInstanceIdValues?.instanceId ?? childInstanceIdValues)
 
     const published = []
     let resultAcked = false
-    const computeFunctionSubject = createBasicSubject(natsEvents['*'].component_service['*'].function_result.evt.component.compute_function.v1['*']).forPublish()
-      .env('prod')
-      .build()
+    const computeFunctionSubject = createComputeFunctionSubject('data')
 
     await runSpec({
       spec: computeFunctionSpec,
@@ -232,7 +229,7 @@ test('computeFunction triggers parent dependant starts across imports', async ()
       spec: startDependantsSpec,
       rootCtx: {
         diagnostics,
-        g,
+        g, dataMapper,
         natsContext: { publish: async (subject, payload) => dependantPublishes.push({ subject, payload: JSON.parse(payload) }) },
       },
       message: startDependantsMessage,

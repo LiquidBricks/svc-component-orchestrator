@@ -37,12 +37,7 @@ export async function handler({ rootCtx: { g, dataMapper }, scope: { instanceId,
 
       let resolvedImportRefId = importRefId
       if (!resolvedImportRefId && alias && parentComponentId && importedComponentId) {
-        const [importRefLookupId] = await g
-          .V(parentComponentId)
-          .out(domain.edge.has_import.component_importRef.constants.LABEL)
-          .has('alias', alias)
-          .filter(_ => _.out(domain.edge.import_of.importRef_component.constants.LABEL).has('id', importedComponentId))
-          .id()
+        const [importRefLookupId] = await dataMapper.query.findImportRefLookupId({ alias, vertexId: parentComponentId, id: importedComponentId })
         resolvedImportRefId = importRefLookupId
       }
 
@@ -54,12 +49,12 @@ export async function handler({ rootCtx: { g, dataMapper }, scope: { instanceId,
       }
 
       const nestedImports = await componentImports({
-        rootCtx: { g },
+        rootCtx: { g, dataMapper },
         scope: { componentId: importedComponentId },
       })
 
       const nestedGates = await componentGates({
-        rootCtx: { g },
+        rootCtx: { g, dataMapper },
         scope: { componentId: importedComponentId },
       })
 
@@ -122,12 +117,12 @@ export async function handler({ rootCtx: { g, dataMapper }, scope: { instanceId,
       }
 
       const nestedImports = await componentImports({
-        rootCtx: { g },
+        rootCtx: { g, dataMapper },
         scope: { componentId: gatedComponentId },
       })
 
       const nestedGates = await componentGates({
-        rootCtx: { g },
+        rootCtx: { g, dataMapper },
         scope: { componentId: gatedComponentId },
       })
 

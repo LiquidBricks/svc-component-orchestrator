@@ -17,7 +17,7 @@ test('skipIfExists resolves existing component without aborting', async () => {
     }
 
     const result = await skipIfExists({
-      rootCtx: { g },
+      rootCtx: { g, dataMapper },
       scope: { component: { hash } },
     })
 

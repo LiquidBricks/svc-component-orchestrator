@@ -4,6 +4,7 @@ import { component as componentBuilder } from '@liquid-bricks/lib-component-buil
 
 import {
   createBasicSubject,
+  createComputeFunctionSubject,
   withGraphContext,
   registerComponent,
   createInstance,
@@ -32,28 +33,22 @@ test('computeFunction stores state result, marks status provided, and publishes 
     await registerComponent(component, { diagnostics, dataMapper, g })
 
     const instanceId = 'instance-result-computed'
-    const componentId = await getComponentId({ g, diagnostics, componentHash: component.hash })
-    const imports = await loadImports({ g, componentId })
+    const componentId = await getComponentId({ g, dataMapper, diagnostics, componentHash: component.hash })
+    const imports = await loadImports({ g, dataMapper, componentId })
     await createInstance({ diagnostics, dataMapper, g }, { componentHash: component.hash, componentId, instanceId, imports })
 
-    const { stateMachineId } = await getStateMachineId({ g, instanceId })
-    const [stateEdgeId] = await g
-      .V(stateMachineId)
-      .outE(domain.edge.has_data_state.stateMachine_data.constants.LABEL)
-      .filter(_ => _.inV().has('name', component.data[0].name))
-      .id()
+    const { stateMachineId } = await getStateMachineId({ g, dataMapper, instanceId })
+    const [stateEdgeId] = await dataMapper.query.findDataStateEdgeIdByName({ vertexId: stateMachineId, name: component.data[0].name })
     assert.ok(stateEdgeId, 'data state edge missing')
 
-    const [initialValues] = await g.E(stateEdgeId).valueMap('status', 'result', 'updatedAt')
+    const [initialValues] = await dataMapper.query.readInitialValues({ edgeId: stateEdgeId })
     const initialUpdatedAt = pickFirst(initialValues?.updatedAt)
     assert.ok(initialUpdatedAt, 'initial updatedAt missing')
 
     const published = []
     let acked = false
     const message = {
-      subject: createBasicSubject(natsEvents['*'].component_service['*'].function_result.evt.component.compute_function.v1['*']).forPublish()
-        .env('prod')
-        .build(),
+      subject: createComputeFunctionSubject('data'),
       ack: () => { acked = true },
       json: () => ({
         data: {
@@ -76,7 +71,7 @@ test('computeFunction stores state result, marks status provided, and publishes 
     assert.equal(finalScope.stateEdgeId, stateEdgeId)
     assert.equal(acked, true)
 
-    const [updatedValues] = await g.E(stateEdgeId).valueMap('status', 'result', 'updatedAt')
+    const [updatedValues] = await dataMapper.query.readStateEdgeStatusResultAndUpdatedAt({ edgeId: stateEdgeId })
     assert.equal(pickFirst(updatedValues.status), STATE_EDGE_STATUS_BY_TYPE.data)
     assert.equal(pickFirst(updatedValues.result), JSON.stringify({ count: 2 }))
     assert.notEqual(pickFirst(updatedValues.updatedAt), initialUpdatedAt)
@@ -98,23 +93,20 @@ test('computeFunction stores state result, marks status provided, and publishes 
   })
 })
 
-test('validatePayload rejects unknown result type', () => {
+test('validatePayload accepts payloads without a type field', () => {
   const diagnostics = makeDiagnosticsInstance()
-  const handlerDiagnostics = createHandlerDiagnostics(diagnostics, { instanceId: 'i-1', type: 'unknown', name: 'x' })
-  assert.throws(
-    () => validatePayload({ scope: { handlerDiagnostics, instanceId: 'i-1', type: 'unknown', name: 'x' }, rootCtx: { diagnostics } }),
-    diagnostics.DiagnosticError,
-  )
+  const handlerDiagnostics = createHandlerDiagnostics(diagnostics, { instanceId: 'i-1', name: 'x' })
+  assert.doesNotThrow(() => validatePayload({
+    scope: { handlerDiagnostics, instanceId: 'i-1', name: 'x' },
+    rootCtx: { diagnostics },
+  }))
 })
 
-test('validatePayload accepts gate result type', () => {
+test('validatePayload rejects a missing name', () => {
   const diagnostics = makeDiagnosticsInstance()
-  const handlerDiagnostics = createHandlerDiagnostics(diagnostics, { instanceId: 'i-1', type: 'gate', name: 'setup' })
-  const scope = validatePayload({
-    scope: { handlerDiagnostics, instanceId: 'i-1', type: 'gate', name: 'setup' },
-    rootCtx: { diagnostics },
-  })
-
-  assert.equal(scope.stateEdgeLabel, undefined)
-  assert.equal(scope.stateEdgeStatus, undefined)
+  const handlerDiagnostics = createHandlerDiagnostics(diagnostics, { instanceId: 'i-1' })
+  assert.throws(
+    () => validatePayload({ scope: { handlerDiagnostics, instanceId: 'i-1', name: '' }, rootCtx: { diagnostics } }),
+    diagnostics.DiagnosticError,
+  )
 })

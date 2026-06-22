@@ -21,19 +21,13 @@ test('handler attaches agentFns to registered component graph', async () => {
 
     await registerHandlerComponent({ diagnostics, dataMapper, g }, component)
 
-    const [componentId] = await g
-      .V()
-      .has('label', domain.vertex.component.constants.LABEL)
-      .has('hash', component.hash)
-      .id()
+    const [componentId] = await dataMapper.query.findComponentIdByHash({ hash: component.hash })
     assert.ok(componentId, 'component vertex missing')
 
-    const agentFnIds = await g.V(componentId)
-      .out(hasAgentFnLabel)
-      .id()
+    const agentFnIds = await dataMapper.query.listAgentFnIds({ edgeLabel: hasAgentFnLabel, vertexId: componentId })
     assert.equal(agentFnIds.length, 1)
 
-    const [agentFnValues] = await g.V(agentFnIds[0]).valueMap('name', 'portAddr', 'hash', 'codeRef')
+    const [agentFnValues] = await dataMapper.query.readAgentFnValues({ vertexId: agentFnIds[0] })
     assert.equal(first(agentFnValues?.name), 'runCommand')
     assert.equal(first(agentFnValues?.portAddr), 'cmd.run')
     assert.equal(first(agentFnValues?.hash), component.agentFns[0].hash)

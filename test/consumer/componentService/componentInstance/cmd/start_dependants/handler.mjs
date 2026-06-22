@@ -23,13 +23,9 @@ test('handler returns starter list when no dependants are ready', async () => {
 
     await registerComponent({ diagnostics, dataMapper, g }, component)
 
-    const [componentId] = await g
-      .V()
-      .has('label', domain.vertex.component.constants.LABEL)
-      .has('hash', component.hash)
-      .id()
+    const [componentId] = await dataMapper.query.findComponentIdByHash({ hash: component.hash })
 
-    const { imports } = await componentImports({ rootCtx: { g }, scope: { componentId } })
+    const { imports } = await componentImports({ rootCtx: { g, dataMapper }, scope: { componentId } })
 
     const instanceId = 'instance-start-dependants'
     await createInstance({ diagnostics, dataMapper, g }, {
@@ -39,26 +35,16 @@ test('handler returns starter list when no dependants are ready', async () => {
       imports,
     })
 
-    const [instanceVertexId] = await g
-      .V()
-      .has('label', domain.vertex.componentInstance.constants.LABEL)
-      .has('instanceId', instanceId)
-      .id()
+    const [instanceVertexId] = await dataMapper.query.findInstanceVertexId({ instanceId })
 
-    const [stateMachineId] = await g
-      .V(instanceVertexId)
-      .out(domain.edge.has_stateMachine.componentInstance_stateMachine.constants.LABEL)
-      .id()
+    const [stateMachineId] = await dataMapper.query.readStateMachineId({ vertexId: instanceVertexId })
 
-    const [stateEdgeId] = await g
-      .V(stateMachineId)
-      .outE(STATE_EDGE_LABEL_BY_TYPE.data)
-      .id()
+    const [stateEdgeId] = await dataMapper.query.listDataStateEdgeIds({ edgeLabel: STATE_EDGE_LABEL_BY_TYPE.data, vertexId: stateMachineId })
 
-    const [providedNodeId] = await g.E(stateEdgeId).inV().id()
+    const [providedNodeId] = await dataMapper.query.findEdgeTargetNodeId({ edgeId: stateEdgeId })
 
     const { starters } = await handler({
-      rootCtx: { g },
+      rootCtx: { g, dataMapper },
       scope: {
         instanceId,
         instanceVertexId,
@@ -89,14 +75,10 @@ test('handler returns gate compute requests and does not evaluate gate fnc on co
     await registerComponent({ diagnostics, dataMapper, g }, gateDenyTarget)
     await registerComponent({ diagnostics, dataMapper, g }, component)
 
-    const [componentId] = await g
-      .V()
-      .has('label', domain.vertex.component.constants.LABEL)
-      .has('hash', component.hash)
-      .id()
+    const [componentId] = await dataMapper.query.findComponentIdByHash({ hash: component.hash })
 
-    const { imports } = await componentImports({ rootCtx: { g }, scope: { componentId } })
-    const { gates } = await componentGates({ rootCtx: { g }, scope: { componentId } })
+    const { imports } = await componentImports({ rootCtx: { g, dataMapper }, scope: { componentId } })
+    const { gates } = await componentGates({ rootCtx: { g, dataMapper }, scope: { componentId } })
 
     const instanceId = 'instance-start-dependants-gates'
     await createInstance({ diagnostics, dataMapper, g }, {
@@ -107,25 +89,15 @@ test('handler returns gate compute requests and does not evaluate gate fnc on co
       gates,
     })
 
-    const [instanceVertexId] = await g
-      .V()
-      .has('label', domain.vertex.componentInstance.constants.LABEL)
-      .has('instanceId', instanceId)
-      .id()
+    const [instanceVertexId] = await dataMapper.query.findInstanceVertexId({ instanceId })
 
-    const [stateMachineId] = await g
-      .V(instanceVertexId)
-      .out(domain.edge.has_stateMachine.componentInstance_stateMachine.constants.LABEL)
-      .id()
+    const [stateMachineId] = await dataMapper.query.readStateMachineId({ vertexId: instanceVertexId })
 
-    const [stateEdgeId] = await g
-      .V(stateMachineId)
-      .outE(STATE_EDGE_LABEL_BY_TYPE.data)
-      .id()
-    const [providedNodeId] = await g.E(stateEdgeId).inV().id()
+    const [stateEdgeId] = await dataMapper.query.listDataStateEdgeIds({ edgeLabel: STATE_EDGE_LABEL_BY_TYPE.data, vertexId: stateMachineId })
+    const [providedNodeId] = await dataMapper.query.findEdgeTargetNodeId({ edgeId: stateEdgeId })
 
     const { starters } = await handler({
-      rootCtx: { g },
+      rootCtx: { g, dataMapper },
       scope: {
         instanceId,
         instanceVertexId,

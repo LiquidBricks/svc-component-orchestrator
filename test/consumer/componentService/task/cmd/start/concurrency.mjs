@@ -52,22 +52,12 @@ function createNatsContextSpy() {
   }
 }
 
-async function getTaskStateEdgeId({ g, instanceId }) {
-  const [instanceVertexId] = await g
-    .V()
-    .has('label', domain.vertex.componentInstance.constants.LABEL)
-    .has('instanceId', instanceId)
-    .id()
+async function getTaskStateEdgeId({ g, dataMapper, instanceId }) {
+  const [instanceVertexId] = await dataMapper.query.findInstanceVertexId({ instanceId })
 
-  const [stateMachineId] = await g
-    .V(instanceVertexId)
-    .out(domain.edge.has_stateMachine.componentInstance_stateMachine.constants.LABEL)
-    .id()
+  const [stateMachineId] = await dataMapper.query.readStateMachineId({ vertexId: instanceVertexId })
 
-  const [taskStateEdgeId] = await g
-    .V(stateMachineId)
-    .outE(domain.edge.has_task_state.stateMachine_task.constants.LABEL)
-    .id()
+  const [taskStateEdgeId] = await dataMapper.query.readTaskStateEdgeId({ vertexId: stateMachineId })
 
   return taskStateEdgeId
 }
@@ -83,13 +73,9 @@ test('concurrent duplicate task starts should emit only one execution request', 
 
     await registerComponent({ diagnostics, dataMapper, g }, component)
 
-    const [componentId] = await g
-      .V()
-      .has('label', domain.vertex.component.constants.LABEL)
-      .has('hash', component.hash)
-      .id()
+    const [componentId] = await dataMapper.query.findComponentIdByHash({ hash: component.hash })
 
-    const { imports } = await componentImports({ rootCtx: { g }, scope: { componentId } })
+    const { imports } = await componentImports({ rootCtx: { g, dataMapper }, scope: { componentId } })
 
     const instanceId = 'instance-task-concurrency'
     await createInstance({ diagnostics, dataMapper, g }, {
@@ -99,7 +85,7 @@ test('concurrent duplicate task starts should emit only one execution request', 
       imports,
     })
 
-    const stateId = await getTaskStateEdgeId({ g, instanceId })
+    const stateId = await getTaskStateEdgeId({ g, dataMapper, instanceId })
     const { natsContext, published } = createNatsContextSpy()
 
     await Promise.all([

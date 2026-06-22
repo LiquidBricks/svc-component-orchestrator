@@ -31,11 +31,8 @@ function normalizeResult(value) {
   }
 }
 
-async function areAllStatesProvided({ g, stateMachineId }) {
-  const statusMaps = await g
-    .V(stateMachineId)
-    .outE(...STATE_EDGE_LABELS)
-    .valueMap('status')
+async function areAllStatesProvided({ g, dataMapper, stateMachineId }) {
+  const statusMaps = await dataMapper.query.readStatusMaps({ edgeLabels: STATE_EDGE_LABELS, vertexId: stateMachineId })
   if (!statusMaps?.length) return true
 
   return statusMaps.every(map => {
@@ -56,23 +53,15 @@ async function publishCompletion({ natsContext, instanceId, stateMachineId }) {
   )
 }
 
-async function getCurrentState({ g, stateMachineId }) {
-  const [stateValues] = await g.V(stateMachineId).valueMap('state')
+async function getCurrentState({ g, dataMapper, stateMachineId }) {
+  const [stateValues] = await dataMapper.query.readStateMachineState({ vertexId: stateMachineId })
   return valueFor(stateValues, 'state')
 }
 
-async function findParentInstances({ g, instanceVertexId }) {
-  const importParentInstanceVertexIds = await g
-    .V(instanceVertexId)
-    .in(domain.edge.uses_import.importInstanceRef_componentInstance.constants.LABEL)
-    .in(domain.edge.uses_import.componentInstance_importInstanceRef.constants.LABEL)
-    .id()
+async function findParentInstances({ g, dataMapper, instanceVertexId }) {
+  const importParentInstanceVertexIds = await dataMapper.query.listImportParentInstanceVertexIds({ vertexId: instanceVertexId })
 
-  const gateParentInstanceVertexIds = await g
-    .V(instanceVertexId)
-    .in(domain.edge.uses_gate.gateInstanceRef_componentInstance.constants.LABEL)
-    .in(domain.edge.uses_gate.componentInstance_gateInstanceRef.constants.LABEL)
-    .id()
+  const gateParentInstanceVertexIds = await dataMapper.query.listGateParentInstanceVertexIds({ vertexId: instanceVertexId })
 
   const parents = []
   const parentInstanceVertexIds = new Set([
@@ -82,90 +71,71 @@ async function findParentInstances({ g, instanceVertexId }) {
 
   for (const parentInstanceVertexId of parentInstanceVertexIds) {
     if (!parentInstanceVertexId) continue
-    const [stateMachineId] = await g
-      .V(parentInstanceVertexId)
-      .out(domain.edge.has_stateMachine.componentInstance_stateMachine.constants.LABEL)
-      .id()
+    const [stateMachineId] = await dataMapper.query.readStateMachineId({ vertexId: parentInstanceVertexId })
     if (!stateMachineId) continue
 
-    const [instanceIdValues] = await g.V(parentInstanceVertexId).valueMap('instanceId')
+    const [instanceIdValues] = await dataMapper.query.readInstanceIdValues({ vertexId: parentInstanceVertexId })
     const instanceId = valueFor(instanceIdValues, 'instanceId')
     parents.push({ instanceVertexId: parentInstanceVertexId, stateMachineId, instanceId })
   }
   return parents
 }
 
-async function isGateFinished({ g, gateInstanceRefId, cache }) {
-  const [resultValues] = await g.V(gateInstanceRefId).valueMap('result')
+async function isGateFinished({ g, dataMapper, gateInstanceRefId, cache }) {
+  const [resultValues] = await dataMapper.query.readResultValues({ vertexId: gateInstanceRefId })
   const rawResult = valueFor(resultValues, 'result')
   if (rawResult === undefined || rawResult === null || rawResult === '') return false
 
   const result = normalizeResult(rawResult)
   if (result !== true) return true
 
-  const [gateInstanceVertexId] = await g
-    .V(gateInstanceRefId)
-    .out(domain.edge.uses_gate.gateInstanceRef_componentInstance.constants.LABEL)
-    .id()
+  const [gateInstanceVertexId] = await dataMapper.query.findGateInstanceVertexIdForRef({ vertexId: gateInstanceRefId })
   if (!gateInstanceVertexId) return false
 
-  const [gateStateMachineId] = await g
-    .V(gateInstanceVertexId)
-    .out(domain.edge.has_stateMachine.componentInstance_stateMachine.constants.LABEL)
-    .id()
+  const [gateStateMachineId] = await dataMapper.query.readGateStateMachineId({ vertexId: gateInstanceVertexId })
   if (!gateStateMachineId) return false
 
   return isInstanceFinished({
-    g,
+    g, dataMapper,
     instanceVertexId: gateInstanceVertexId,
     stateMachineId: gateStateMachineId,
     cache,
   })
 }
 
-async function areAllGatesFinished({ g, instanceVertexId, cache }) {
-  const gateInstanceRefIds = await g
-    .V(instanceVertexId)
-    .out(domain.edge.uses_gate.componentInstance_gateInstanceRef.constants.LABEL)
-    .id()
+async function areAllGatesFinished({ g, dataMapper, instanceVertexId, cache }) {
+  const gateInstanceRefIds = await dataMapper.query.listGateInstanceRefIds({ vertexId: instanceVertexId })
 
   for (const gateInstanceRefId of gateInstanceRefIds ?? []) {
     if (!gateInstanceRefId) continue
-    const finishedGate = await isGateFinished({ g, gateInstanceRefId, cache })
+    const finishedGate = await isGateFinished({ g, dataMapper, gateInstanceRefId, cache })
     if (!finishedGate) return false
   }
 
   return true
 }
 
-async function isInstanceFinished({ g, instanceVertexId, stateMachineId, cache }) {
+async function isInstanceFinished({ g, dataMapper, instanceVertexId, stateMachineId, cache }) {
   const cacheKey = `${instanceVertexId}:${stateMachineId}`
   if (cache.has(cacheKey)) return cache.get(cacheKey)
 
-  const statesProvided = await areAllStatesProvided({ g, stateMachineId })
+  const statesProvided = await areAllStatesProvided({ g, dataMapper, stateMachineId })
   if (!statesProvided) {
     cache.set(cacheKey, false)
     return false
   }
 
-  const importInstanceVertexIds = await g
-    .V(instanceVertexId)
-    .out(domain.edge.uses_import.componentInstance_importInstanceRef.constants.LABEL)
-    .out(domain.edge.uses_import.importInstanceRef_componentInstance.constants.LABEL)
-    .id()
+  const importInstanceVertexIds = await dataMapper.query.listImportInstanceVertexIds({ vertexId: instanceVertexId })
 
   for (const importInstanceVertexId of importInstanceVertexIds ?? []) {
     if (!importInstanceVertexId) continue
-    const [importStateMachineId] = await g
-      .V(importInstanceVertexId)
-      .out(domain.edge.has_stateMachine.componentInstance_stateMachine.constants.LABEL)
-      .id()
+    const [importStateMachineId] = await dataMapper.query.readImportStateMachineId({ vertexId: importInstanceVertexId })
     if (!importStateMachineId) {
       cache.set(cacheKey, false)
       return false
     }
     const finishedImport = await isInstanceFinished({
-      g,
+      g, dataMapper,
       instanceVertexId: importInstanceVertexId,
       stateMachineId: importStateMachineId,
       cache,
@@ -176,7 +146,7 @@ async function isInstanceFinished({ g, instanceVertexId, stateMachineId, cache }
     }
   }
 
-  const gatesFinished = await areAllGatesFinished({ g, instanceVertexId, cache })
+  const gatesFinished = await areAllGatesFinished({ g, dataMapper, instanceVertexId, cache })
   if (!gatesFinished) {
     cache.set(cacheKey, false)
     return false
@@ -186,30 +156,30 @@ async function isInstanceFinished({ g, instanceVertexId, stateMachineId, cache }
   return true
 }
 
-async function completeInstanceChain({ g, natsContext, instanceVertexId, stateMachineId, instanceId, visited, finishedCache }) {
+async function completeInstanceChain({ g, dataMapper, natsContext, instanceVertexId, stateMachineId, instanceId, visited, finishedCache }) {
   if (!instanceVertexId || !stateMachineId) return
   const visitKey = `${instanceVertexId}:${stateMachineId}`
   if (visited.has(visitKey)) return
   visited.add(visitKey)
 
-  const finished = await isInstanceFinished({ g, instanceVertexId, stateMachineId, cache: finishedCache })
-  const currentState = await getCurrentState({ g, stateMachineId })
+  const finished = await isInstanceFinished({ g, dataMapper, instanceVertexId, stateMachineId, cache: finishedCache })
+  const currentState = await getCurrentState({ g, dataMapper, stateMachineId })
 
   if (finished && currentState !== domain.vertex.stateMachine.constants.STATES.COMPLETE) {
     await publishCompletion({ natsContext, instanceId, stateMachineId })
   }
 
-  const parents = await findParentInstances({ g, instanceVertexId })
+  const parents = await findParentInstances({ g, dataMapper, instanceVertexId })
   for (const parent of parents) {
-    await completeInstanceChain({ g, natsContext, ...parent, visited, finishedCache })
+    await completeInstanceChain({ g, dataMapper, natsContext, ...parent, visited, finishedCache })
   }
 }
 
 export async function completeStateMachineIfFinished({
   scope: { handlerDiagnostics, stateMachineId, instanceId, instanceVertexId },
-  rootCtx: { g, natsContext },
+  rootCtx: { g, dataMapper, natsContext },
 }) {
   const visited = new Set()
   const finishedCache = new Map()
-  await completeInstanceChain({ g, natsContext, instanceVertexId, stateMachineId, instanceId, visited, finishedCache })
+  await completeInstanceChain({ g, dataMapper, natsContext, instanceVertexId, stateMachineId, instanceId, visited, finishedCache })
 }

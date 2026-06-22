@@ -1,11 +1,8 @@
 import { Errors } from '../../../../../errors.js'
 import { domain } from '@liquid-bricks/spec-domain/domain'
 
-export async function component({ rootCtx: { g }, scope: { handlerDiagnostics, componentHash } }) {
-  const [componentId] = await g.V()
-    .has('label', domain.vertex.component.constants.LABEL)
-    .has('hash', componentHash)
-    .id()
+export async function component({ rootCtx: { g, dataMapper }, scope: { handlerDiagnostics, componentHash } }) {
+  const [componentId] = await dataMapper.query.findComponentIdByHash({ hash: componentHash })
 
   handlerDiagnostics.require(
     componentId,

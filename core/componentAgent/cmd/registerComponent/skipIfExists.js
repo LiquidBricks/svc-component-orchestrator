@@ -1,12 +1,8 @@
 
 import { domain } from '@liquid-bricks/spec-domain/domain'
 
-export async function skipIfExists({ rootCtx: { g }, scope: { component: { hash } } }) {
-  const ids = await g
-    .V()
-    .has('label', domain.vertex.component.constants.LABEL)
-    .has('hash', hash)
-    .id()
+export async function skipIfExists({ rootCtx: { g, dataMapper }, scope: { component: { hash } } }) {
+  const ids = await dataMapper.query.findComponentIdByHash({ hash })
 
   if (ids.length > 0) {
     return {

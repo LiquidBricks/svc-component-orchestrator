@@ -20,13 +20,9 @@ test('instanceVertex resolves componentInstance vertex id', async () => {
 
     await registerComponent({ diagnostics, dataMapper, g }, component)
 
-    const [componentId] = await g
-      .V()
-      .has('label', domain.vertex.component.constants.LABEL)
-      .has('hash', component.hash)
-      .id()
+    const [componentId] = await dataMapper.query.findComponentIdByHash({ hash: component.hash })
 
-    const { imports } = await componentImports({ rootCtx: { g }, scope: { componentId } })
+    const { imports } = await componentImports({ rootCtx: { g, dataMapper }, scope: { componentId } })
 
     const instanceId = 'instance-vertex'
     await createInstance({ diagnostics, dataMapper, g }, {
@@ -38,22 +34,22 @@ test('instanceVertex resolves componentInstance vertex id', async () => {
 
     const handlerDiagnostics = createHandlerDiagnostics(diagnostics, { instanceId })
     const { instanceVertexId } = await instanceVertex({
-      rootCtx: { g },
+      rootCtx: { g, dataMapper },
       scope: { handlerDiagnostics, instanceId },
     })
 
-    const [row] = await g.V(instanceVertexId).valueMap('instanceId')
+    const [row] = await dataMapper.query.readComponentInstanceId({ vertexId: instanceVertexId })
     const instanceValue = Array.isArray(row.instanceId) ? row.instanceId[0] : row.instanceId
     assert.equal(instanceValue, instanceId)
   })
 })
 
 test('instanceVertex rejects missing instance', async () => {
-  await withGraphContext(async ({ diagnostics, g }) => {
+  await withGraphContext(async ({ diagnostics, g, dataMapper }) => {
     const handlerDiagnostics = createHandlerDiagnostics(diagnostics, { instanceId: 'missing-instance' })
 
     await assert.rejects(
-      instanceVertex({ rootCtx: { g }, scope: { handlerDiagnostics, instanceId: 'missing-instance' } }),
+      instanceVertex({ rootCtx: { g, dataMapper }, scope: { handlerDiagnostics, instanceId: 'missing-instance' } }),
       diagnostics.DiagnosticError,
     )
   })

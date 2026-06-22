@@ -23,13 +23,9 @@ test('handler marks stateMachine complete', async () => {
 
     await registerComponent({ diagnostics, dataMapper, g }, component)
 
-    const [componentId] = await g
-      .V()
-      .has('label', domain.vertex.component.constants.LABEL)
-      .has('hash', component.hash)
-      .id()
+    const [componentId] = await dataMapper.query.findComponentIdByHash({ hash: component.hash })
 
-    const { imports } = await componentImports({ rootCtx: { g }, scope: { componentId } })
+    const { imports } = await componentImports({ rootCtx: { g, dataMapper }, scope: { componentId } })
 
     const instanceId = 'instance-complete'
     await createInstance({ diagnostics, dataMapper, g }, {
@@ -39,25 +35,18 @@ test('handler marks stateMachine complete', async () => {
       imports,
     })
 
-    const [instanceVertexId] = await g
-      .V()
-      .has('label', domain.vertex.componentInstance.constants.LABEL)
-      .has('instanceId', instanceId)
-      .id()
+    const [instanceVertexId] = await dataMapper.query.findInstanceVertexId({ instanceId })
 
-    const [stateMachineId] = await g
-      .V(instanceVertexId)
-      .out(domain.edge.has_stateMachine.componentInstance_stateMachine.constants.LABEL)
-      .id()
+    const [stateMachineId] = await dataMapper.query.readStateMachineId({ vertexId: instanceVertexId })
 
     const handlerDiagnostics = createHandlerDiagnostics(diagnostics, { instanceId, stateMachineId })
 
     await handler({
-      rootCtx: { g },
+      rootCtx: { g, dataMapper },
       scope: { handlerDiagnostics, instanceId, stateMachineId },
     })
 
-    const [stateRow] = await g.V(stateMachineId).valueMap('state')
+    const [stateRow] = await dataMapper.query.readStateMachineState({ vertexId: stateMachineId })
     assert.equal(
       pickFirst(stateRow.state),
       domain.vertex.stateMachine.constants.STATES.COMPLETE,

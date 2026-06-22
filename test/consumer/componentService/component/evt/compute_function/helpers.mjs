@@ -8,12 +8,17 @@ import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nat
 
 import { createComponentServiceRouter } from '../../../../../../router.js'
 import { path as registerPath } from '../../../../../../core/componentAgent/cmd/registerComponent/index.js'
-import { STATE_EDGE_LABEL_BY_TYPE, STATE_EDGE_STATUS_BY_TYPE } from '../../../../../../core/component/evt/compute_function/constants.js'
-import { validatePayload } from '../../../../../../core/component/evt/compute_function/validatePayload.js'
+import { DATA_STATE_EDGE_LABEL, DATA_STATE_EDGE_STATUS } from '../../../../../../core/component/evt/compute_function/data/constants.js'
+import { TASK_STATE_EDGE_LABEL, TASK_STATE_EDGE_STATUS } from '../../../../../../core/component/evt/compute_function/task/constants.js'
+
+import { validatePayload } from '../../../../../../core/component/evt/compute_function/_helper/validatePayload.js'
 import { componentImports } from '../../../../../../core/componentInstance/cmd/create/loadData/componentImports.js'
 import { dataMapper as createDataMapper, domain } from '@liquid-bricks/spec-domain/domain'
 import { serviceConfiguration } from '../../../../../provider/serviceConfiguration/dotenv/index.js'
 import { invokeRoute, runHookGroup } from '../../../../../util/invokeRoute.js'
+
+const STATE_EDGE_LABEL_BY_TYPE = Object.freeze({ data: DATA_STATE_EDGE_LABEL, task: TASK_STATE_EDGE_LABEL })
+const STATE_EDGE_STATUS_BY_TYPE = Object.freeze({ data: DATA_STATE_EDGE_STATUS, task: TASK_STATE_EDGE_STATUS })
 
 const { NATS_IP_ADDRESS } = serviceConfiguration()
 assert.ok(NATS_IP_ADDRESS, 'NATS_IP_ADDRESS missing; set in .env or .env.local')
@@ -51,7 +56,8 @@ export async function withGraphContext(run) {
 
 const createInstanceSpec = getCreateInstanceSpec()
 const startInstanceSpec = getStartInstanceSpec()
-const computeFunctionSpec = getComputeFunctionSpec()
+const computeFunctionSpecs = getComputeFunctionSpecs()
+const computeFunctionSpec = Symbol('computeFunctionSpec')
 const injectResultsSpec = getInjectResultsSpec()
 const stateMachineCompletedSpec = getStateMachineCompletedSpec()
 const startDependantsSpec = getStartDependantsSpec()
@@ -89,21 +95,25 @@ function getStartInstanceSpec() {
   return route.config
 }
 
-function getComputeFunctionSpec() {
+function getComputeFunctionSpecs() {
   const router = createComponentServiceRouter({
     natsContext: {},
     g: {},
     diagnostics: makeDiagnosticsInstance(),
     dataMapper: {},
   })
-  const route = router.routes.find(({ values }) =>
+  const routes = router.routes.filter(({ values }) =>
     values.context === 'function_result'
     && values.channel === 'evt'
     && values.entity === 'component'
     && values.action === 'compute_function'
   )
-  assert.ok(route, 'computeFunction route not found')
-  return route.config
+  assert.deepEqual(
+    routes.map(({ values }) => values.id).sort(),
+    ['data', 'gate', 'task'],
+    'computeFunction routes missing',
+  )
+  return Object.fromEntries(routes.map(({ values, config }) => [values.id, config]))
 }
 
 function getInjectResultsSpec() {
@@ -190,17 +200,13 @@ export async function startInstance(ctx, scope) {
   return startInstanceSpec.handler({ rootCtx: ctx, scope: { ...scope, handlerDiagnostics } })
 }
 
-export async function loadImports({ g, componentId }) {
-  const { imports = [] } = await componentImports({ rootCtx: { g }, scope: { componentId } })
+export async function loadImports({ g, dataMapper, componentId }) {
+  const { imports = [] } = await componentImports({ rootCtx: { g, dataMapper }, scope: { componentId } })
   return imports
 }
 
-export async function getComponentId({ g, diagnostics, componentHash }) {
-  const [componentId] = await g
-    .V()
-    .has('label', domain.vertex.component.constants.LABEL)
-    .has('hash', componentHash)
-    .id()
+export async function getComponentId({ g, dataMapper, diagnostics, componentHash }) {
+  const [componentId] = await dataMapper.query.findComponentIdByHash({ hash: componentHash })
   diagnostics.require(
     componentId,
     diagnostics.DiagnosticError,
@@ -214,49 +220,37 @@ export function pickFirst(values) {
   return values ?? null
 }
 
-export async function getStateMachineId({ g, instanceId }) {
-  const [instanceVertexId] = await g
-    .V()
-    .has('label', domain.vertex.componentInstance.constants.LABEL)
-    .has('instanceId', instanceId)
-    .id()
+export async function getStateMachineId({ g, dataMapper, instanceId }) {
+  const [instanceVertexId] = await dataMapper.query.findInstanceVertexId({ instanceId })
   assert.ok(instanceVertexId, `componentInstance ${instanceId} missing`)
 
-  const [stateMachineId] = await g
-    .V(instanceVertexId)
-    .out(domain.edge.has_stateMachine.componentInstance_stateMachine.constants.LABEL)
-    .id()
+  const [stateMachineId] = await dataMapper.query.readStateMachineId({ vertexId: instanceVertexId })
   return { stateMachineId, instanceVertexId }
 }
 
-export async function getStateEdgeId({ g, stateMachineId, type, name }) {
-  const [stateEdgeId] = await g
-    .V(stateMachineId)
-    .outE(STATE_EDGE_LABEL_BY_TYPE[type])
-    .filter(_ => _.inV().has('name', name))
-    .id()
+export async function getStateEdgeId({ g, dataMapper, stateMachineId, type, name }) {
+  const [stateEdgeId] = await dataMapper.query.findStateEdgeIdByTypeAndName({ edgeLabel: STATE_EDGE_LABEL_BY_TYPE[type], vertexId: stateMachineId, name })
   return stateEdgeId
 }
 
-export async function getImportedInstance({ g, rootInstanceVertexId, aliasPath }) {
+export async function getImportedInstance({ g, dataMapper, rootInstanceVertexId, aliasPath }) {
   let current = rootInstanceVertexId
   for (const alias of aliasPath) {
-    const [importInstanceRefId] = await g
-      .V(current)
-      .out(domain.edge.uses_import.componentInstance_importInstanceRef.constants.LABEL)
-      .filter(_ => _.out(domain.edge.uses_import.importInstanceRef_importRef.constants.LABEL).has('alias', alias))
-      .id()
+    const [importInstanceRefId] = await dataMapper.query.findImportInstanceRefIdByAlias({ vertexId: current, alias })
     const [next] = importInstanceRefId
-      ? await g
-        .V(importInstanceRefId)
-        .out(domain.edge.uses_import.importInstanceRef_componentInstance.constants.LABEL)
-        .id()
+      ? await dataMapper.query.readNext({ vertexId: importInstanceRefId })
       : []
     current = next
   }
   return current
 }
 
+
+export function createComputeFunctionSubject(type) {
+  const subjectSpec = natsEvents['*'].component_service['*'].function_result.evt.component.compute_function.v1[type]
+  assert.ok(subjectSpec, 'computeFunction subject missing for type ' + type)
+  return createBasicSubject(subjectSpec).forPublish().env('prod').build()
+}
 
 export function createInjectResultsSubject() {
   return createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.injectResults.v1['*'])
@@ -293,6 +287,11 @@ export async function runInjectResultsCommands({ rootCtx, events }) {
 
 export async function runSpec({ spec, rootCtx, message, initialScope = {} }) {
   const messagePayload = initialScope.handlerDiagnostics ? undefined : message?.json?.()
+  if (spec === computeFunctionSpec) {
+    const resultType = messagePayload?.data?.type
+    spec = computeFunctionSpecs[resultType]
+    assert.ok(spec, 'computeFunction route missing for type ' + resultType)
+  }
   const handlerDiagnostics = initialScope.handlerDiagnostics
     ?? createHandlerDiagnostics(rootCtx?.diagnostics, initialScope, messagePayload)
   let scope = { handlerDiagnostics, ...initialScope }
@@ -321,6 +320,7 @@ export async function runSpec({ spec, rootCtx, message, initialScope = {} }) {
 
 export {
   createBasicSubject,
+  createComputeFunctionSubject,
   domain,
   STATE_EDGE_LABEL_BY_TYPE,
   STATE_EDGE_STATUS_BY_TYPE,

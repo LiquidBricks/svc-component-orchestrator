@@ -10,34 +10,28 @@ function normalizeValues(list = []) {
   ))
 }
 
-export async function usesGateInstances({ rootCtx: { g }, scope: { instanceVertexId } }) {
+export async function usesGateInstances({ rootCtx: { g, dataMapper }, scope: { instanceVertexId } }) {
   const gates = []
-  const gateRefInstanceIds = await g
-    .V(instanceVertexId)
-    .out(domain.edge.uses_gate.componentInstance_gateInstanceRef.constants.LABEL)
-    .id()
+  const gateRefInstanceIds = await dataMapper.query.listGateRefInstanceIds({ vertexId: instanceVertexId })
 
   for (const gateRefInstanceId of gateRefInstanceIds ?? []) {
-    const [gateRefId] = await g
-      .V(gateRefInstanceId)
-      .out(domain.edge.uses_gate.gateInstanceRef_gateRef.constants.LABEL)
-      .id()
+    const [gateRefId] = await dataMapper.query.findGateRefIdForInstanceRef({ vertexId: gateRefInstanceId })
 
-    const [aliasValues] = gateRefId ? await g.V(gateRefId).valueMap('alias') : []
+    const [aliasValues] = gateRefId ? await dataMapper.query.readGateRefAlias({ vertexId: gateRefId }) : []
     const aliasRaw = aliasValues?.alias ?? aliasValues
     const alias = Array.isArray(aliasRaw) ? aliasRaw[0] : aliasRaw
 
     const taskWaitForIds = gateRefId
-      ? await g.V(gateRefId).out(domain.edge.wait_for.gateRef_task.constants.LABEL).id()
+      ? await dataMapper.query.listGateTaskWaitForIds({ vertexId: gateRefId })
       : []
     const dataWaitForIds = gateRefId
-      ? await g.V(gateRefId).out(domain.edge.wait_for.gateRef_data.constants.LABEL).id()
+      ? await dataMapper.query.listGateDataWaitForIds({ vertexId: gateRefId })
       : []
     const depsTaskIds = gateRefId
-      ? await g.V(gateRefId).out(domain.edge.has_dependency.gateRef_task.constants.LABEL).id()
+      ? await dataMapper.query.listDepsTaskIds({ vertexId: gateRefId })
       : []
     const depsDataIds = gateRefId
-      ? await g.V(gateRefId).out(domain.edge.has_dependency.gateRef_data.constants.LABEL).id()
+      ? await dataMapper.query.listDepsDataIds({ vertexId: gateRefId })
       : []
 
     const waitFor = normalizeValues([
@@ -49,12 +43,9 @@ export async function usesGateInstances({ rootCtx: { g }, scope: { instanceVerte
       ...(depsDataIds ?? []),
     ])
 
-    const [gateInstanceVertexId] = await g
-      .V(gateRefInstanceId)
-      .out(domain.edge.uses_gate.gateInstanceRef_componentInstance.constants.LABEL)
-      .id()
+    const [gateInstanceVertexId] = await dataMapper.query.findGateInstanceVertexIdForRef({ vertexId: gateRefInstanceId })
     if (!gateInstanceVertexId) continue
-    const [instanceValues] = await g.V(gateInstanceVertexId).valueMap('instanceId')
+    const [instanceValues] = await dataMapper.query.readGateInstanceId({ vertexId: gateInstanceVertexId })
     const instanceIdValues = instanceValues?.instanceId ?? instanceValues
     const gateInstanceId = Array.isArray(instanceIdValues) ? instanceIdValues[0] : instanceIdValues
     if (!gateInstanceId) continue

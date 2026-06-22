@@ -12,7 +12,7 @@ const republishIfImportsMissing = registerSpec.pre.find(fn => fn.name === 'repub
 test('republishIfImportsMissing republishes and aborts when an import is missing', async () => {
   assert.ok(republishIfImportsMissing, 'republishIfImportsMissing pre hook missing')
 
-  await withGraphContext(async ({ diagnostics, g }) => {
+  await withGraphContext(async ({ diagnostics, g, dataMapper }) => {
     const component = componentBuilder('MissingImportComponent')
       .import('SharedComponent', { hash: 'missing-hash' })
       .toJSON()
@@ -29,7 +29,7 @@ test('republishIfImportsMissing republishes and aborts when an import is missing
 
     await republishIfImportsMissing({
       message,
-      rootCtx: { g, natsContext },
+      rootCtx: { g, dataMapper, natsContext },
       scope: { handlerDiagnostics, component, [s.scope.ac]: abortCtl },
     })
 
@@ -49,7 +49,7 @@ test('republishIfImportsMissing republishes and aborts when an import is missing
 test('republishIfImportsMissing rejects missing import name', async () => {
   assert.ok(republishIfImportsMissing, 'republishIfImportsMissing pre hook missing')
 
-  await withGraphContext(async ({ diagnostics, g }) => {
+  await withGraphContext(async ({ diagnostics, g, dataMapper }) => {
     const component = componentBuilder('MissingImportNameComponent')
       .import('SharedComponent', { hash: 'some-hash' })
       .toJSON()
@@ -65,7 +65,7 @@ test('republishIfImportsMissing rejects missing import name', async () => {
     await assert.rejects(
       republishIfImportsMissing({
         message,
-        rootCtx: { g, natsContext: { publish: async () => { } } },
+        rootCtx: { g, dataMapper, natsContext: { publish: async () => { } } },
         scope: { handlerDiagnostics, component, [s.scope.ac]: abortCtl },
       }),
       diagnostics.DiagnosticError,
@@ -76,7 +76,7 @@ test('republishIfImportsMissing rejects missing import name', async () => {
 test('republishIfImportsMissing rejects missing import hash', async () => {
   assert.ok(republishIfImportsMissing, 'republishIfImportsMissing pre hook missing')
 
-  await withGraphContext(async ({ diagnostics, g }) => {
+  await withGraphContext(async ({ diagnostics, g, dataMapper }) => {
     const component = componentBuilder('MissingImportHashComponent')
       .import('SharedComponent', { hash: 'some-hash' })
       .toJSON()
@@ -92,7 +92,7 @@ test('republishIfImportsMissing rejects missing import hash', async () => {
     await assert.rejects(
       republishIfImportsMissing({
         message,
-        rootCtx: { g, natsContext: { publish: async () => { } } },
+        rootCtx: { g, dataMapper, natsContext: { publish: async () => { } } },
         scope: { handlerDiagnostics, component, [s.scope.ac]: abortCtl },
       }),
       diagnostics.DiagnosticError,
@@ -123,7 +123,7 @@ test('republishIfImportsMissing no-ops when imports already registered', async (
 
     await republishIfImportsMissing({
       message,
-      rootCtx: { g, natsContext },
+      rootCtx: { g, dataMapper, natsContext },
       scope: { handlerDiagnostics, component, [s.scope.ac]: abortCtl },
     })
 

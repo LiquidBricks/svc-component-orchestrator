@@ -38,11 +38,7 @@ export async function attachComponentImports({
     )
     uniqueImportNamesSet.add(importName)
 
-    const [importedComponentId] = await g
-      .V()
-      .has('label', domain.vertex.component.constants.LABEL)
-      .has('hash', importHash)
-      .id()
+    const [importedComponentId] = await dataMapper.query.findImportedComponentIdByHash({ hash: importHash })
 
     handlerDiagnostics.require(
       importedComponentId,

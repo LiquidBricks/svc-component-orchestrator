@@ -35,11 +35,7 @@ test('register route executes decode/pre/handler/post and publishes component re
 
     assert.equal(message.acked, true)
 
-    const [componentId] = await g
-      .V()
-      .has('label', domain.vertex.component.constants.LABEL)
-      .has('hash', component.hash)
-      .id()
+    const [componentId] = await dataMapper.query.findComponentIdByHash({ hash: component.hash })
     assert.ok(componentId, 'component vertex missing')
 
     assert.equal(publishCalls.length, 2)
@@ -67,11 +63,7 @@ test('register route republishes and aborts when imports are missing', async () 
     assert.equal(message.acked, true)
     assert.equal(scope.status, 'aborted')
 
-    const componentIds = await g
-      .V()
-      .has('label', domain.vertex.component.constants.LABEL)
-      .has('hash', component.hash)
-      .id()
+    const componentIds = await dataMapper.query.listComponentIds({ hash: component.hash })
     assert.equal(componentIds.length, 0)
 
     assert.equal(publishCalls.length, 1)
@@ -96,11 +88,7 @@ test('register route republishes and aborts when gates are missing', async () =>
     assert.equal(message.acked, true)
     assert.equal(scope.status, 'aborted')
 
-    const componentIds = await g
-      .V()
-      .has('label', domain.vertex.component.constants.LABEL)
-      .has('hash', component.hash)
-      .id()
+    const componentIds = await dataMapper.query.listComponentIds({ hash: component.hash })
     assert.equal(componentIds.length, 0)
 
     assert.equal(publishCalls.length, 1)
@@ -127,18 +115,10 @@ test('register route attaches provider when component already exists', async () 
     assert.equal(message.acked, true)
     assert.equal(scope.componentAlreadyRegistered, true)
 
-    const componentIds = await g
-      .V()
-      .has('label', domain.vertex.component.constants.LABEL)
-      .has('hash', component.hash)
-      .id()
+    const componentIds = await dataMapper.query.listComponentIds({ hash: component.hash })
     assert.equal(componentIds.length, 1)
 
-    const [providedComponentId] = await g
-      .V(scope.componentAgentVID)
-      .out('domain.edge.provides_component.componentAgent__component')
-      .has('hash', component.hash)
-      .id()
+    const [providedComponentId] = await dataMapper.query.findProvidedComponentId({ componentAgentId: scope.componentAgentVID, componentHash: component.hash })
     assert.equal(providedComponentId, componentIds[0])
     assert.equal(publishCalls.length, 2)
   })

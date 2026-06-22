@@ -22,32 +22,23 @@ test('handler links gates to existing components and records waitFor/deps', asyn
 
     await registerHandlerComponent({ diagnostics, dataMapper, g }, component)
 
-    const [componentId] = await g
-      .V()
-      .has('label', domain.vertex.component.constants.LABEL)
-      .has('hash', component.hash)
-      .id()
+    const [componentId] = await dataMapper.query.findComponentIdByHash({ hash: component.hash })
 
-    const gateRefIds = await g.V(componentId)
-      .out(domain.edge.has_gate.component_gateRef.constants.LABEL)
-      .id()
+    const gateRefIds = await dataMapper.query.listGateRefIds({ vertexId: componentId })
     assert.equal(gateRefIds.length, 1)
 
-    const [gatedComponentId] = await g
-      .V(gateRefIds[0])
-      .out(domain.edge.gate_of.gateRef_component.constants.LABEL)
-      .id()
+    const [gatedComponentId] = await dataMapper.query.findGatedComponentIdForGateRef({ vertexId: gateRefIds[0] })
     assert.equal(gatedComponentId, sharedComponentId)
 
-    const [gateValues] = await g.V(gateRefIds[0]).valueMap('alias', 'fnc')
+    const [gateValues] = await dataMapper.query.readGateValues({ vertexId: gateRefIds[0] })
     const aliasValue = Array.isArray(gateValues?.alias) ? gateValues.alias[0] : gateValues?.alias
     const fncValue = Array.isArray(gateValues?.fnc) ? gateValues.fnc[0] : gateValues?.fnc
     assert.equal(aliasValue, component.gates[0].name)
     assert.equal(fncValue, component.gates[0].fnc)
 
-    const waitForTaskIds = await g.V(gateRefIds[0]).out(domain.edge.wait_for.gateRef_task.constants.LABEL).id()
-    const waitForDataIds = await g.V(gateRefIds[0]).out(domain.edge.wait_for.gateRef_data.constants.LABEL).id()
-    const depTaskIds = await g.V(gateRefIds[0]).out(domain.edge.has_dependency.gateRef_task.constants.LABEL).id()
+    const waitForTaskIds = await dataMapper.query.listWaitForTaskIds({ vertexId: gateRefIds[0] })
+    const waitForDataIds = await dataMapper.query.listWaitForDataIds({ vertexId: gateRefIds[0] })
+    const depTaskIds = await dataMapper.query.listDepTaskIds({ vertexId: gateRefIds[0] })
     assert.equal(waitForDataIds.length, 1)
     assert.equal(waitForTaskIds.length, 0)
     assert.equal(depTaskIds.length, 1)
@@ -70,18 +61,12 @@ test('handler accepts agentFn gate deps without creating graph dependency edges'
 
     await registerHandlerComponent({ diagnostics, dataMapper, g }, component)
 
-    const [componentId] = await g
-      .V()
-      .has('label', domain.vertex.component.constants.LABEL)
-      .has('hash', component.hash)
-      .id()
-    const [gateRefId] = await g.V(componentId)
-      .out(domain.edge.has_gate.component_gateRef.constants.LABEL)
-      .id()
+    const [componentId] = await dataMapper.query.findComponentIdByHash({ hash: component.hash })
+    const [gateRefId] = await dataMapper.query.listGateRefIds({ vertexId: componentId })
 
     assert.ok(gateRefId, 'gateRef missing')
-    assert.deepEqual(await g.V(gateRefId).out(domain.edge.has_dependency.gateRef_task.constants.LABEL).id(), [])
-    assert.deepEqual(await g.V(gateRefId).out(domain.edge.has_dependency.gateRef_data.constants.LABEL).id(), [])
+    assert.deepEqual(await dataMapper.query.findHasDependencyGateRefTask({ vertexId: gateRefId }), [])
+    assert.deepEqual(await dataMapper.query.findHasDependencyGateRefData({ vertexId: gateRefId }), [])
   })
 })
 

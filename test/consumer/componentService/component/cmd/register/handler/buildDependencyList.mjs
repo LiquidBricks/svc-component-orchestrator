@@ -14,11 +14,7 @@ test('handler allows data entries without fnc', async () => {
 
     await registerHandlerComponent({ diagnostics, dataMapper, g }, component)
 
-    const [dataId] = await g
-      .V()
-      .has('label', domain.vertex.data.constants.LABEL)
-      .has('name', 'dataNoFnc')
-      .id()
+    const [dataId] = await dataMapper.query.findDataId()
 
     assert.ok(dataId, 'data vertex missing')
   })

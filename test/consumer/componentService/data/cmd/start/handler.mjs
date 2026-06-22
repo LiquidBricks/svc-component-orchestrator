@@ -2,28 +2,27 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import { handler } from '../../../../../../core/data/cmd/start/handler.js'
+import { dataMapper as createDataMapper } from '@liquid-bricks/spec-domain/domain'
 
 function makeGraphSpy() {
   const calls = []
-  return {
-    calls,
-    g: {
-      V(id) {
-        return {
-          property(key, value) {
-            calls.push({ id, key, value })
-            return this
-          },
-        }
-      },
+  const g = {
+    V(id) {
+      return {
+        property(key, value) {
+          calls.push({ id, key, value })
+          return this
+        },
+      }
     },
   }
+  return { calls, g, dataMapper: createDataMapper({ g, diagnostics: {} }) }
 }
 
 test('handler marks data state running and updates timestamp', async () => {
-  const { g, calls } = makeGraphSpy()
+  const { g, dataMapper, calls } = makeGraphSpy()
   await handler({
-    rootCtx: { g },
+    rootCtx: { g, dataMapper },
     scope: { handlerDiagnostics: {}, stateId: 'state-1' },
   })
 

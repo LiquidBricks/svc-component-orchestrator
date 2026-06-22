@@ -45,12 +45,8 @@ function createMemoryContext() {
   return { diagnostics, graph, g, dataMapper }
 }
 
-async function getComponentId({ g, diagnostics, componentHash }) {
-  const [componentId] = await g
-    .V()
-    .has('label', domain.vertex.component.constants.LABEL)
-    .has('hash', componentHash)
-    .id()
+async function getComponentId({ g, dataMapper, diagnostics, componentHash }) {
+  const [componentId] = await dataMapper.query.findComponentIdByHash({ hash: componentHash })
   diagnostics.require(
     componentId,
     diagnostics.DiagnosticError,
@@ -59,39 +55,28 @@ async function getComponentId({ g, diagnostics, componentHash }) {
   return componentId
 }
 
-async function getInstanceContext({ g, diagnostics, instanceId }) {
-  const [instanceVertexId] = await g
-    .V()
-    .has('label', domain.vertex.componentInstance.constants.LABEL)
-    .has('instanceId', instanceId)
-    .id()
+async function getInstanceContext({ g, dataMapper, diagnostics, instanceId }) {
+  const [instanceVertexId] = await dataMapper.query.findInstanceVertexId({ instanceId })
   diagnostics.require(
     instanceVertexId,
     diagnostics.DiagnosticError,
     `componentInstance ${instanceId} not found`,
   )
 
-  const [stateMachineId] = await g
-    .V(instanceVertexId)
-    .out(domain.edge.has_stateMachine.componentInstance_stateMachine.constants.LABEL)
-    .id()
+  const [stateMachineId] = await dataMapper.query.readStateMachineId({ vertexId: instanceVertexId })
 
   return { instanceVertexId, stateMachineId }
 }
 
-async function getStateEdgeIdByName({ g, stateMachineId, edgeLabel, nodeName }) {
-  const [edgeId] = await g
-    .V(stateMachineId)
-    .outE(edgeLabel)
-    .filter(_ => _.inV().has('name', nodeName))
-    .id()
+async function getStateEdgeIdByName({ g, dataMapper, stateMachineId, edgeLabel, nodeName }) {
+  const [edgeId] = await dataMapper.query.findEdgeId({ edgeLabel, vertexId: stateMachineId, name: nodeName })
   return edgeId
 }
 
-async function edgeNames({ g, edgeIds }) {
+async function edgeNames({ g, dataMapper, edgeIds }) {
   const names = []
   for (const edgeId of edgeIds ?? []) {
-    const [row] = await g.E(edgeId).inV().valueMap('name')
+    const [row] = await dataMapper.query.readStateEdgeTargetName({ edgeId })
     const value = row?.name ?? row
     names.push(Array.isArray(value) ? value[0] : value)
   }
@@ -104,6 +89,7 @@ function findImportByAlias(imports, alias) {
 
 test('task waitFor behaves like a dependency', async () => {
   const ctx = createMemoryContext()
+  const { dataMapper } = ctx
   try {
     const handlerDiagnostics = createHandlerDiagnostics(ctx.diagnostics)
     const component = componentBuilder('WaitForTasks')
@@ -112,8 +98,8 @@ test('task waitFor behaves like a dependency', async () => {
       .toJSON()
 
     await invokeRoute(ctx, { path: registerPath, data: { component, agentID: 'test-agent' } })
-    const componentId = await getComponentId({ g: ctx.g, diagnostics: ctx.diagnostics, componentHash: component.hash })
-    const { imports } = await componentImports({ rootCtx: { g: ctx.g }, scope: { componentId } })
+    const componentId = await getComponentId({ g: ctx.g, dataMapper, diagnostics: ctx.diagnostics, componentHash: component.hash })
+    const { imports } = await componentImports({ rootCtx: { g: ctx.g, dataMapper }, scope: { componentId } })
 
     const instanceId = 'instance-wait-for-task'
     await createInstanceHandler({
@@ -121,28 +107,29 @@ test('task waitFor behaves like a dependency', async () => {
       scope: { handlerDiagnostics, componentHash: component.hash, componentId, instanceId, imports },
     })
 
-    const { instanceVertexId, stateMachineId } = await getInstanceContext({ g: ctx.g, diagnostics: ctx.diagnostics, instanceId })
-    const { taskStateIds } = await findDependencyFreeStates({ rootCtx: { g: ctx.g }, scope: { stateMachineId } })
-    const readyTaskNames = await edgeNames({ g: ctx.g, edgeIds: taskStateIds })
+    const { instanceVertexId, stateMachineId } = await getInstanceContext({ g: ctx.g, dataMapper, diagnostics: ctx.diagnostics, instanceId })
+    const { taskStateIds } = await findDependencyFreeStates({ rootCtx: { g: ctx.g, dataMapper }, scope: { stateMachineId } })
+    const readyTaskNames = await edgeNames({ g: ctx.g, dataMapper, edgeIds: taskStateIds })
     assert.deepEqual(readyTaskNames, ['first'])
 
     const firstEdgeId = await getStateEdgeIdByName({
-      g: ctx.g,
+      g: ctx.g, dataMapper,
       stateMachineId,
       edgeLabel: domain.edge.has_task_state.stateMachine_task.constants.LABEL,
       nodeName: 'first',
     })
-    const [providedNodeId] = await ctx.g.E(firstEdgeId).inV().id()
-    await ctx.g
-      .E(firstEdgeId)
-      .property('status', domain.edge.has_task_state.stateMachine_task.constants.Status.PROVIDED)
-      .property('result', '"done"')
+    const [providedNodeId] = await ctx.dataMapper.query.findEdgeTargetNodeId({ edgeId: firstEdgeId })
+    await ctx.dataMapper.mutation.setStateEdgeStatusAndResult({
+      edgeId: firstEdgeId,
+      status: domain.edge.has_task_state.stateMachine_task.constants.Status.PROVIDED,
+      result: '"done"',
+    })
 
     const { starters } = await startDependantsHandler({
-      rootCtx: { g: ctx.g },
+      rootCtx: { g: ctx.g, dataMapper },
       scope: { instanceId, instanceVertexId, stateMachineId, providedNodeId, type: 'task' },
     })
-    const readyAfterNames = await edgeNames({ g: ctx.g, edgeIds: starters[0].taskStateIds })
+    const readyAfterNames = await edgeNames({ g: ctx.g, dataMapper, edgeIds: starters[0].taskStateIds })
     assert.deepEqual(readyAfterNames, ['second'])
   } finally {
     try { await ctx.graph?.close?.() } catch { }
@@ -151,6 +138,7 @@ test('task waitFor behaves like a dependency', async () => {
 
 test('import waitFor can reference another import lifecycle.done', async () => {
   const ctx = createMemoryContext()
+  const { dataMapper } = ctx
   try {
     const handlerDiagnostics = createHandlerDiagnostics(ctx.diagnostics)
     const controlPlaneComponent = componentBuilder('WaitForLifecycleControlPlane')
@@ -171,8 +159,8 @@ test('import waitFor can reference another import lifecycle.done', async () => {
     await invokeRoute(ctx, { path: registerPath, data: { component: corednsComponent, agentID: 'test-agent' } })
     await invokeRoute(ctx, { path: registerPath, data: { component: rootComponent, agentID: 'test-agent' } })
 
-    const componentId = await getComponentId({ g: ctx.g, diagnostics: ctx.diagnostics, componentHash: rootComponent.hash })
-    const { imports } = await componentImports({ rootCtx: { g: ctx.g }, scope: { componentId } })
+    const componentId = await getComponentId({ g: ctx.g, dataMapper, diagnostics: ctx.diagnostics, componentHash: rootComponent.hash })
+    const { imports } = await componentImports({ rootCtx: { g: ctx.g, dataMapper }, scope: { componentId } })
 
     const instanceId = 'instance-wait-for-lifecycle-registration'
     await createInstanceHandler({
@@ -180,9 +168,9 @@ test('import waitFor can reference another import lifecycle.done', async () => {
       scope: { handlerDiagnostics, componentHash: rootComponent.hash, componentId, instanceId, imports },
     })
 
-    const { instanceVertexId } = await getInstanceContext({ g: ctx.g, diagnostics: ctx.diagnostics, instanceId })
+    const { instanceVertexId } = await getInstanceContext({ g: ctx.g, dataMapper, diagnostics: ctx.diagnostics, instanceId })
     const { usesImportInstances: importInstances } = await usesImportInstances({
-      rootCtx: { g: ctx.g },
+      rootCtx: { g: ctx.g, dataMapper },
       scope: { instanceVertexId },
     })
 
@@ -196,6 +184,7 @@ test('import waitFor can reference another import lifecycle.done', async () => {
 
 test('import waitFor lifecycle.done starts dependent import after referenced import completes', async () => {
   const ctx = createMemoryContext()
+  const { dataMapper } = ctx
   try {
     const handlerDiagnostics = createHandlerDiagnostics(ctx.diagnostics)
     const controlPlaneComponent = componentBuilder('WaitForLifecycleCompletionControlPlane')
@@ -216,8 +205,8 @@ test('import waitFor lifecycle.done starts dependent import after referenced imp
     await invokeRoute(ctx, { path: registerPath, data: { component: corednsComponent, agentID: 'test-agent' } })
     await invokeRoute(ctx, { path: registerPath, data: { component: rootComponent, agentID: 'test-agent' } })
 
-    const componentId = await getComponentId({ g: ctx.g, diagnostics: ctx.diagnostics, componentHash: rootComponent.hash })
-    const { imports } = await componentImports({ rootCtx: { g: ctx.g }, scope: { componentId } })
+    const componentId = await getComponentId({ g: ctx.g, dataMapper, diagnostics: ctx.diagnostics, componentHash: rootComponent.hash })
+    const { imports } = await componentImports({ rootCtx: { g: ctx.g, dataMapper }, scope: { componentId } })
 
     const rootInstanceId = 'instance-wait-for-lifecycle-completion'
     await createInstanceHandler({
@@ -226,12 +215,12 @@ test('import waitFor lifecycle.done starts dependent import after referenced imp
     })
 
     const { instanceVertexId: rootInstanceVertexId } = await getInstanceContext({
-      g: ctx.g,
+      g: ctx.g, dataMapper,
       diagnostics: ctx.diagnostics,
       instanceId: rootInstanceId,
     })
     const { usesImportInstances: importInstances } = await usesImportInstances({
-      rootCtx: { g: ctx.g },
+      rootCtx: { g: ctx.g, dataMapper },
       scope: { instanceVertexId: rootInstanceVertexId },
     })
     const controlPlaneImport = findImportByAlias(importInstances, 'controlplanepod')
@@ -246,7 +235,7 @@ test('import waitFor lifecycle.done starts dependent import after referenced imp
     const blockedPublishes = []
     await startImportHandler({
       rootCtx: {
-        g: ctx.g,
+        g: ctx.g, dataMapper,
         natsContext: { publish: async (subject, payload) => blockedPublishes.push({ subject, payload: JSON.parse(payload) }) },
       },
       scope: { instanceId: corednsImport.instanceId, parentInstanceId: rootInstanceId },
@@ -258,28 +247,29 @@ test('import waitFor lifecycle.done starts dependent import after referenced imp
     )
 
     const { stateMachineId: controlPlaneStateMachineId } = await getInstanceContext({
-      g: ctx.g,
+      g: ctx.g, dataMapper,
       diagnostics: ctx.diagnostics,
       instanceId: controlPlaneImport.instanceId,
     })
     const configureEdgeId = await getStateEdgeIdByName({
-      g: ctx.g,
+      g: ctx.g, dataMapper,
       stateMachineId: controlPlaneStateMachineId,
       edgeLabel: domain.edge.has_task_state.stateMachine_task.constants.LABEL,
       nodeName: 'configure',
     })
-    await ctx.g
-      .E(configureEdgeId)
-      .property('status', domain.edge.has_task_state.stateMachine_task.constants.Status.PROVIDED)
-      .property('result', JSON.stringify({ configured: true }))
-    await ctx.g
-      .V(controlPlaneStateMachineId)
-      .property('state', domain.vertex.stateMachine.constants.STATES.COMPLETE)
+    await ctx.dataMapper.mutation.setStateEdgeStatusAndResult({
+      edgeId: configureEdgeId,
+      status: domain.edge.has_task_state.stateMachine_task.constants.Status.PROVIDED,
+      result: JSON.stringify({ configured: true }),
+    })
+    await ctx.dataMapper.mutation.markStateMachineCompleteState({
+      stateMachineId: controlPlaneStateMachineId,
+    })
 
     const readyPublishes = []
     await startImportHandler({
       rootCtx: {
-        g: ctx.g,
+        g: ctx.g, dataMapper,
         natsContext: { publish: async (subject, payload) => readyPublishes.push({ subject, payload: JSON.parse(payload) }) },
       },
       scope: { instanceId: corednsImport.instanceId, parentInstanceId: rootInstanceId },
@@ -295,6 +285,7 @@ test('import waitFor lifecycle.done starts dependent import after referenced imp
 
 test('import waitFor prevents starting child until dependency provided', async () => {
   const ctx = createMemoryContext()
+  const { dataMapper } = ctx
   try {
     const handlerDiagnostics = createHandlerDiagnostics(ctx.diagnostics)
     const childComponent = componentBuilder('WaitForChild')
@@ -308,8 +299,8 @@ test('import waitFor prevents starting child until dependency provided', async (
     await invokeRoute(ctx, { path: registerPath, data: { component: childComponent, agentID: 'test-agent' } })
     await invokeRoute(ctx, { path: registerPath, data: { component: parentComponent, agentID: 'test-agent' } })
 
-    const componentId = await getComponentId({ g: ctx.g, diagnostics: ctx.diagnostics, componentHash: parentComponent.hash })
-    const { imports } = await componentImports({ rootCtx: { g: ctx.g }, scope: { componentId } })
+    const componentId = await getComponentId({ g: ctx.g, dataMapper, diagnostics: ctx.diagnostics, componentHash: parentComponent.hash })
+    const { imports } = await componentImports({ rootCtx: { g: ctx.g, dataMapper }, scope: { componentId } })
 
     const instanceId = 'instance-wait-for-import'
     const createResult = await createInstanceHandler({
@@ -319,9 +310,9 @@ test('import waitFor prevents starting child until dependency provided', async (
     const childInstanceId = createResult.importedInstances?.[0]?.instanceId
     assert.ok(childInstanceId, 'child instance missing')
 
-    const { instanceVertexId, stateMachineId } = await getInstanceContext({ g: ctx.g, diagnostics: ctx.diagnostics, instanceId })
+    const { instanceVertexId, stateMachineId } = await getInstanceContext({ g: ctx.g, dataMapper, diagnostics: ctx.diagnostics, instanceId })
     const { usesImportInstances: importInstances } = await usesImportInstances({
-      rootCtx: { g: ctx.g },
+      rootCtx: { g: ctx.g, dataMapper },
       scope: { instanceVertexId },
     })
     assert.ok(importInstances.length > 0, 'expected an import instance')
@@ -349,24 +340,25 @@ test('import waitFor prevents starting child until dependency provided', async (
       publish: async (subject, payload) => preGateImportStartPublishes.push({ subject, payload: JSON.parse(payload) }),
     }
     await startImportHandler({
-      rootCtx: { natsContext: preGateImportStartContext, g: ctx.g },
+      rootCtx: { natsContext: preGateImportStartContext, g: ctx.g, dataMapper },
       scope: initialPublishes[0].payload.data,
     })
     assert.equal(preGateImportStartPublishes.filter(({ subject }) => subject === startComponentInstanceSubject).length, 0)
 
     const gateEdgeId = await getStateEdgeIdByName({
-      g: ctx.g,
+      g: ctx.g, dataMapper,
       stateMachineId,
       edgeLabel: domain.edge.has_data_state.stateMachine_data.constants.LABEL,
       nodeName: 'gate',
     })
-    const [gateNodeId] = await ctx.g.E(gateEdgeId).inV().id()
-    await ctx.g
-      .E(gateEdgeId)
-      .property('status', domain.edge.has_data_state.stateMachine_data.constants.Status.PROVIDED)
+    const [gateNodeId] = await ctx.dataMapper.query.findEdgeTargetNodeId({ edgeId: gateEdgeId })
+    await ctx.dataMapper.mutation.setStateEdgeStatus({
+      edgeId: gateEdgeId,
+      status: domain.edge.has_data_state.stateMachine_data.constants.Status.PROVIDED,
+    })
 
     const dependants = await startDependantsHandler({
-      rootCtx: { g: ctx.g },
+      rootCtx: { g: ctx.g, dataMapper },
       scope: { instanceId, instanceVertexId, stateMachineId, providedNodeId: gateNodeId, type: 'data' },
     })
 
@@ -390,7 +382,7 @@ test('import waitFor prevents starting child until dependency provided', async (
     }
     for (const publishedImportStartCommand of published.filter(({ subject }) => subject === startImportSubject)) {
       await startImportHandler({
-        rootCtx: { natsContext: postGateImportStartContext, g: ctx.g },
+        rootCtx: { natsContext: postGateImportStartContext, g: ctx.g, dataMapper },
         scope: publishedImportStartCommand.payload.data,
       })
     }
