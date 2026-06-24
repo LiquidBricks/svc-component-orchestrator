@@ -3,14 +3,12 @@ import assert from 'node:assert/strict'
 
 import { agentFn, component as componentBuilder } from '../../../../../../../../lib-component-builder/componentBuilder/index.js'
 
-import { domain, registerHandlerComponent, withGraphContext } from '../helpers.mjs'
+import { registerHandlerComponent, withGraphContext } from '../helpers.mjs'
 
 function first(value) {
   return Array.isArray(value) ? value[0] : value
 }
 
-const hasAgentFnLabel = domain.edge.has_agentFn?.component_agentFn?.constants?.LABEL
-  ?? 'domain.edge.has_agentFn.component__agentFn'
 
 test('handler attaches agentFns to registered component graph', async () => {
   await withGraphContext(async ({ diagnostics, dataMapper, g }) => {
@@ -24,7 +22,7 @@ test('handler attaches agentFns to registered component graph', async () => {
     const [componentId] = await dataMapper.query.findComponentIdByHash({ hash: component.hash })
     assert.ok(componentId, 'component vertex missing')
 
-    const agentFnIds = await dataMapper.query.listAgentFnIds({ edgeLabel: hasAgentFnLabel, vertexId: componentId })
+    const agentFnIds = await dataMapper.query.listComponentAgentFnIds({ vertexId: componentId })
     assert.equal(agentFnIds.length, 1)
 
     const [agentFnValues] = await dataMapper.query.readAgentFnValues({ vertexId: agentFnIds[0] })

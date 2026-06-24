@@ -77,7 +77,7 @@ export async function attachImportWaitFor({
       await dataMapper.edge.wait_for.importRef_data.create({ fromId: importRefId, toId: targetId })
     }
     if (waitForTargets.lifecycle.size) {
-      await dataMapper.mutation.updateImportRefLifecycleWaitFor({ importRefId, waitFor: JSON.stringify(Array.from(waitForTargets.lifecycle)) })
+      await dataMapper.vertex.importRef.setLifecycleWaitFor({ importRefId, waitFor: JSON.stringify(Array.from(waitForTargets.lifecycle)) })
     }
   }
 }

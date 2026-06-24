@@ -6,12 +6,10 @@ import { component as componentBuilder } from '@liquid-bricks/lib-component-buil
 import { handler } from '../../../../../../core/componentInstance/cmd/start_dependants/handler.js'
 import { componentImports } from '../../../../../../core/componentInstance/cmd/create/loadData/componentImports.js'
 import { componentGates } from '../../../../../../core/componentInstance/cmd/create/loadData/componentGates.js'
-import { STATE_EDGE_LABEL_BY_TYPE } from '../../../../../../core/componentInstance/cmd/start_dependants/constants.js'
 import {
   withGraphContext,
   registerComponent,
   createInstance,
-  domain,
 } from '../../../helpers.mjs'
 
 
@@ -39,7 +37,7 @@ test('handler returns starter list when no dependants are ready', async () => {
 
     const [stateMachineId] = await dataMapper.query.readStateMachineId({ vertexId: instanceVertexId })
 
-    const [stateEdgeId] = await dataMapper.query.listDataStateEdgeIds({ edgeLabel: STATE_EDGE_LABEL_BY_TYPE.data, vertexId: stateMachineId })
+    const [stateEdgeId] = await dataMapper.query.listDataStateEdgeIds({ vertexId: stateMachineId })
 
     const [providedNodeId] = await dataMapper.query.findEdgeTargetNodeId({ edgeId: stateEdgeId })
 
@@ -93,7 +91,7 @@ test('handler returns gate compute requests and does not evaluate gate fnc on co
 
     const [stateMachineId] = await dataMapper.query.readStateMachineId({ vertexId: instanceVertexId })
 
-    const [stateEdgeId] = await dataMapper.query.listDataStateEdgeIds({ edgeLabel: STATE_EDGE_LABEL_BY_TYPE.data, vertexId: stateMachineId })
+    const [stateEdgeId] = await dataMapper.query.listDataStateEdgeIds({ vertexId: stateMachineId })
     const [providedNodeId] = await dataMapper.query.findEdgeTargetNodeId({ edgeId: stateEdgeId })
 
     const { starters } = await handler({

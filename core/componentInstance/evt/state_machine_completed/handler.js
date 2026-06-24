@@ -11,6 +11,6 @@ export async function handler({ scope: { handlerDiagnostics, stateMachineId, ins
   }
 
   const now = new Date().toISOString()
-  await dataMapper.mutation.markStateMachineComplete({ updatedAt: now, vertexId: stateMachineId })
+  await dataMapper.vertex.stateMachine.setComplete({ updatedAt: now, stateMachineId })
 
 }

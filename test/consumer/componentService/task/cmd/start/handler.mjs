@@ -7,7 +7,7 @@ import { dataMapper as createDataMapper } from '@liquid-bricks/spec-domain/domai
 function makeGraphSpy() {
   const calls = []
   const g = {
-    V(id) {
+    E(id) {
       return {
         property(key, value) {
           calls.push({ id, key, value })
@@ -27,6 +27,7 @@ test('handler marks task state running and updates timestamp', async () => {
   })
 
   assert.equal(calls.length, 2)
+  assert.equal(calls[0].id, 'state-task-1')
   assert.deepEqual(
     calls.map(({ key, value }) => ({ key, value })),
     [

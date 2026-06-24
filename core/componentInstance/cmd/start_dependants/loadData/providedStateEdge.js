@@ -1,7 +1,9 @@
 import { Errors } from '../../../../../errors.js'
 
-export async function providedStateEdge({ scope: { handlerDiagnostics, stateMachineId, stateEdgeLabel, stateEdgeId, instanceId, type }, rootCtx: { g, dataMapper } }) {
-  const [providedNodeId] = await dataMapper.query.findStateEdgeTargetNodeId({ id: stateEdgeId, edgeLabel: stateEdgeLabel, vertexId: stateMachineId })
+export async function providedStateEdge({ scope: { handlerDiagnostics, stateMachineId, stateEdgeId, instanceId, type }, rootCtx: { g, dataMapper } }) {
+  const [providedNodeId] = type === 'task'
+    ? await dataMapper.query.findTaskStateEdgeTargetNodeId({ id: stateEdgeId, vertexId: stateMachineId })
+    : await dataMapper.query.findDataStateEdgeTargetNodeId({ id: stateEdgeId, vertexId: stateMachineId })
 
   handlerDiagnostics.require(
     providedNodeId,

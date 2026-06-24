@@ -1,16 +1,10 @@
-import { domain } from '@liquid-bricks/spec-domain/domain'
 import { findImportPathBetweenComponents, findStateEdgeForNodeInInstanceTree, normalizeResult, setNested, vertexLabelToType } from '../../../../componentInstance/cmd/dependencyUtils.js'
 
-const DEPENDENCY_EDGE_LABELS = Object.freeze([
-  domain.edge.has_dependency.data_task.constants.LABEL,
-  domain.edge.has_dependency.data_data.constants.LABEL,
-  domain.edge.has_dependency.data_deferred.constants.LABEL,
-])
 
 export async function dependencyResults({ rootCtx: { g, dataMapper }, scope: { componentInstanceVertexId, dataVertexId } }) {
   const [dependentComponentId] = await dataMapper.query.findDependentComponentId({ vertexId: componentInstanceVertexId })
 
-  const dependencyNodeIds = await dataMapper.query.listDependencyNodeIds({ edgeLabels: DEPENDENCY_EDGE_LABELS, vertexId: dataVertexId })
+  const dependencyNodeIds = await dataMapper.query.listDataDependencyNodeIds({ vertexId: dataVertexId })
 
   const deps = {}
   const seen = new Set()

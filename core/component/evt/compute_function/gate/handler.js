@@ -6,7 +6,7 @@ export async function handler({ rootCtx: { g, dataMapper }, scope: { instanceId,
   const [gateInstanceRefId] = await dataMapper.query.findGateInstanceRefIdByAlias({ vertexId: instanceVertexId, alias: name })
   if (!gateInstanceRefId) return { instanceId }
 
-  await dataMapper.mutation.updateGateInstanceRefResultAndUpdatedAt({ result: result != null ? JSON.stringify(result) : '', vertexId: gateInstanceRefId })
+  await dataMapper.vertex.gateInstanceRef.setResultAndUpdatedAt({ result: result != null ? JSON.stringify(result) : '', gateInstanceRefId })
 
   return { instanceId }
 }

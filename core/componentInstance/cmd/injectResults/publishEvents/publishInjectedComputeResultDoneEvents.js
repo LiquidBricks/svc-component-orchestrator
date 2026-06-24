@@ -1,33 +1,32 @@
 import { create as createBasicSubject } from '@liquid-bricks/lib-nats-subject/create/basic'
 import { Errors } from '../../../../../errors.js'
-import { domain } from '@liquid-bricks/spec-domain/domain'
-import { DATA_STATE_EDGE_LABEL } from '../../../../component/evt/compute_function/data/constants.js'
-import { TASK_STATE_EDGE_LABEL } from '../../../../component/evt/compute_function/task/constants.js'
 
 import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
 
-const STATE_EDGE_LABEL_BY_TYPE = Object.freeze({
-  data: DATA_STATE_EDGE_LABEL,
-  task: TASK_STATE_EDGE_LABEL,
-})
 
-
-const INJECTS_INTO_EDGE_BY_TYPE = Object.freeze({
-  data: [
-    { edgeLabel: domain.edge.injects_into.data_data.constants.LABEL, targetType: 'data' },
-    { edgeLabel: domain.edge.injects_into.data_task.constants.LABEL, targetType: 'task' },
-  ],
-  task: [
-    { edgeLabel: domain.edge.injects_into.task_data.constants.LABEL, targetType: 'data' },
-    { edgeLabel: domain.edge.injects_into.task_task.constants.LABEL, targetType: 'task' },
-  ],
-})
+async function listInjectedTargetEdgeIds({ dataMapper, fromType, targetType, vertexId }) {
+  if (fromType === 'data' && targetType === 'data') {
+    return dataMapper.query.listDataToDataInjectionEdgeIds({ vertexId })
+  }
+  if (fromType === 'data' && targetType === 'task') {
+    return dataMapper.query.listDataToTaskInjectionEdgeIds({ vertexId })
+  }
+  if (fromType === 'task' && targetType === 'data') {
+    return dataMapper.query.listTaskToDataInjectionEdgeIds({ vertexId })
+  }
+  if (fromType === 'task' && targetType === 'task') {
+    return dataMapper.query.listTaskToTaskInjectionEdgeIds({ vertexId })
+  }
+  return []
+}
 
 async function findComponentIdForNode({ g, dataMapper, nodeId, type }) {
-  const edgeLabel = type === 'task'
-    ? domain.edge.has_task.component_task.constants.LABEL
-    : domain.edge.has_data.component_data.constants.LABEL
-  const [componentId] = await dataMapper.query.findOwningComponentId({ edgeLabel, vertexId: nodeId })
+  if (type === 'task') {
+    const [componentId] = await dataMapper.query.findComponentIdForTask({ vertexId: nodeId })
+    return componentId
+  }
+
+  const [componentId] = await dataMapper.query.findComponentIdForData({ vertexId: nodeId })
   return componentId
 }
 
@@ -97,10 +96,16 @@ async function findInstanceForImportPath({ g, dataMapper, rootInstanceVertexId, 
   let currentInstanceVertexId = rootInstanceVertexId
   for (const alias of aliasPath ?? []) {
     const [importInstanceRefId] = await dataMapper.query.findImportInstanceRefIdByAlias({ vertexId: currentInstanceVertexId, alias })
-    const [gateInstanceRefId] = importInstanceRefId ? [] : await dataMapper.query.findGateInstanceRefIdByAlias({ vertexId: currentInstanceVertexId, alias })
-    const refId = importInstanceRefId ?? gateInstanceRefId
-    if (!refId) return null
-    const [nextInstanceVertexId] = await dataMapper.query.findNextInstanceVertexId({ edgeLabel: importInstanceRefId ? domain.edge.uses_import.importInstanceRef_componentInstance.constants.LABEL : domain.edge.uses_gate.gateInstanceRef_componentInstance.constants.LABEL, vertexId: refId })
+    if (importInstanceRefId) {
+      const [nextInstanceVertexId] = await dataMapper.query.findImportedInstanceVertexIdForRef({ vertexId: importInstanceRefId })
+      if (!nextInstanceVertexId) return null
+      currentInstanceVertexId = nextInstanceVertexId
+      continue
+    }
+
+    const [gateInstanceRefId] = await dataMapper.query.findGateInstanceRefIdByAlias({ vertexId: currentInstanceVertexId, alias })
+    if (!gateInstanceRefId) return null
+    const [nextInstanceVertexId] = await dataMapper.query.findGatedInstanceVertexIdForRef({ vertexId: gateInstanceRefId })
     if (!nextInstanceVertexId) return null
     currentInstanceVertexId = nextInstanceVertexId
   }
@@ -168,15 +173,19 @@ async function findRootComponentContext({ g, dataMapper, handlerDiagnostics, ins
   return { rootInstanceVertexId, rootComponentId }
 }
 
-async function findStateEdgeForNode({ g, dataMapper, stateMachineId, targetNodeId, targetStateEdgeLabel }) {
-  const [stateEdgeId] = await dataMapper.query.findStateEdgeIdForTargetNode({ edgeLabel: targetStateEdgeLabel, vertexId: stateMachineId, id: targetNodeId })
+async function findStateEdgeForNode({ g, dataMapper, stateMachineId, targetNodeId, targetType }) {
+  const [stateEdgeId] = targetType === 'task'
+    ? await dataMapper.query.findTaskStateEdgeIdForTargetNode({ vertexId: stateMachineId, id: targetNodeId })
+    : await dataMapper.query.findDataStateEdgeIdForTargetNode({ vertexId: stateMachineId, id: targetNodeId })
   return stateEdgeId
 }
 
 export async function publishInjectedComputeResultDoneEvents({ scope, rootCtx: { g, dataMapper, natsContext } }) {
-  const { handlerDiagnostics, instanceId, instanceVertexId, stateMachineId, stateEdgeId, stateEdgeLabel, type, result } = scope
+  const { handlerDiagnostics, instanceId, instanceVertexId, stateMachineId, stateEdgeId, type, result } = scope
 
-  const [providedNodeId] = await dataMapper.query.findStateEdgeTargetNodeId({ id: stateEdgeId, edgeLabel: stateEdgeLabel, vertexId: stateMachineId })
+  const [providedNodeId] = type === 'task'
+    ? await dataMapper.query.findTaskStateEdgeTargetNodeId({ id: stateEdgeId, vertexId: stateMachineId })
+    : await dataMapper.query.findDataStateEdgeTargetNodeId({ id: stateEdgeId, vertexId: stateMachineId })
 
   handlerDiagnostics.require(
     providedNodeId,
@@ -195,17 +204,14 @@ export async function publishInjectedComputeResultDoneEvents({ scope, rootCtx: {
 
   const fromName = await findNodeName({ g, dataMapper, nodeId: providedNodeId })
 
-  const injectsIntoEdges = INJECTS_INTO_EDGE_BY_TYPE[type]
-  if (!injectsIntoEdges?.length) return
+  const targetTypes = ['data', 'task']
 
   const publishedTargets = new Set()
   let rootContext = null
 
-  for (const { edgeLabel, targetType } of injectsIntoEdges) {
-    const targetEdgeIds = await dataMapper.query.listTargetEdgeIds({ edgeLabel, vertexId: providedNodeId })
+  for (const targetType of targetTypes) {
+    const targetEdgeIds = await listInjectedTargetEdgeIds({ dataMapper, fromType: type, targetType, vertexId: providedNodeId })
     if (!targetEdgeIds?.length) continue
-
-    const targetStateEdgeLabel = STATE_EDGE_LABEL_BY_TYPE[targetType]
 
     for (const targetEdgeId of targetEdgeIds) {
       const [targetNodeId] = await dataMapper.query.findEdgeTargetNodeId({ edgeId: targetEdgeId })
@@ -332,7 +338,7 @@ export async function publishInjectedComputeResultDoneEvents({ scope, rootCtx: {
         g, dataMapper,
         stateMachineId: targetStateMachineId,
         targetNodeId,
-        targetStateEdgeLabel,
+        targetType,
       })
       handlerDiagnostics.require(
         targetStateEdgeId,

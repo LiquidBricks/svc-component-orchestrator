@@ -5,10 +5,6 @@ import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nat
 
 
 const PROVIDED_STATUS = domain.edge.has_data_state.stateMachine_data.constants.Status.PROVIDED
-const STATE_EDGE_LABELS = [
-  domain.edge.has_data_state.stateMachine_data.constants.LABEL,
-  domain.edge.has_task_state.stateMachine_task.constants.LABEL,
-]
 
 function pickFirst(values) {
   return Array.isArray(values) ? values[0] : values
@@ -32,7 +28,7 @@ function normalizeResult(value) {
 }
 
 async function areAllStatesProvided({ g, dataMapper, stateMachineId }) {
-  const statusMaps = await dataMapper.query.readStatusMaps({ edgeLabels: STATE_EDGE_LABELS, vertexId: stateMachineId })
+  const statusMaps = await dataMapper.query.readStateMachineStatusMaps({ vertexId: stateMachineId })
   if (!statusMaps?.length) return true
 
   return statusMaps.every(map => {

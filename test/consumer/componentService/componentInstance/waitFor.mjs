@@ -68,8 +68,10 @@ async function getInstanceContext({ g, dataMapper, diagnostics, instanceId }) {
   return { instanceVertexId, stateMachineId }
 }
 
-async function getStateEdgeIdByName({ g, dataMapper, stateMachineId, edgeLabel, nodeName }) {
-  const [edgeId] = await dataMapper.query.findEdgeId({ edgeLabel, vertexId: stateMachineId, name: nodeName })
+async function getStateEdgeIdByName({ g, dataMapper, stateMachineId, type, nodeName }) {
+  const [edgeId] = type === 'task'
+    ? await dataMapper.query.findTaskStateEdgeIdByName({ vertexId: stateMachineId, name: nodeName })
+    : await dataMapper.query.findDataStateEdgeIdByName({ vertexId: stateMachineId, name: nodeName })
   return edgeId
 }
 
@@ -115,11 +117,11 @@ test('task waitFor behaves like a dependency', async () => {
     const firstEdgeId = await getStateEdgeIdByName({
       g: ctx.g, dataMapper,
       stateMachineId,
-      edgeLabel: domain.edge.has_task_state.stateMachine_task.constants.LABEL,
+      type: 'task',
       nodeName: 'first',
     })
     const [providedNodeId] = await ctx.dataMapper.query.findEdgeTargetNodeId({ edgeId: firstEdgeId })
-    await ctx.dataMapper.mutation.setStateEdgeStatusAndResult({
+    await ctx.dataMapper.edge.has_task_state.stateMachine_task.setStatusAndResult({
       edgeId: firstEdgeId,
       status: domain.edge.has_task_state.stateMachine_task.constants.Status.PROVIDED,
       result: '"done"',
@@ -254,15 +256,15 @@ test('import waitFor lifecycle.done starts dependent import after referenced imp
     const configureEdgeId = await getStateEdgeIdByName({
       g: ctx.g, dataMapper,
       stateMachineId: controlPlaneStateMachineId,
-      edgeLabel: domain.edge.has_task_state.stateMachine_task.constants.LABEL,
+      type: 'task',
       nodeName: 'configure',
     })
-    await ctx.dataMapper.mutation.setStateEdgeStatusAndResult({
+    await ctx.dataMapper.edge.has_task_state.stateMachine_task.setStatusAndResult({
       edgeId: configureEdgeId,
       status: domain.edge.has_task_state.stateMachine_task.constants.Status.PROVIDED,
       result: JSON.stringify({ configured: true }),
     })
-    await ctx.dataMapper.mutation.markStateMachineCompleteState({
+    await ctx.dataMapper.vertex.stateMachine.setComplete({
       stateMachineId: controlPlaneStateMachineId,
     })
 
@@ -348,11 +350,11 @@ test('import waitFor prevents starting child until dependency provided', async (
     const gateEdgeId = await getStateEdgeIdByName({
       g: ctx.g, dataMapper,
       stateMachineId,
-      edgeLabel: domain.edge.has_data_state.stateMachine_data.constants.LABEL,
+      type: 'data',
       nodeName: 'gate',
     })
     const [gateNodeId] = await ctx.dataMapper.query.findEdgeTargetNodeId({ edgeId: gateEdgeId })
-    await ctx.dataMapper.mutation.setStateEdgeStatus({
+    await ctx.dataMapper.edge.has_data_state.stateMachine_data.setStatus({
       edgeId: gateEdgeId,
       status: domain.edge.has_data_state.stateMachine_data.constants.Status.PROVIDED,
     })

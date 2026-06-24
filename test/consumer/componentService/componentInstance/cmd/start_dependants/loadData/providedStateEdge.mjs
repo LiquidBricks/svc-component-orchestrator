@@ -5,13 +5,11 @@ import { component as componentBuilder } from '@liquid-bricks/lib-component-buil
 
 import { providedStateEdge } from '../../../../../../../core/componentInstance/cmd/start_dependants/loadData/providedStateEdge.js'
 import { componentImports } from '../../../../../../../core/componentInstance/cmd/create/loadData/componentImports.js'
-import { STATE_EDGE_LABEL_BY_TYPE } from '../../../../../../../core/componentInstance/cmd/start_dependants/constants.js'
 import {
   withGraphContext,
   registerComponent,
   createInstance,
   createHandlerDiagnostics,
-  domain,
 } from '../../../../helpers.mjs'
 
 
@@ -39,13 +37,12 @@ test('providedStateEdge resolves provided node id', async () => {
 
     const [stateMachineId] = await dataMapper.query.readStateMachineId({ vertexId: instanceVertexId })
 
-    const stateEdgeLabel = STATE_EDGE_LABEL_BY_TYPE.data
-    const [stateEdgeId] = await dataMapper.query.listStateEdgeIds({ edgeLabel: stateEdgeLabel, vertexId: stateMachineId })
+    const [stateEdgeId] = await dataMapper.query.listDataStateEdgeIds({ vertexId: stateMachineId })
 
     const handlerDiagnostics = createHandlerDiagnostics(diagnostics, { instanceId, stateEdgeId, type: 'data' })
     const { providedNodeId } = await providedStateEdge({
       rootCtx: { g, dataMapper },
-      scope: { handlerDiagnostics, stateMachineId, stateEdgeLabel, stateEdgeId, instanceId, type: 'data' },
+      scope: { handlerDiagnostics, stateMachineId, stateEdgeId, instanceId, type: 'data' },
     })
 
     const [row] = await dataMapper.query.readNodeName({ vertexId: providedNodeId })
@@ -64,7 +61,6 @@ test('providedStateEdge rejects missing stateEdge', async () => {
         scope: {
           handlerDiagnostics,
           stateMachineId: 'missing-state-machine',
-          stateEdgeLabel: STATE_EDGE_LABEL_BY_TYPE.data,
           stateEdgeId: 'missing',
           instanceId: 'instance',
           type: 'data',

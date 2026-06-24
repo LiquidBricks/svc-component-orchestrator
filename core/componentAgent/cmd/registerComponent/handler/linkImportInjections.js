@@ -1,5 +1,4 @@
 import { Errors } from '../../../../../errors.js'
-import { domain } from '@liquid-bricks/spec-domain/domain'
 
 function parseImportInjectionPath({ handlerDiagnostics, path, compName, hash, importName, role, refType = 'import' }) {
   const trimmedPath = String(path ?? '').trim()
@@ -114,11 +113,9 @@ async function resolveInjectionNodeId({
     refType,
   })
 
-  const edgeLabel = type === 'task'
-    ? domain.edge.has_task.component_task.constants.LABEL
-    : domain.edge.has_data.component_data.constants.LABEL
-
-  const [nodeId] = await dataMapper.query.findImportInjectionTargetNodeId({ name, edgeLabel, vertexId: targetComponentId })
+  const [nodeId] = type === 'task'
+    ? await dataMapper.query.findImportInjectionTaskTargetNodeIdByName({ name, vertexId: targetComponentId })
+    : await dataMapper.query.findImportInjectionDataTargetNodeIdByName({ name, vertexId: targetComponentId })
 
   handlerDiagnostics.require(
     nodeId,
@@ -130,34 +127,31 @@ async function resolveInjectionNodeId({
   return nodeId
 }
 
-function getInjectEdgeLabel({ fromType, toType }) {
-  if (fromType === 'task') {
-    if (toType === 'task') return domain.edge.injects_into.task_task.constants.LABEL
-    if (toType === 'data') return domain.edge.injects_into.task_data.constants.LABEL
-  } else if (fromType === 'data') {
-    if (toType === 'task') return domain.edge.injects_into.data_task.constants.LABEL
-    if (toType === 'data') return domain.edge.injects_into.data_data.constants.LABEL
-  }
-  return null
-}
-
-function createEdgeFactory({ g, dataMapper }) {
+function createEdgeFactory({ dataMapper }) {
   return async function createEdge({ fromType, toType, fromId, toId, targetImportPath = [] }) {
-    const edgeLabel = getInjectEdgeLabel({ fromType, toType })
-    if (!edgeLabel) return
-
     const hasTargetImportPath = Array.isArray(targetImportPath) && targetImportPath.length > 0
-    if (hasTargetImportPath) {
-      await dataMapper.mutation.createInjectionEdgeWithTargetAliasPath({ edgeLabel, fromId, toId, targetAliasPath: JSON.stringify(targetImportPath) })
-      return
-    }
+    const payload = hasTargetImportPath
+      ? { fromId, toId, targetAliasPath: JSON.stringify(targetImportPath) }
+      : { fromId, toId }
 
     if (fromType === 'task') {
-      if (toType === 'task') await dataMapper.edge.injects_into.task_task.create({ fromId, toId })
-      if (toType === 'data') await dataMapper.edge.injects_into.task_data.create({ fromId, toId })
+      if (toType === 'task') {
+        if (hasTargetImportPath) await dataMapper.edge.injects_into.task_task.createWithTargetAliasPath(payload)
+        else await dataMapper.edge.injects_into.task_task.create(payload)
+      }
+      if (toType === 'data') {
+        if (hasTargetImportPath) await dataMapper.edge.injects_into.task_data.createWithTargetAliasPath(payload)
+        else await dataMapper.edge.injects_into.task_data.create(payload)
+      }
     } else if (fromType === 'data') {
-      if (toType === 'task') await dataMapper.edge.injects_into.data_task.create({ fromId, toId })
-      if (toType === 'data') await dataMapper.edge.injects_into.data_data.create({ fromId, toId })
+      if (toType === 'task') {
+        if (hasTargetImportPath) await dataMapper.edge.injects_into.data_task.createWithTargetAliasPath(payload)
+        else await dataMapper.edge.injects_into.data_task.create(payload)
+      }
+      if (toType === 'data') {
+        if (hasTargetImportPath) await dataMapper.edge.injects_into.data_data.createWithTargetAliasPath(payload)
+        else await dataMapper.edge.injects_into.data_data.create(payload)
+      }
     }
   }
 }

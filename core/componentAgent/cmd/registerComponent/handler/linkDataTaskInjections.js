@@ -1,5 +1,4 @@
 import { Errors } from '../../../../../errors.js'
-import { domain } from '@liquid-bricks/spec-domain/domain'
 
 function parseInjectionPath({ handlerDiagnostics, injection, compName, hash, dependencyType, dependencyName }) {
   const trimmedInjection = String(injection ?? '').trim()
@@ -112,11 +111,9 @@ async function resolveInjectionTargetId({
     pathValue: inject,
   })
 
-  const edgeLabel = targetType === 'task'
-    ? domain.edge.has_task.component_task.constants.LABEL
-    : domain.edge.has_data.component_data.constants.LABEL
-
-  const [targetNodeId] = await dataMapper.query.findComponentNodeIdByName({ name: targetName, edgeLabel, vertexId: targetComponentId })
+  const [targetNodeId] = targetType === 'task'
+    ? await dataMapper.query.findComponentTaskNodeIdByName({ name: targetName, vertexId: targetComponentId })
+    : await dataMapper.query.findComponentDataNodeIdByName({ name: targetName, vertexId: targetComponentId })
 
   handlerDiagnostics.require(
     targetNodeId,

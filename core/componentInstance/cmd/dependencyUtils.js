@@ -2,10 +2,8 @@ import { domain } from '@liquid-bricks/spec-domain/domain'
 
 export const LIFECYCLE_WAIT_FOR_PROPERTY = domain.vertex.importRef.constants.LIFECYCLE_WAIT_FOR_PROPERTY
 
-const STATE_EDGE_LABELS = Object.freeze([
-  domain.edge.has_task_state.stateMachine_task.constants.LABEL,
-  domain.edge.has_data_state.stateMachine_data.constants.LABEL,
-])
+const TASK_STATE_EDGE_LABEL = domain.edge.has_task_state.stateMachine_task.constants.LABEL
+const DATA_STATE_EDGE_LABEL = domain.edge.has_data_state.stateMachine_data.constants.LABEL
 export const PROVIDED_STATUS = domain.edge.has_task_state.stateMachine_task.constants.Status.PROVIDED
 
 export function normalizeLifecycleWaitForValues(value) {
@@ -70,11 +68,7 @@ export function setNested(obj, path, value) {
   return obj
 }
 
-const DEPENDENCY_NODE_EDGE_LABELS = Object.freeze({
-  task: domain.edge.has_task.component_task.constants.LABEL,
-  data: domain.edge.has_data.component_data.constants.LABEL,
-  deferred: domain.edge.has_deferred.component_deferred.constants.LABEL,
-})
+const DEPENDENCY_NODE_TYPES = Object.freeze(['task', 'data', 'deferred'])
 
 function parseDependencyPath(path) {
   const parts = String(path ?? '').split('.').filter(Boolean)
@@ -82,7 +76,7 @@ function parseDependencyPath(path) {
   const targetType = parts[parts.length - 2]
   const targetName = parts[parts.length - 1]
   const importPath = parts.slice(0, parts.length - 2)
-  if (!DEPENDENCY_NODE_EDGE_LABELS[targetType] || !targetName) return null
+  if (!DEPENDENCY_NODE_TYPES.includes(targetType) || !targetName) return null
   return { importPath, targetType, targetName }
 }
 
@@ -145,8 +139,14 @@ async function resolveDependencyPathTargetId({
     componentId = nextComponentId
   }
 
-  const edgeLabel = DEPENDENCY_NODE_EDGE_LABELS[parsed.targetType]
-  const [nodeId] = await dataMapper.query.findDependencyTargetNodeId({ name: parsed.targetName, edgeLabel, vertexId: componentId })
+  let nodeId = null
+  if (parsed.targetType === 'task') {
+    ;[nodeId] = await dataMapper.query.findDependencyTaskTargetNodeIdByName({ name: parsed.targetName, vertexId: componentId })
+  } else if (parsed.targetType === 'data') {
+    ;[nodeId] = await dataMapper.query.findDependencyDataTargetNodeIdByName({ name: parsed.targetName, vertexId: componentId })
+  } else if (parsed.targetType === 'deferred') {
+    ;[nodeId] = await dataMapper.query.findDependencyDeferredTargetNodeIdByName({ name: parsed.targetName, vertexId: componentId })
+  }
 
   const resolved = nodeId ?? null
   pathResolutionCache?.set(cacheKey, resolved)
@@ -181,13 +181,18 @@ export async function findStateEdgeForNodeInInstanceTree({
 
     const [stateMachineId] = await dataMapper.query.readStateMachineId({ vertexId: instanceVertexId })
     if (stateMachineId) {
-      for (const stateEdgeLabel of STATE_EDGE_LABELS) {
-        const [stateEdgeId] = await dataMapper.query.findStateEdgeIdForTargetNode({ edgeLabel: stateEdgeLabel, vertexId: stateMachineId, id: targetNodeId })
-        if (stateEdgeId) {
-          const result = { stateMachineId, stateEdgeId, stateEdgeLabel, instanceVertexId }
-          stateEdgeCache.set(cacheKey, result)
-          return result
-        }
+      const [taskStateEdgeId] = await dataMapper.query.findTaskStateEdgeIdForTargetNode({ vertexId: stateMachineId, id: targetNodeId })
+      if (taskStateEdgeId) {
+        const result = { stateMachineId, stateEdgeId: taskStateEdgeId, stateEdgeLabel: TASK_STATE_EDGE_LABEL, instanceVertexId }
+        stateEdgeCache.set(cacheKey, result)
+        return result
+      }
+
+      const [dataStateEdgeId] = await dataMapper.query.findDataStateEdgeIdForTargetNode({ vertexId: stateMachineId, id: targetNodeId })
+      if (dataStateEdgeId) {
+        const result = { stateMachineId, stateEdgeId: dataStateEdgeId, stateEdgeLabel: DATA_STATE_EDGE_LABEL, instanceVertexId }
+        stateEdgeCache.set(cacheKey, result)
+        return result
       }
     }
 

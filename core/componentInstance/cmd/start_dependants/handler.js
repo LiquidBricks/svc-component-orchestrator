@@ -1,4 +1,3 @@
-import { domain } from '@liquid-bricks/spec-domain/domain'
 import {
   findImportPathBetweenComponents,
   findStateEdgeForNodeInInstanceTree,
@@ -10,45 +9,7 @@ import {
   setNested,
   vertexLabelToType,
 } from '../dependencyUtils.js'
-import { STATE_WAITING_STATUS_BY_TYPE, STATE_EDGE_LABEL_BY_TYPE } from './constants.js'
-
-const DEPENDENT_EDGE_LABELS_BY_TYPE = Object.freeze({
-  data: {
-    task: [
-      domain.edge.has_dependency.task_data.constants.LABEL,
-      domain.edge.wait_for.task_data.constants.LABEL,
-    ],
-    data: [
-      domain.edge.has_dependency.data_data.constants.LABEL,
-      domain.edge.wait_for.data_data.constants.LABEL,
-    ],
-  },
-  task: {
-    task: [
-      domain.edge.has_dependency.task_task.constants.LABEL,
-      domain.edge.wait_for.task_task.constants.LABEL,
-    ],
-    data: [
-      domain.edge.has_dependency.data_task.constants.LABEL,
-      domain.edge.wait_for.data_task.constants.LABEL,
-    ],
-  },
-})
-
-const TASK_DEPENDENCY_EDGE_LABELS = Object.freeze([
-  domain.edge.has_dependency.task_task.constants.LABEL,
-  domain.edge.has_dependency.task_data.constants.LABEL,
-  domain.edge.has_dependency.task_deferred.constants.LABEL,
-  domain.edge.wait_for.task_task.constants.LABEL,
-  domain.edge.wait_for.task_data.constants.LABEL,
-])
-const DATA_DEPENDENCY_EDGE_LABELS = Object.freeze([
-  domain.edge.has_dependency.data_task.constants.LABEL,
-  domain.edge.has_dependency.data_data.constants.LABEL,
-  domain.edge.has_dependency.data_deferred.constants.LABEL,
-  domain.edge.wait_for.data_task.constants.LABEL,
-  domain.edge.wait_for.data_data.constants.LABEL,
-])
+import { STATE_WAITING_STATUS_BY_TYPE } from './constants.js'
 
 export async function handler({ rootCtx: { g, dataMapper }, scope: {
   instanceId, instanceVertexId, stateMachineId, providedNodeId, type } }) {
@@ -103,18 +64,29 @@ export async function handler({ rootCtx: { g, dataMapper }, scope: {
 async function gatherDependentNodes({ g, dataMapper, providedNodeId, type }) {
   if (!providedNodeId) return { dependentTaskNodeIds: [], dependentDataNodeIds: [] }
 
-  const taskEdgeLabels = DEPENDENT_EDGE_LABELS_BY_TYPE[type]?.task ?? []
-  const dataEdgeLabels = DEPENDENT_EDGE_LABELS_BY_TYPE[type]?.data ?? []
+  if (type === 'task') {
+    const [dependentTaskNodeIds, dependentDataNodeIds] = await Promise.all([
+      dataMapper.query.listDependentTaskNodeIdsForTask({ vertexId: providedNodeId }),
+      dataMapper.query.listDependentDataNodeIdsForTask({ vertexId: providedNodeId }),
+    ])
+    return {
+      dependentTaskNodeIds: Array.from(new Set(dependentTaskNodeIds ?? [])),
+      dependentDataNodeIds: Array.from(new Set(dependentDataNodeIds ?? [])),
+    }
+  }
 
-  const dependentTaskNodeIds = taskEdgeLabels.length
-    ? Array.from(new Set(await dataMapper.query.listDependentTaskNodeIds({ edgeLabels: taskEdgeLabels, vertexId: providedNodeId })))
-    : []
+  if (type === 'data') {
+    const [dependentTaskNodeIds, dependentDataNodeIds] = await Promise.all([
+      dataMapper.query.listDependentTaskNodeIdsForData({ vertexId: providedNodeId }),
+      dataMapper.query.listDependentDataNodeIdsForData({ vertexId: providedNodeId }),
+    ])
+    return {
+      dependentTaskNodeIds: Array.from(new Set(dependentTaskNodeIds ?? [])),
+      dependentDataNodeIds: Array.from(new Set(dependentDataNodeIds ?? [])),
+    }
+  }
 
-  const dependentDataNodeIds = dataEdgeLabels.length
-    ? Array.from(new Set(await dataMapper.query.listDependentDataNodeIds({ edgeLabels: dataEdgeLabels, vertexId: providedNodeId })))
-    : []
-
-  return { dependentTaskNodeIds, dependentDataNodeIds }
+  return { dependentTaskNodeIds: [], dependentDataNodeIds: [] }
 }
 
 async function collectInstanceChain({ g, dataMapper, startInstanceVertexId, startInstanceId, startStateMachineId }) {
@@ -185,8 +157,7 @@ async function findReadyStatesForInstance({
       stateMachineId,
       instanceVertexId,
       candidateNodeIds: dependentTaskNodeIds,
-      dependencyEdgeLabels: TASK_DEPENDENCY_EDGE_LABELS,
-      stateEdgeLabel: STATE_EDGE_LABEL_BY_TYPE.task,
+      nodeType: 'task',
       expectedStatus: STATE_WAITING_STATUS_BY_TYPE.task,
       stateEdgeCache,
       pathResolutionCache,
@@ -196,8 +167,7 @@ async function findReadyStatesForInstance({
       stateMachineId,
       instanceVertexId,
       candidateNodeIds: dependentDataNodeIds,
-      dependencyEdgeLabels: DATA_DEPENDENCY_EDGE_LABELS,
-      stateEdgeLabel: STATE_EDGE_LABEL_BY_TYPE.data,
+      nodeType: 'data',
       expectedStatus: STATE_WAITING_STATUS_BY_TYPE.data,
       stateEdgeCache,
       pathResolutionCache,
@@ -212,8 +182,7 @@ async function findReadyStatesForType({
   stateMachineId,
   instanceVertexId,
   candidateNodeIds,
-  dependencyEdgeLabels,
-  stateEdgeLabel,
+  nodeType,
   expectedStatus,
   stateEdgeCache,
   pathResolutionCache,
@@ -224,7 +193,9 @@ async function findReadyStatesForType({
     if (!nodeId || seen.has(nodeId)) continue
     seen.add(nodeId)
 
-    const [stateEdgeId] = await dataMapper.query.findStateEdgeIdForTargetNode({ edgeLabel: stateEdgeLabel, vertexId: stateMachineId, id: nodeId })
+    const [stateEdgeId] = nodeType === 'task'
+      ? await dataMapper.query.findTaskStateEdgeIdForTargetNode({ vertexId: stateMachineId, id: nodeId })
+      : await dataMapper.query.findDataStateEdgeIdForTargetNode({ vertexId: stateMachineId, id: nodeId })
     if (!stateEdgeId) continue
 
     const statusValues = await dataMapper.query.readStateEdgeStatus({ edgeId: stateEdgeId })
@@ -236,7 +207,7 @@ async function findReadyStatesForType({
     const depsReady = await dependenciesProvided({
       g, dataMapper,
       nodeId,
-      dependencyEdgeLabels,
+      nodeType,
       instanceVertexId,
       stateEdgeCache,
       pathResolutionCache,
@@ -248,8 +219,10 @@ async function findReadyStatesForType({
   return ready
 }
 
-async function dependenciesProvided({ g, dataMapper, nodeId, dependencyEdgeLabels, instanceVertexId, stateEdgeCache, pathResolutionCache }) {
-  const dependencyNodeIds = await dataMapper.query.listDependencyNodeIds({ edgeLabels: dependencyEdgeLabels, vertexId: nodeId })
+async function dependenciesProvided({ g, dataMapper, nodeId, nodeType, instanceVertexId, stateEdgeCache, pathResolutionCache }) {
+  const dependencyNodeIds = nodeType === 'task'
+    ? await dataMapper.query.listTaskDependencyAndWaitForNodeIds({ vertexId: nodeId })
+    : await dataMapper.query.listDataDependencyAndWaitForNodeIds({ vertexId: nodeId })
   if (!dependencyNodeIds?.length) {
     return true
   }

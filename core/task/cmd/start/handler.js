@@ -21,5 +21,5 @@ export async function handler({ rootCtx: { g, dataMapper }, scope: { handlerDiag
 
   const now = new Date().toISOString()
 
-  await dataMapper.mutation.markTaskStateRunning({ updatedAt: now, vertexId: stateId })
+  await dataMapper.edge.has_task_state.stateMachine_task.setRunning({ updatedAt: now, edgeId: stateId })
 }

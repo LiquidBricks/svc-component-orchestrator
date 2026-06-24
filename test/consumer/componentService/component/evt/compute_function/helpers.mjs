@@ -229,7 +229,9 @@ export async function getStateMachineId({ g, dataMapper, instanceId }) {
 }
 
 export async function getStateEdgeId({ g, dataMapper, stateMachineId, type, name }) {
-  const [stateEdgeId] = await dataMapper.query.findStateEdgeIdByTypeAndName({ edgeLabel: STATE_EDGE_LABEL_BY_TYPE[type], vertexId: stateMachineId, name })
+  const [stateEdgeId] = type === 'task'
+    ? await dataMapper.query.findTaskStateEdgeIdByName({ vertexId: stateMachineId, name })
+    : await dataMapper.query.findDataStateEdgeIdByName({ vertexId: stateMachineId, name })
   return stateEdgeId
 }
 

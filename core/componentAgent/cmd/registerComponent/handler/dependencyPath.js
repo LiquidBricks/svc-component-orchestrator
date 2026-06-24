@@ -1,5 +1,4 @@
 import { Errors } from '../../../../../errors.js'
-import { domain } from '@liquid-bricks/spec-domain/domain'
 
 const SUPPORTED_DEPENDENCY_TYPES = ['data', 'task', 'deferred', 'lifecycle', 'agentFn']
 
@@ -201,21 +200,9 @@ export async function resolveDependencyTargetId({
     pathValue: dep,
   })
 
-  let edgeLabel = null
-  if (targetType === 'task') {
-    edgeLabel = domain.edge.has_task.component_task.constants.LABEL
-  } else if (targetType === 'data') {
-    edgeLabel = domain.edge.has_data.component_data.constants.LABEL
-  }
-
-  handlerDiagnostics.require(
-    !!edgeLabel,
-    Errors.PRECONDITION_INVALID,
-    `Unknown dependency type:${targetType} for component(${compName})#${hash} ${dependencyType}:${dependencyName} dep[${dep}]`,
-    { type: targetType, dep, component: compName, hash },
-  )
-
-  const [targetNodeId] = await dataMapper.query.findComponentNodeIdByName({ name: targetName, edgeLabel, vertexId: targetComponentId })
+  const [targetNodeId] = targetType === 'task'
+    ? await dataMapper.query.findComponentTaskNodeIdByName({ name: targetName, vertexId: targetComponentId })
+    : await dataMapper.query.findComponentDataNodeIdByName({ name: targetName, vertexId: targetComponentId })
 
   handlerDiagnostics.require(
     targetNodeId,
