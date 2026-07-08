@@ -5,6 +5,7 @@ import { component as componentBuilder } from '@liquid-bricks/lib-component-buil
 import {
   createBasicSubject,
   createComputeFunctionSubject,
+  assertDataStartDependantsPayload,
   withGraphContext,
   registerComponent,
   createInstance,
@@ -83,6 +84,7 @@ test('computeFunction publishes injected computeFunction events for injection ta
     assert.equal(pickFirst(updatedValues.result), JSON.stringify(resultPayload))
 
     const computeFunctionSubject = createComputeFunctionSubject('data')
+    const computeFunctionSubjects = new Set([computeFunctionSubject, createComputeFunctionSubject('task')])
     const startDependantsSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start_dependants.v1['*']).forPublish()
       .env('prod')
       .build()
@@ -102,10 +104,14 @@ test('computeFunction publishes injected computeFunction events for injection ta
     })
 
     const injectedPublishes = await runInjectResultsCommands({ rootCtx, events: published })
-    const injectedEvents = injectedPublishes.filter(p => p.subject === computeFunctionSubject)
+    const injectedEvents = injectedPublishes.filter(p => computeFunctionSubjects.has(p.subject))
 
     assert.equal(startDependantsEvents.length, 1)
-    assert.deepEqual(startDependantsEvents[0].payload.data, { instanceId, stateEdgeId: sourceEdgeId, type: 'data' })
+    assertDataStartDependantsPayload(startDependantsEvents[0].payload.data, {
+      instanceId,
+      stateEdgeId: sourceEdgeId,
+      result: resultPayload,
+    })
 
     const injectedPayloads = injectedEvents
       .map(evt => evt.payload.data)
@@ -208,7 +214,11 @@ test('injected result triggers dependant data and task start commands', async ()
 
     const targetStartDependants = injectedPublishes.filter(p => p.subject === startDependantsSubject)
     assert.equal(targetStartDependants.length, 1)
-    assert.deepEqual(targetStartDependants[0].payload.data, { instanceId, stateEdgeId: dataTargetStateEdgeId, type: 'data' })
+    assertDataStartDependantsPayload(targetStartDependants[0].payload.data, {
+      instanceId,
+      stateEdgeId: dataTargetStateEdgeId,
+      result: injectedEvent.payload.data.result,
+    })
 
     const dependantPublishes = []
     let startAcked = false

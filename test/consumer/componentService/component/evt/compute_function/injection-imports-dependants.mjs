@@ -5,6 +5,7 @@ import { component } from '@liquid-bricks/lib-component-builder'
 import {
   createBasicSubject,
   createComputeFunctionSubject,
+  assertDataStartDependantsPayload,
   withGraphContext,
   registerComponent,
   createInstance,
@@ -128,7 +129,11 @@ test('imported injection triggers dependant starts inside imported component', a
 
     const childStartDependants = injectedPublishes.filter(p => p.subject === startDependantsSubject)
     assert.equal(childStartDependants.length, 1)
-    assert.deepEqual(childStartDependants[0].payload.data, { instanceId: childInstanceId, stateEdgeId: childTargetStateEdgeId, type: 'data' })
+    assertDataStartDependantsPayload(childStartDependants[0].payload.data, {
+      instanceId: childInstanceId,
+      stateEdgeId: childTargetStateEdgeId,
+      result: injectedEvent.payload.data.result,
+    })
 
     const dependantPublishes = []
     await runSpec({

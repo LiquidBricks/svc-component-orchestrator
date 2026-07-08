@@ -12,7 +12,7 @@ import {
 import { STATE_WAITING_STATUS_BY_TYPE } from './constants.js'
 
 export async function handler({ rootCtx: { g, dataMapper }, scope: {
-  instanceId, instanceVertexId, stateMachineId, providedNodeId, type } }) {
+  instanceId, instanceVertexId, stateMachineId, providedNodeId, type, stateEdgeId, stateEdgeLabel, stateEdgeStatus, status, result } }) {
   const { dependentTaskNodeIds, dependentDataNodeIds } = await gatherDependentNodes({ g, dataMapper, providedNodeId, type })
   const instances = await collectInstanceChain({
     g, dataMapper, startInstanceVertexId: instanceVertexId,
@@ -21,6 +21,19 @@ export async function handler({ rootCtx: { g, dataMapper }, scope: {
 
   const stateEdgeCache = new Map()
   const pathResolutionCache = new Map()
+  const stateStatusOverrides = new Map()
+  const stateResultOverrides = new Map()
+  const providedStatus = stateEdgeStatus ?? status
+
+  if (providedNodeId && stateEdgeId) {
+    stateEdgeCache.set(instanceVertexId + ':' + providedNodeId, { stateMachineId, stateEdgeId, stateEdgeLabel, instanceVertexId })
+  }
+  if (stateEdgeId && providedStatus !== undefined) {
+    stateStatusOverrides.set(stateEdgeId, providedStatus)
+  }
+  if (stateEdgeId && result !== undefined) {
+    stateResultOverrides.set(stateEdgeId, result)
+  }
   const starters = []
   for (const instance of instances) {
     const { instanceId: targetInstanceId, instanceVertexId: targetInstanceVertexId, stateMachineId: targetStateMachineId } = instance
@@ -34,12 +47,14 @@ export async function handler({ rootCtx: { g, dataMapper }, scope: {
       dependentDataNodeIds,
       stateEdgeCache,
       pathResolutionCache,
+      stateStatusOverrides,
     })
     const importInstanceIds = await findReadyImportsForInstance({
       g, dataMapper,
       instanceVertexId: targetInstanceVertexId,
       stateEdgeCache,
       pathResolutionCache,
+      stateStatusOverrides,
     })
     const gateStartRequests = await findReadyGatesForInstance({
       g, dataMapper,
@@ -47,6 +62,8 @@ export async function handler({ rootCtx: { g, dataMapper }, scope: {
       instanceVertexId: targetInstanceVertexId,
       stateEdgeCache,
       pathResolutionCache,
+      stateStatusOverrides,
+      stateResultOverrides,
     })
     starters.push({
       instanceId: targetInstanceId,
@@ -150,6 +167,7 @@ async function findReadyStatesForInstance({
   dependentDataNodeIds,
   stateEdgeCache,
   pathResolutionCache,
+  stateStatusOverrides,
 }) {
   const [taskStateIds, dataStateIds] = await Promise.all([
     findReadyStatesForType({
@@ -161,6 +179,7 @@ async function findReadyStatesForInstance({
       expectedStatus: STATE_WAITING_STATUS_BY_TYPE.task,
       stateEdgeCache,
       pathResolutionCache,
+      stateStatusOverrides,
     }),
     findReadyStatesForType({
       g, dataMapper,
@@ -171,6 +190,7 @@ async function findReadyStatesForInstance({
       expectedStatus: STATE_WAITING_STATUS_BY_TYPE.data,
       stateEdgeCache,
       pathResolutionCache,
+      stateStatusOverrides,
     }),
   ])
 
@@ -186,6 +206,7 @@ async function findReadyStatesForType({
   expectedStatus,
   stateEdgeCache,
   pathResolutionCache,
+  stateStatusOverrides,
 }) {
   const ready = []
   const seen = new Set()
@@ -211,6 +232,7 @@ async function findReadyStatesForType({
       instanceVertexId,
       stateEdgeCache,
       pathResolutionCache,
+      stateStatusOverrides,
     })
     if (!depsReady) continue
 
@@ -219,7 +241,7 @@ async function findReadyStatesForType({
   return ready
 }
 
-async function dependenciesProvided({ g, dataMapper, nodeId, nodeType, instanceVertexId, stateEdgeCache, pathResolutionCache }) {
+async function dependenciesProvided({ g, dataMapper, nodeId, nodeType, instanceVertexId, stateEdgeCache, pathResolutionCache, stateStatusOverrides }) {
   const dependencyNodeIds = nodeType === 'task'
     ? await dataMapper.query.listTaskDependencyAndWaitForNodeIds({ vertexId: nodeId })
     : await dataMapper.query.listDataDependencyAndWaitForNodeIds({ vertexId: nodeId })
@@ -234,6 +256,7 @@ async function dependenciesProvided({ g, dataMapper, nodeId, nodeType, instanceV
       targetNodeId: depNodeId,
       stateEdgeCache,
       pathResolutionCache,
+      stateStatusOverrides,
     })
     if (!ready) return false
   }
@@ -252,7 +275,7 @@ function normalizeWaitForValues(waitForValues = []) {
   ))
 }
 
-async function areWaitForsProvided({ g, dataMapper, rootInstanceVertexId, waitFor = [], stateEdgeCache, pathResolutionCache }) {
+async function areWaitForsProvided({ g, dataMapper, rootInstanceVertexId, waitFor = [], stateEdgeCache, pathResolutionCache, stateStatusOverrides }) {
   if (!waitFor?.length) return true
   for (const targetNodeId of waitFor) {
     const ready = await isNodeProvided({
@@ -261,6 +284,7 @@ async function areWaitForsProvided({ g, dataMapper, rootInstanceVertexId, waitFo
       targetNodeId,
       stateEdgeCache,
       pathResolutionCache,
+      stateStatusOverrides,
     })
     if (!ready) return false
   }
@@ -286,6 +310,7 @@ async function buildGateDependencyPayload({
   dependencyNodeIds = [],
   stateEdgeCache,
   importPathCache,
+  stateResultOverrides,
 }) {
   const deps = {}
   const seen = new Set()
@@ -325,9 +350,14 @@ async function buildGateDependencyPayload({
       }
     }
 
-    const [stateValues] = await dataMapper.query.readDependencyStateResult({ edgeId: stateEdgeInfo.stateEdgeId })
-    const resultValues = stateValues?.result ?? stateValues
-    const result = normalizeResult(Array.isArray(resultValues) ? resultValues[0] : resultValues)
+    let result
+    if (stateResultOverrides?.has(stateEdgeInfo.stateEdgeId)) {
+      result = stateResultOverrides.get(stateEdgeInfo.stateEdgeId)
+    } else {
+      const [stateValues] = await dataMapper.query.readDependencyStateResult({ edgeId: stateEdgeInfo.stateEdgeId })
+      const resultValues = stateValues?.result ?? stateValues
+      result = normalizeResult(Array.isArray(resultValues) ? resultValues[0] : resultValues)
+    }
     const path = [...aliasPath, depType, depName].join('.')
     setNested(deps, path, result)
   }
@@ -340,6 +370,7 @@ async function findReadyImportsForInstance({
   instanceVertexId,
   stateEdgeCache,
   pathResolutionCache,
+  stateStatusOverrides,
 }) {
   const readyImports = []
   const importRefInstanceIds = await dataMapper.query.listImportRefInstanceIds({ vertexId: instanceVertexId })
@@ -376,6 +407,7 @@ async function findReadyImportsForInstance({
       waitFor,
       stateEdgeCache,
       pathResolutionCache,
+      stateStatusOverrides,
     })
     if (!ready) continue
 
@@ -394,6 +426,8 @@ async function findReadyGatesForInstance({
   instanceVertexId,
   stateEdgeCache,
   pathResolutionCache,
+  stateStatusOverrides,
+  stateResultOverrides,
 }) {
   const readyGates = []
   const importPathCache = new Map()
@@ -448,6 +482,7 @@ async function findReadyGatesForInstance({
       waitFor,
       stateEdgeCache,
       pathResolutionCache,
+      stateStatusOverrides,
     })
     if (!readyWaitFor) continue
 
@@ -457,6 +492,7 @@ async function findReadyGatesForInstance({
       waitFor: deps,
       stateEdgeCache,
       pathResolutionCache,
+      stateStatusOverrides,
     })
     if (!depsReady) continue
 
@@ -470,6 +506,7 @@ async function findReadyGatesForInstance({
       dependencyNodeIds: deps,
       stateEdgeCache,
       importPathCache,
+      stateResultOverrides,
     })
     dispatched.add(alias)
     readyGates.push({

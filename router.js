@@ -4,6 +4,7 @@ import * as component from './core/component/index.js'
 import * as componentAgent from './core/componentAgent/index.js'
 import * as componentInstance from './core/componentInstance/index.js'
 import * as data from './core/data/index.js'
+import * as domain from './core/domain/index.js'
 import * as gate from './core/gate/index.js'
 import * as importEntity from './core/import/index.js'
 import * as task from './core/task/index.js'
@@ -22,6 +23,7 @@ export const routes = [
   [task.cmd.start.path, task.cmd.start.spec],
   [componentInstance.evt.createDone.path, componentInstance.evt.createDone.spec],
   [component.evt.compute_function.data.path, component.evt.compute_function.data.spec],
+  [domain.edge.has_data_state.result_computed.path, domain.edge.has_data_state.result_computed.spec],
   [component.evt.compute_function.gate.path, component.evt.compute_function.gate.spec],
   [component.evt.compute_function.task.path, component.evt.compute_function.task.spec],
   [componentInstance.cmd.injectResults.path, componentInstance.cmd.injectResults.spec],

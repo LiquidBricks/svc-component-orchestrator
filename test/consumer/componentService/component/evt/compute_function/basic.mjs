@@ -5,6 +5,8 @@ import { component as componentBuilder } from '@liquid-bricks/lib-component-buil
 import {
   createBasicSubject,
   createComputeFunctionSubject,
+  createResultComputedSubject,
+  assertDataStartDependantsPayload,
   withGraphContext,
   registerComponent,
   createInstance,
@@ -23,6 +25,80 @@ import {
 
 import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
 
+
+test('computeFunction data route publishes result_computed domain fact only', async () => {
+  await withGraphContext(async ({ diagnostics, dataMapper, g }) => {
+    const component = componentBuilder('ComputeResultDomainFactComponent')
+      .data('dataInput', { deps: () => { } })
+      .toJSON()
+
+    await registerComponent(component, { diagnostics, dataMapper, g })
+
+    const instanceId = 'instance-result-domain-fact'
+    const componentId = await getComponentId({ g, dataMapper, diagnostics, componentHash: component.hash })
+    const imports = await loadImports({ g, dataMapper, componentId })
+    await createInstance({ diagnostics, dataMapper, g }, { componentHash: component.hash, componentId, instanceId, imports })
+
+    const { stateMachineId } = await getStateMachineId({ g, dataMapper, instanceId })
+    const [stateEdgeId] = await dataMapper.query.findDataStateEdgeIdByName({ vertexId: stateMachineId, name: component.data[0].name })
+    assert.ok(stateEdgeId, 'data state edge missing')
+
+    const [initialValues] = await dataMapper.query.readInitialValues({ edgeId: stateEdgeId })
+    const initialUpdatedAt = pickFirst(initialValues?.updatedAt)
+    assert.ok(initialUpdatedAt, 'initial updatedAt missing')
+
+    const resultPayload = { count: 2 }
+    const published = []
+    let acked = false
+    const message = {
+      subject: createComputeFunctionSubject('data'),
+      ack: () => { acked = true },
+      json: () => ({
+        data: {
+          instanceId,
+          type: 'data',
+          name: component.data[0].name,
+          result: resultPayload,
+        }
+      }),
+    }
+    const rootCtx = {
+      diagnostics,
+      g,
+      dataMapper,
+      natsContext: { publish: async (subject, payload) => published.push({ subject, payload: JSON.parse(payload) }) },
+    }
+
+    const finalScope = await runSpec({ spec: computeFunctionSpec, rootCtx, message, processDomainFacts: false })
+
+    assert.equal(finalScope.stateEdgeId, stateEdgeId)
+    assert.equal(acked, true)
+    assert.equal(published.length, 1)
+    assert.equal(published[0].subject, createResultComputedSubject())
+
+    const factData = published[0].payload.data
+    assert.equal(typeof factData.updatedAt, 'string')
+    assert.deepEqual({ ...factData, updatedAt: '<updatedAt>' }, {
+      instanceId,
+      instanceVertexId: finalScope.instanceVertexId,
+      stateMachineId,
+      stateEdgeId,
+      stateId: stateEdgeId,
+      type: 'data',
+      name: component.data[0].name,
+      result: resultPayload,
+      resultValue: JSON.stringify(resultPayload),
+      status: STATE_EDGE_STATUS_BY_TYPE.data,
+      stateEdgeStatus: STATE_EDGE_STATUS_BY_TYPE.data,
+      updatedAt: '<updatedAt>',
+    })
+
+    const [unchangedValues] = await dataMapper.query.readStateEdgeStatusResultAndUpdatedAt({ edgeId: stateEdgeId })
+    assert.notEqual(pickFirst(unchangedValues.status), STATE_EDGE_STATUS_BY_TYPE.data)
+    assert.notEqual(pickFirst(unchangedValues.result), JSON.stringify(resultPayload))
+    assert.equal(pickFirst(unchangedValues.updatedAt), initialUpdatedAt)
+  })
+})
 
 test('computeFunction stores state result, marks status provided, and publishes start_dependants', async () => {
   await withGraphContext(async ({ diagnostics, dataMapper, g }) => {
@@ -85,7 +161,11 @@ test('computeFunction stores state result, marks status provided, and publishes 
 
     const startDependantsEvents = published.filter(p => p.subject === startDependantsSubject)
     assert.equal(startDependantsEvents.length, 1)
-    assert.deepEqual(startDependantsEvents[0].payload.data, { instanceId, stateEdgeId, type: 'data' })
+    assertDataStartDependantsPayload(startDependantsEvents[0].payload.data, {
+      instanceId,
+      stateEdgeId,
+      result: { count: 2 },
+    })
 
     const completionEvents = published.filter(p => p.subject === completionSubject)
     assert.equal(completionEvents.length, 1)

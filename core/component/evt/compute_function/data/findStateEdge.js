@@ -1,4 +1,5 @@
-import { DATA_STATE_EDGE_LABEL, DATA_STATE_EDGE_STATUS } from './constants.js'
+import { Errors } from '../../../../../errors.js'
+import { DATA_STATE_EDGE_STATUS } from './constants.js'
 
 export async function findStateEdge({ scope: { handlerDiagnostics, stateMachineId, name, instanceId }, rootCtx: { g, dataMapper } }) {
   const [stateEdgeId] = await dataMapper.query.findDataStateEdgeIdByName({ vertexId: stateMachineId, name })

@@ -383,7 +383,7 @@ test('publishEvents dispatches gate start command and gate handler emits compute
       scope: gateStartEvents[0].payload.data,
     })
 
-    const gateComputeEvents = gatePublishes.filter(({ subject }) => subject === gateExecSubject)
+    const gateComputeEvents = gatePublishes.filter(({ subject }) => subject === gateCommandSubject)
     assert.equal(gateComputeEvents.length, 1)
     assert.deepEqual(gateComputeEvents[0].payload.data, {
       instanceId,

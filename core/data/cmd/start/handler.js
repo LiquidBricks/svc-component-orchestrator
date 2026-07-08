@@ -9,7 +9,7 @@ function getStatus(value) {
 export async function handler({ rootCtx: { g, dataMapper }, scope: { handlerDiagnostics, stateId } }) {
   let currentStatus = null
   try {
-    const statusValues = await dataMapper.query.readDataStateStatus({ stateId })
+    const statusValues = await dataMapper.query.readStateEdgeStatus({ edgeId: stateId })
     currentStatus = getStatus(statusValues)
   } catch {
     // best-effort read; fall through to set running

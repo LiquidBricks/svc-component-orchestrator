@@ -12,7 +12,7 @@ export const path = createSubject(natsEvents['*'].component_service['*']['*'].cm
 
 export const spec = {
   decode: [
-    decodeData(['instanceId', 'stateEdgeId', 'type']),
+    decodeData(['instanceId', 'stateEdgeId', 'type', 'status', 'stateEdgeStatus', 'result']),
   ],
   pre: [
     validatePayload,

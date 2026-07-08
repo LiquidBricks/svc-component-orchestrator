@@ -5,6 +5,7 @@ import { component as componentBuilder } from '@liquid-bricks/lib-component-buil
 import {
   createBasicSubject,
   createComputeFunctionSubject,
+  assertDataStartDependantsPayload,
   withGraphContext,
   registerComponent,
   createInstance,
@@ -84,6 +85,7 @@ test('computeFunction publishes injected events across imports using import inje
     let ackedTargetTask = false
     const resultPayload = { viaImportInject: true }
     const computeFunctionSubject = createComputeFunctionSubject('data')
+    const computeFunctionSubjects = new Set([computeFunctionSubject, createComputeFunctionSubject('task')])
 
     const rootCtx = {
       diagnostics,
@@ -114,7 +116,7 @@ test('computeFunction publishes injected events across imports using import inje
     assert.equal(ackedTargetTask, true)
 
     const targetTaskInjectedPublishes = await runInjectResultsCommands({ rootCtx, events: published })
-    const targetTaskInjectedEvents = targetTaskInjectedPublishes.filter(p => p.subject === computeFunctionSubject).map(p => p.payload.data)
+    const targetTaskInjectedEvents = targetTaskInjectedPublishes.filter(p => computeFunctionSubjects.has(p.subject)).map(p => p.payload.data)
     const sortedTaskInjected = targetTaskInjectedEvents.sort((a, b) => a.name.localeCompare(b.name))
     assert.deepEqual(sortedTaskInjected, [
       { instanceId: providerInstanceId, stateId: providerDataStateEdgeId, name: 'providerData', type: 'data', result: resultPayload },
@@ -145,7 +147,7 @@ test('computeFunction publishes injected events across imports using import inje
     assert.equal(ackedTargetData, true)
 
     const targetDataInjectedPublishes = await runInjectResultsCommands({ rootCtx, events: published })
-    const dataInjectedEvents = targetDataInjectedPublishes.filter(p => p.subject === computeFunctionSubject).map(p => p.payload.data)
+    const dataInjectedEvents = targetDataInjectedPublishes.filter(p => computeFunctionSubjects.has(p.subject)).map(p => p.payload.data)
     assert.deepEqual(dataInjectedEvents, [
       { instanceId: providerInstanceId, stateId: providerTaskStateEdgeId, name: 'providerTask', type: 'task', result: resultPayload },
     ])
@@ -224,7 +226,11 @@ test('computeFunction publishes injected computeFunction to imported component i
     const startDependantsEvents = published.filter(p => p.subject === startDependantsSubject)
 
     assert.equal(startDependantsEvents.length, 1)
-    assert.deepEqual(startDependantsEvents[0].payload.data, { instanceId: rootInstanceId, stateEdgeId: rootDataStateEdgeId, type: 'data' })
+    assertDataStartDependantsPayload(startDependantsEvents[0].payload.data, {
+      instanceId: rootInstanceId,
+      stateEdgeId: rootDataStateEdgeId,
+      result: resultPayload,
+    })
 
     assert.equal(injectedEvents.length, 1)
     assert.deepEqual(injectedEvents[0].payload.data, {
@@ -306,10 +312,10 @@ test('computeFunction skips unreachable injected targets in a different instance
 
     const startDependantsEvents = published.filter((entry) => entry.subject === startDependantsSubject)
     assert.equal(startDependantsEvents.length, 1)
-    assert.deepEqual(startDependantsEvents[0].payload.data, {
+    assertDataStartDependantsPayload(startDependantsEvents[0].payload.data, {
       instanceId: providerInstanceId,
       stateEdgeId: providerDataStateEdgeId,
-      type: 'data',
+      result: { context: 'standalone-provider' },
     })
   })
 })

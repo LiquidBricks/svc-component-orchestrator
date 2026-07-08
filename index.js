@@ -3,6 +3,15 @@ import { create as createBasicSubject } from '@liquid-bricks/lib-nats-subject/cr
 import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
 import { createComponentServiceRouter } from './router.js'
 
+const domainEdgeSubjectSpec = natsEvents['*']?.domain?.['*']?.['*']?.edge?.['>'] ?? {
+  env: '*',
+  ns: 'domain',
+  tenant: '*',
+  context: '*',
+  channel: 'edge',
+  entity: '>',
+}
+
 const consumerName = 'componentServiceConsumer'
 export async function Consumer({ streamName, natsContext, g, diagnostics: d }) {
   const diagnostics = d.child({ consumerName })
@@ -22,6 +31,7 @@ export async function Consumer({ streamName, natsContext, g, diagnostics: d }) {
     filter_subjects: [
       createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd['>']).forSubscribe().build(),
       createBasicSubject(natsEvents['*'].component_service['*']['*'].evt['>']).forSubscribe().build(),
+      createBasicSubject(domainEdgeSubjectSpec).forSubscribe().build(),
     ],
   });
 

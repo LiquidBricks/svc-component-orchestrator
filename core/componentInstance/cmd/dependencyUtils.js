@@ -247,7 +247,9 @@ export async function findImportPathBetweenComponents({ g, dataMapper, fromCompo
   return null
 }
 
-export async function getStateEdgeStatus({ g, dataMapper, stateEdgeId }) {
+export async function getStateEdgeStatus({ g, dataMapper, stateEdgeId, stateStatusOverrides }) {
+  if (stateStatusOverrides?.has(stateEdgeId)) return stateStatusOverrides.get(stateEdgeId)
+
   const [statusValues] = await dataMapper.query.readStateEdgeStatus({ edgeId: stateEdgeId })
   const statusMap = Array.isArray(statusValues) ? statusValues[0] : statusValues
   const statusValuesMap = statusMap?.status ?? statusMap
@@ -291,6 +293,7 @@ export async function isNodeProvided({
   targetNodeId,
   stateEdgeCache,
   pathResolutionCache,
+  stateStatusOverrides,
 }) {
   if (typeof targetNodeId === 'string') {
     const lifecycleProvided = await isLifecycleProvided({
@@ -319,7 +322,12 @@ export async function isNodeProvided({
   })
   if (!stateEdgeInfo) return false
 
-  const status = await getStateEdgeStatus({ g, dataMapper, stateEdgeId: stateEdgeInfo.stateEdgeId })
+  const status = await getStateEdgeStatus({
+    g,
+    dataMapper,
+    stateEdgeId: stateEdgeInfo.stateEdgeId,
+    stateStatusOverrides,
+  })
   return status === PROVIDED_STATUS
 }
 

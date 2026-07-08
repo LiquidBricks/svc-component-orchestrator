@@ -6,7 +6,7 @@ import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nat
 
 
 export async function publishStartDependantsCommand({
-  scope: { instanceId, instanceVertexId, stateEdgeId },
+  scope: { instanceId, instanceVertexId, stateEdgeId, stateEdgeStatus, result },
   rootCtx: { natsContext, g, dataMapper },
 }) {
   if (g && instanceVertexId) {
@@ -23,6 +23,6 @@ export async function publishStartDependantsCommand({
 
   await natsContext.publish(
     subject.build(),
-    JSON.stringify({ data: { instanceId, stateEdgeId, type: 'task' } })
+    JSON.stringify({ data: { instanceId, stateEdgeId, type: 'task', status: stateEdgeStatus, stateEdgeStatus, result } })
   )
 }
