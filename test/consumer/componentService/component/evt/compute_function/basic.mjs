@@ -2,12 +2,15 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { component as componentBuilder } from '@liquid-bricks/lib-component-builder'
 
+import { componentGates } from '../../../../../../core/componentInstance/cmd/create/loadData/componentGates.js'
+
 import {
   createBasicSubject,
   computeFunctionDataSubject,
   computeFunctionGateSubject,
   computeFunctionTaskSubject,
   taskResultComputedSubject,
+  gateResultComputedSubject,
   assertDataStartDependantsPayload,
   withGraphContext,
   registerComponent,
@@ -26,6 +29,12 @@ import {
 } from './helpers.mjs'
 
 import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
+
+
+async function loadGates({ g, dataMapper, componentId }) {
+  const { gates = [] } = await componentGates({ rootCtx: { g, dataMapper }, scope: { componentId } })
+  return gates
+}
 
 
 test('computeFunction data route publishes result_computed domain fact only', async () => {
@@ -180,6 +189,75 @@ test('computeFunction task route publishes result_computed domain fact only', as
     assert.notEqual(pickFirst(unchangedValues.status), STATE_EDGE_STATUS_BY_TYPE.task)
     assert.notEqual(pickFirst(unchangedValues.result), JSON.stringify(resultPayload))
     assert.equal(pickFirst(unchangedValues.updatedAt), initialUpdatedAt)
+  })
+})
+
+
+test('computeFunction gate route publishes result_computed domain fact only', async () => {
+  await withGraphContext(async ({ diagnostics, dataMapper, g }) => {
+    const targetComponent = componentBuilder('ComputeGateResultDomainFactTarget').toJSON()
+    const rootComponent = componentBuilder('ComputeGateResultDomainFactRoot')
+      .gate('setup', { hash: targetComponent.hash, fnc: () => true })
+      .toJSON()
+
+    await registerComponent(targetComponent, { diagnostics, dataMapper, g })
+    await registerComponent(rootComponent, { diagnostics, dataMapper, g })
+
+    const instanceId = 'instance-gate-result-domain-fact'
+    const componentId = await getComponentId({ g, dataMapper, diagnostics, componentHash: rootComponent.hash })
+    const imports = await loadImports({ g, dataMapper, componentId })
+    const gates = await loadGates({ g, dataMapper, componentId })
+    await createInstance({ diagnostics, dataMapper, g }, { componentHash: rootComponent.hash, componentId, instanceId, imports, gates })
+
+    const { stateMachineId, instanceVertexId } = await getStateMachineId({ g, dataMapper, instanceId })
+    const [gateInstanceRefId] = await dataMapper.query.findGateInstanceRefIdByAlias({ vertexId: instanceVertexId, alias: 'setup' })
+    assert.ok(gateInstanceRefId, 'gate instance ref missing')
+
+    const resultPayload = true
+    const published = []
+    let acked = false
+    const message = {
+      subject: computeFunctionGateSubject,
+      ack: () => { acked = true },
+      json: () => ({
+        data: {
+          instanceId,
+          type: 'gate',
+          name: 'setup',
+          result: resultPayload,
+        }
+      }),
+    }
+    const rootCtx = {
+      diagnostics,
+      g,
+      dataMapper,
+      natsContext: { publish: async (subject, payload) => published.push({ subject, payload: JSON.parse(payload) }) },
+    }
+
+    const finalScope = await runSpec({ spec: computeFunctionSpec, rootCtx, message, processDomainFacts: false })
+
+    assert.equal(finalScope.gateInstanceRefId, gateInstanceRefId)
+    assert.equal(acked, true)
+    assert.equal(published.length, 1)
+    assert.equal(published[0].subject, gateResultComputedSubject)
+
+    const factData = published[0].payload.data
+    assert.equal(typeof factData.updatedAt, 'string')
+    assert.deepEqual({ ...factData, updatedAt: '<updatedAt>' }, {
+      instanceId,
+      instanceVertexId,
+      stateMachineId,
+      gateInstanceRefId,
+      type: 'gate',
+      name: 'setup',
+      result: resultPayload,
+      resultValue: JSON.stringify(resultPayload),
+      updatedAt: '<updatedAt>',
+    })
+
+    const [unchangedValues] = await dataMapper.query.readResultValues({ vertexId: gateInstanceRefId })
+    assert.equal(pickFirst(unchangedValues?.result), null)
   })
 })
 

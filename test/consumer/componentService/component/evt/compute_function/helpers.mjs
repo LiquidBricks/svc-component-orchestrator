@@ -60,7 +60,8 @@ const computeFunctionSpecs = getComputeFunctionSpecs()
 const computeFunctionSpec = Symbol('computeFunctionSpec')
 const dataResultComputedSpec = getDataResultComputedSpec()
 const taskResultComputedSpec = getTaskResultComputedSpec()
-const resultComputedSpecByType = Object.freeze({ data: dataResultComputedSpec, task: taskResultComputedSpec })
+const gateResultComputedSpec = getGateResultComputedSpec()
+const resultComputedSpecByType = Object.freeze({ data: dataResultComputedSpec, task: taskResultComputedSpec, gate: gateResultComputedSpec })
 const injectResultsSpec = getInjectResultsSpec()
 const stateMachineCompletedSpec = getStateMachineCompletedSpec()
 const startDependantsSpec = getStartDependantsSpec()
@@ -150,6 +151,23 @@ function getTaskResultComputedSpec() {
     && values.action === 'result_computed'
   )
   assert.ok(route, 'task result_computed domain route not found')
+  return route.config
+}
+
+function getGateResultComputedSpec() {
+  const router = createComponentServiceRouter({
+    natsContext: {},
+    g: {},
+    diagnostics: makeDiagnosticsInstance(),
+    dataMapper: {},
+  })
+  const route = router.routes.find(({ values }) =>
+    values.ns === 'domain'
+    && values.channel === 'edge'
+    && values.entity === 'uses_gate'
+    && values.action === 'result_computed'
+  )
+  assert.ok(route, 'gate result_computed domain route not found')
   return route.config
 }
 
@@ -359,13 +377,24 @@ const taskResultComputedSubject = createBasicSubject(natsEvents['*'].domain['*']
   .env('prod')
   .build()
 
+const gateResultComputedSubject = createBasicSubject(natsEvents['*'].domain['*']['*'].edge.uses_gate.result_computed.v1['*'])
+  .forPublish()
+  .env('prod')
+  .build()
+
 const resultComputedSubjectByType = Object.freeze({
   data: dataResultComputedSubject,
   task: taskResultComputedSubject,
+  gate: gateResultComputedSubject,
 })
 
 function isResultComputedFact(event) {
   const type = event?.payload?.data?.type
+  if (type === 'gate') {
+    return event?.subject === resultComputedSubjectByType.gate
+      && event?.payload?.data?.gateInstanceRefId
+  }
+
   return event?.subject === resultComputedSubjectByType[type]
     && event?.payload?.data?.stateEdgeId
 }
@@ -375,6 +404,8 @@ async function projectResultComputedFact({ rootCtx, payload }) {
   const result = typeof fact.resultValue === 'string'
     ? fact.resultValue
     : (fact.result != null ? JSON.stringify(fact.result) : '')
+  if (fact.type === 'gate') return
+
   const stateEdge = fact.type === 'task'
     ? rootCtx.dataMapper.edge.has_task_state.stateMachine_task
     : rootCtx.dataMapper.edge.has_data_state.stateMachine_data
@@ -414,7 +445,7 @@ export async function runSpec({ spec, rootCtx, message, initialScope = {}, proce
   }
   const processEmittedFacts = processDomainFacts
     && requestedSpec === computeFunctionSpec
-    && ['data', 'task'].includes(resultType)
+    && ['data', 'task', 'gate'].includes(resultType)
   const publishedDuringRoute = []
   const activeRootCtx = processEmittedFacts && rootCtx?.natsContext?.publish
     ? {
@@ -477,4 +508,5 @@ export {
   dataStartSpec,
   dataResultComputedSubject,
   taskResultComputedSubject,
+  gateResultComputedSubject,
 }

@@ -1,12 +1,23 @@
-import { domain } from '@liquid-bricks/spec-domain/domain'
+export async function handler({
+  rootCtx: { dataMapper },
+  scope: { instanceId, instanceVertexId, gateInstanceRefId, name, result, resultValue, updatedAt },
+}) {
+  let resolvedGateInstanceRefId = gateInstanceRefId
+  if (!resolvedGateInstanceRefId && instanceVertexId && name) {
+    const [foundGateInstanceRefId] = await dataMapper.query.findGateInstanceRefIdByAlias({ vertexId: instanceVertexId, alias: name })
+    resolvedGateInstanceRefId = foundGateInstanceRefId
+  }
+  if (!resolvedGateInstanceRefId) return { instanceId }
 
-export async function handler({ rootCtx: { g, dataMapper }, scope: { instanceId, instanceVertexId, name, result } }) {
-  if (!instanceVertexId || !name) return { instanceId }
+  const serializedResult = typeof resultValue === 'string'
+    ? resultValue
+    : (result != null ? JSON.stringify(result) : '')
 
-  const [gateInstanceRefId] = await dataMapper.query.findGateInstanceRefIdByAlias({ vertexId: instanceVertexId, alias: name })
-  if (!gateInstanceRefId) return { instanceId }
+  await dataMapper.vertex.gateInstanceRef.setResultAndUpdatedAt({
+    result: serializedResult,
+    gateInstanceRefId: resolvedGateInstanceRefId,
+    updatedAt,
+  })
 
-  await dataMapper.vertex.gateInstanceRef.setResultAndUpdatedAt({ result: result != null ? JSON.stringify(result) : '', gateInstanceRefId })
-
-  return { instanceId }
+  return { instanceId, gateInstanceRefId: resolvedGateInstanceRefId, updatedAt }
 }
