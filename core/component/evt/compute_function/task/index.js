@@ -1,29 +1,51 @@
 import { create as createSubject } from '@liquid-bricks/lib-nats-subject/create/basic'
 import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
 import { ackMessage, decodeData } from '../../../../../middleware/index.js'
-import { completeStateMachineIfFinished } from '../_helper/completeStateMachineIfFinished.js'
 import { findStateEdge } from './findStateEdge.js'
 import { loadData } from '../_helper/loadData.js'
-import { publishInjectResultsCommand } from './publishInjectResultsCommand.js'
-import { publishStartDependantsCommand } from './publishStartDependantsCommand.js'
 import { validatePayload } from '../_helper/validatePayload.js'
 
-async function handleStateResult({
-  rootCtx: { dataMapper },
-  scope: { instanceId, result, stateEdgeId, stateEdgeStatus },
+async function publishResultComputedFact({
+  scope: {
+    instanceId,
+    instanceVertexId,
+    name,
+    result,
+    stateMachineId,
+    stateEdgeId,
+    stateEdgeStatus,
+  },
+  rootCtx: { natsContext },
 }) {
   const updatedAt = new Date().toISOString()
   const resultValue = result != null ? JSON.stringify(result) : ''
 
-  await dataMapper.edge.has_task_state.stateMachine_task.updateResultStatusUpdatedAt({
-    edgeId: stateEdgeId,
-    result: resultValue,
-    status: stateEdgeStatus,
-    updatedAt,
-  })
+  await natsContext.publish(
+    createSubject(natsEvents['*'].domain['*']['*'].edge.has_task_state.result_computed.v1['*'])
+      .forPublish()
+      .env('prod')
+      .build(),
+    JSON.stringify({
+      data: {
+        instanceId,
+        instanceVertexId,
+        stateMachineId,
+        stateEdgeId,
+        stateId: stateEdgeId,
+        type: 'task',
+        name,
+        result,
+        resultValue,
+        status: stateEdgeStatus,
+        stateEdgeStatus,
+        updatedAt,
+      },
+    }),
+  )
 
-  return { instanceId }
+  return { instanceId, stateEdgeId, status: stateEdgeStatus, updatedAt }
 }
+
 
 export const path = createSubject(natsEvents['*'].component_service['*'].function_result.evt.component.compute_function.v1.task)
   .forSubscribe()
@@ -38,13 +60,8 @@ export const spec = {
     loadData,
     findStateEdge,
   ],
-  handler: handleStateResult,
+  handler: publishResultComputedFact,
   post: [
-    {
-      completeStateMachineIfFinished,
-      publishInjectResultsCommand,
-      publishStartDependantsCommand,
-    },
     ackMessage,
   ]
 }

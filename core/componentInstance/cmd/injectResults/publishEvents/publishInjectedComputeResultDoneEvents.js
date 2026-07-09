@@ -4,6 +4,25 @@ import { Errors } from '../../../../../errors.js'
 import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
 
 
+const computeFunctionDataSubject = createBasicSubject(
+  natsEvents['*'].component_service['*'].function_result.evt.component.compute_function.v1.data
+).forPublish().env('prod').build()
+
+const computeFunctionTaskSubject = createBasicSubject(
+  natsEvents['*'].component_service['*'].function_result.evt.component.compute_function.v1.task
+).forPublish().env('prod').build()
+
+function computeFunctionSubjectForTargetType(targetType) {
+  switch (targetType) {
+    case 'data':
+      return computeFunctionDataSubject
+    case 'task':
+      return computeFunctionTaskSubject
+    default:
+      throw new TypeError('Unsupported injected compute_function target type: ' + targetType)
+  }
+}
+
 async function listInjectedTargetEdgeIds({ dataMapper, fromType, targetType, vertexId }) {
   if (fromType === 'data' && targetType === 'data') {
     return dataMapper.query.listDataToDataInjectionEdgeIds({ vertexId })
@@ -358,12 +377,8 @@ export async function publishInjectedComputeResultDoneEvents({ scope, rootCtx: {
         buildDiagnostics({ targetStateEdgeId })
       )
 
-      const computeFunctionSubject = createBasicSubject(
-        natsEvents['*'].component_service['*'].function_result.evt.component.compute_function.v1[targetType],
-      ).forPublish().env('prod').build()
-
       await natsContext.publish(
-        computeFunctionSubject,
+        computeFunctionSubjectForTargetType(targetType),
         JSON.stringify({
           data: {
             instanceId: targetInstanceId,

@@ -7,6 +7,7 @@ import {
   computeFunctionDataSubject,
   computeFunctionGateSubject,
   computeFunctionTaskSubject,
+  taskResultComputedSubject,
   assertDataStartDependantsPayload,
   withGraphContext,
   registerComponent,
@@ -102,6 +103,81 @@ test('computeFunction data route publishes result_computed domain fact only', as
 
     const [unchangedValues] = await dataMapper.query.readStateEdgeStatusResultAndUpdatedAt({ edgeId: stateEdgeId })
     assert.notEqual(pickFirst(unchangedValues.status), STATE_EDGE_STATUS_BY_TYPE.data)
+    assert.notEqual(pickFirst(unchangedValues.result), JSON.stringify(resultPayload))
+    assert.equal(pickFirst(unchangedValues.updatedAt), initialUpdatedAt)
+  })
+})
+
+test('computeFunction task route publishes result_computed domain fact only', async () => {
+  await withGraphContext(async ({ diagnostics, dataMapper, g }) => {
+    const taskName = 'taskInput'
+    const component = componentBuilder('ComputeTaskResultDomainFactComponent')
+      .task(taskName, {})
+      .toJSON()
+
+    await registerComponent(component, { diagnostics, dataMapper, g })
+
+    const instanceId = 'instance-task-result-domain-fact'
+    const componentId = await getComponentId({ g, dataMapper, diagnostics, componentHash: component.hash })
+    const imports = await loadImports({ g, dataMapper, componentId })
+    await createInstance({ diagnostics, dataMapper, g }, { componentHash: component.hash, componentId, instanceId, imports })
+
+    const { stateMachineId } = await getStateMachineId({ g, dataMapper, instanceId })
+    const [stateEdgeId] = await dataMapper.query.findTaskStateEdgeIdByName({ vertexId: stateMachineId, name: taskName })
+    assert.ok(stateEdgeId, 'task state edge missing')
+
+    const [initialValues] = await dataMapper.query.readInitialValues({ edgeId: stateEdgeId })
+    const initialUpdatedAt = pickFirst(initialValues?.updatedAt)
+    assert.ok(initialUpdatedAt, 'initial updatedAt missing')
+
+    const resultPayload = { count: 3 }
+    const published = []
+    let acked = false
+    const message = {
+      subject: computeFunctionTaskSubject,
+      ack: () => { acked = true },
+      json: () => ({
+        data: {
+          instanceId,
+          type: 'task',
+          name: taskName,
+          result: resultPayload,
+        }
+      }),
+    }
+    const rootCtx = {
+      diagnostics,
+      g,
+      dataMapper,
+      natsContext: { publish: async (subject, payload) => published.push({ subject, payload: JSON.parse(payload) }) },
+    }
+
+    const finalScope = await runSpec({ spec: computeFunctionSpec, rootCtx, message, processDomainFacts: false })
+
+    assert.equal(finalScope.stateEdgeId, stateEdgeId)
+    assert.equal(acked, true)
+    assert.equal(published.length, 1)
+    assert.equal(published[0].subject, taskResultComputedSubject)
+
+    const factData = published[0].payload.data
+    assert.equal(typeof factData.updatedAt, 'string')
+    assert.deepEqual({ ...factData, updatedAt: '<updatedAt>' }, {
+      instanceId,
+      instanceVertexId: finalScope.instanceVertexId,
+      stateMachineId,
+      stateEdgeId,
+      stateId: stateEdgeId,
+      type: 'task',
+      name: taskName,
+      result: resultPayload,
+      resultValue: JSON.stringify(resultPayload),
+      status: STATE_EDGE_STATUS_BY_TYPE.task,
+      stateEdgeStatus: STATE_EDGE_STATUS_BY_TYPE.task,
+      updatedAt: '<updatedAt>',
+    })
+
+    const [unchangedValues] = await dataMapper.query.readStateEdgeStatusResultAndUpdatedAt({ edgeId: stateEdgeId })
+    assert.notEqual(pickFirst(unchangedValues.status), STATE_EDGE_STATUS_BY_TYPE.task)
     assert.notEqual(pickFirst(unchangedValues.result), JSON.stringify(resultPayload))
     assert.equal(pickFirst(unchangedValues.updatedAt), initialUpdatedAt)
   })

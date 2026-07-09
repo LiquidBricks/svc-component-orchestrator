@@ -59,6 +59,8 @@ const startInstanceSpec = getStartInstanceSpec()
 const computeFunctionSpecs = getComputeFunctionSpecs()
 const computeFunctionSpec = Symbol('computeFunctionSpec')
 const dataResultComputedSpec = getDataResultComputedSpec()
+const taskResultComputedSpec = getTaskResultComputedSpec()
+const resultComputedSpecByType = Object.freeze({ data: dataResultComputedSpec, task: taskResultComputedSpec })
 const injectResultsSpec = getInjectResultsSpec()
 const stateMachineCompletedSpec = getStateMachineCompletedSpec()
 const startDependantsSpec = getStartDependantsSpec()
@@ -131,6 +133,23 @@ function getDataResultComputedSpec() {
     && values.action === 'result_computed'
   )
   assert.ok(route, 'data result_computed domain route not found')
+  return route.config
+}
+
+function getTaskResultComputedSpec() {
+  const router = createComponentServiceRouter({
+    natsContext: {},
+    g: {},
+    diagnostics: makeDiagnosticsInstance(),
+    dataMapper: {},
+  })
+  const route = router.routes.find(({ values }) =>
+    values.ns === 'domain'
+    && values.channel === 'edge'
+    && values.entity === 'has_task_state'
+    && values.action === 'result_computed'
+  )
+  assert.ok(route, 'task result_computed domain route not found')
   return route.config
 }
 
@@ -335,19 +354,32 @@ const dataResultComputedSubject = createBasicSubject(natsEvents['*'].domain['*']
   .env('prod')
   .build()
 
-function isDataResultComputedFact(event) {
-  return event?.subject === dataResultComputedSubject
-    && event?.payload?.data?.type === 'data'
+const taskResultComputedSubject = createBasicSubject(natsEvents['*'].domain['*']['*'].edge.has_task_state.result_computed.v1['*'])
+  .forPublish()
+  .env('prod')
+  .build()
+
+const resultComputedSubjectByType = Object.freeze({
+  data: dataResultComputedSubject,
+  task: taskResultComputedSubject,
+})
+
+function isResultComputedFact(event) {
+  const type = event?.payload?.data?.type
+  return event?.subject === resultComputedSubjectByType[type]
     && event?.payload?.data?.stateEdgeId
 }
 
-async function projectDataResultComputedFact({ rootCtx, payload }) {
+async function projectResultComputedFact({ rootCtx, payload }) {
   const fact = payload?.data ?? {}
   const result = typeof fact.resultValue === 'string'
     ? fact.resultValue
     : (fact.result != null ? JSON.stringify(fact.result) : '')
+  const stateEdge = fact.type === 'task'
+    ? rootCtx.dataMapper.edge.has_task_state.stateMachine_task
+    : rootCtx.dataMapper.edge.has_data_state.stateMachine_data
 
-  await rootCtx.dataMapper.edge.has_data_state.stateMachine_data.updateResultStatusUpdatedAt({
+  await stateEdge.updateResultStatusUpdatedAt({
     edgeId: fact.stateEdgeId,
     result,
     status: fact.stateEdgeStatus ?? fact.status,
@@ -355,11 +387,11 @@ async function projectDataResultComputedFact({ rootCtx, payload }) {
   })
 }
 
-async function processDataResultComputedFacts({ rootCtx, facts }) {
-  for (const fact of facts.filter(isDataResultComputedFact)) {
-    await projectDataResultComputedFact({ rootCtx, payload: fact.payload })
+async function processResultComputedFacts({ rootCtx, facts }) {
+  for (const fact of facts.filter(isResultComputedFact)) {
+    await projectResultComputedFact({ rootCtx, payload: fact.payload })
     await runSpec({
-      spec: dataResultComputedSpec,
+      spec: resultComputedSpecByType[fact.payload.data.type],
       rootCtx,
       message: {
         subject: fact.subject,
@@ -382,7 +414,7 @@ export async function runSpec({ spec, rootCtx, message, initialScope = {}, proce
   }
   const processEmittedFacts = processDomainFacts
     && requestedSpec === computeFunctionSpec
-    && resultType === 'data'
+    && ['data', 'task'].includes(resultType)
   const publishedDuringRoute = []
   const activeRootCtx = processEmittedFacts && rootCtx?.natsContext?.publish
     ? {
@@ -424,7 +456,7 @@ export async function runSpec({ spec, rootCtx, message, initialScope = {}, proce
   }
 
   if (processEmittedFacts) {
-    await processDataResultComputedFacts({ rootCtx, facts: publishedDuringRoute })
+    await processResultComputedFacts({ rootCtx, facts: publishedDuringRoute })
   }
 
   return scope
@@ -443,4 +475,6 @@ export {
   stateMachineCompletedSpec,
   startDependantsSpec,
   dataStartSpec,
+  dataResultComputedSubject,
+  taskResultComputedSubject,
 }
