@@ -4,8 +4,9 @@ import { component as componentBuilder } from '@liquid-bricks/lib-component-buil
 
 import {
   createBasicSubject,
-  createComputeFunctionSubject,
-  createResultComputedSubject,
+  computeFunctionDataSubject,
+  computeFunctionGateSubject,
+  computeFunctionTaskSubject,
   assertDataStartDependantsPayload,
   withGraphContext,
   registerComponent,
@@ -51,7 +52,7 @@ test('computeFunction data route publishes result_computed domain fact only', as
     const published = []
     let acked = false
     const message = {
-      subject: createComputeFunctionSubject('data'),
+      subject: computeFunctionDataSubject,
       ack: () => { acked = true },
       json: () => ({
         data: {
@@ -74,7 +75,13 @@ test('computeFunction data route publishes result_computed domain fact only', as
     assert.equal(finalScope.stateEdgeId, stateEdgeId)
     assert.equal(acked, true)
     assert.equal(published.length, 1)
-    assert.equal(published[0].subject, createResultComputedSubject())
+    assert.equal(
+      published[0].subject,
+      createBasicSubject(natsEvents['*'].domain['*']['*'].edge.has_data_state.result_computed.v1['*'])
+        .forPublish()
+        .env('prod')
+        .build(),
+    )
 
     const factData = published[0].payload.data
     assert.equal(typeof factData.updatedAt, 'string')
@@ -124,7 +131,7 @@ test('computeFunction stores state result, marks status provided, and publishes 
     const published = []
     let acked = false
     const message = {
-      subject: createComputeFunctionSubject('data'),
+      subject: computeFunctionDataSubject,
       ack: () => { acked = true },
       json: () => ({
         data: {

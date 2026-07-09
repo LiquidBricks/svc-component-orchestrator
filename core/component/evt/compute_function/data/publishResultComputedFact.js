@@ -1,4 +1,5 @@
-import { createResultComputedSubject } from '../../../../domain/edge/has_data_state/result_computed/subject.js'
+import { create as createSubject } from '@liquid-bricks/lib-nats-subject/create/basic'
+import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
 
 export async function publishResultComputedFact({
   scope: {
@@ -16,7 +17,10 @@ export async function publishResultComputedFact({
   const resultValue = result != null ? JSON.stringify(result) : ''
 
   await natsContext.publish(
-    createResultComputedSubject(),
+    createSubject(natsEvents['*'].domain['*']['*'].edge.has_data_state.result_computed.v1['*'])
+      .forPublish()
+      .env('prod')
+      .build(),
     JSON.stringify({
       data: {
         instanceId,

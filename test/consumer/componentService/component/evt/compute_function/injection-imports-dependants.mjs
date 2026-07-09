@@ -4,7 +4,9 @@ import { component } from '@liquid-bricks/lib-component-builder'
 
 import {
   createBasicSubject,
-  createComputeFunctionSubject,
+  computeFunctionDataSubject,
+  computeFunctionGateSubject,
+  computeFunctionTaskSubject,
   assertDataStartDependantsPayload,
   withGraphContext,
   registerComponent,
@@ -65,7 +67,7 @@ test('imported injection triggers dependant starts inside imported component', a
     assert.ok(childDepDataStateEdgeId, 'child data dependant state edge missing')
     assert.ok(childDepTaskStateEdgeId, 'child task dependant state edge missing')
 
-    const computeFunctionSubject = createComputeFunctionSubject('data')
+    const computeFunctionSubject = computeFunctionDataSubject
     const startDependantsSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start_dependants.v1['*']).forPublish()
       .env('prod')
       .build()
@@ -191,7 +193,7 @@ test('computeFunction triggers parent dependant starts across imports', async ()
 
     const published = []
     let resultAcked = false
-    const computeFunctionSubject = createComputeFunctionSubject('data')
+    const computeFunctionSubject = computeFunctionDataSubject
 
     await runSpec({
       spec: computeFunctionSpec,

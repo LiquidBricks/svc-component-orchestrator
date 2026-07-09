@@ -6,7 +6,9 @@ import { componentGates } from '../../../../../../core/componentInstance/cmd/cre
 import { hasInstanceStarted } from '../../../../../../core/componentInstance/cmd/dependencyUtils.js'
 import {
   createBasicSubject,
-  createComputeFunctionSubject,
+  computeFunctionDataSubject,
+  computeFunctionGateSubject,
+  computeFunctionTaskSubject,
   withGraphContext,
   registerComponent,
   createInstance,
@@ -52,7 +54,7 @@ test('stateMachine state switches to complete once all states are provided', asy
     await startInstance({ diagnostics, g, dataMapper }, { stateMachineId })
 
     const published = []
-    const computeFunctionSubject = createComputeFunctionSubject('data')
+    const computeFunctionSubject = computeFunctionDataSubject
 
     let dataAcked = false
     await runSpec({
@@ -156,7 +158,7 @@ test('componentInstance completes when only imports exist and imports finish', a
     await startInstance({ diagnostics, dataMapper, g }, { stateMachineId: childStateMachineId })
 
     const published = []
-    const computeFunctionSubject = createComputeFunctionSubject('data')
+    const computeFunctionSubject = computeFunctionDataSubject
     const stateMachineCompletedSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.state_machine_completed.v1['*']).forPublish()
       .env('prod')
       .build()
@@ -252,7 +254,7 @@ test('componentInstance completes after false gates settle and true gates comple
     })
 
     const published = []
-    const computeFunctionSubject = createComputeFunctionSubject('data')
+    const computeFunctionSubject = computeFunctionDataSubject
     const startSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start.v1['*']).forPublish()
       .env('prod')
       .build()

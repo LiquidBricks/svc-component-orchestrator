@@ -6,7 +6,9 @@ import { componentGates } from '../../../../../../core/componentInstance/cmd/cre
 import { hasInstanceStarted } from '../../../../../../core/componentInstance/cmd/dependencyUtils.js'
 import {
   createBasicSubject,
-  createComputeFunctionSubject,
+  computeFunctionDataSubject,
+  computeFunctionGateSubject,
+  computeFunctionTaskSubject,
   withGraphContext,
   registerComponent,
   createInstance,
@@ -57,7 +59,7 @@ test('computeFunction with gate=true publishes start for gated instance', async 
     const gateInstanceId = await getGateInstanceId({ g, dataMapper, rootInstanceVertexId, alias: 'setup' })
     assert.ok(gateInstanceId, 'gated instance id missing')
 
-    const computeFunctionSubject = createComputeFunctionSubject('gate')
+    const computeFunctionSubject = computeFunctionGateSubject
 
     const published = []
     let acked = false
@@ -127,7 +129,7 @@ test('computeFunction does not publish start_dependants for unstarted gated inst
     const gatedInstanceStarted = await hasInstanceStarted({ g, dataMapper, instanceVertexId: gatedInstanceVertexId })
     assert.equal(gatedInstanceStarted, false)
 
-    const computeFunctionSubject = createComputeFunctionSubject('data')
+    const computeFunctionSubject = computeFunctionDataSubject
 
     const startDependantsSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start_dependants.v1['*']).forPublish()
       .env('prod')
@@ -209,7 +211,7 @@ test('computeFunction with gate=false does not publish gated instance start', as
       { componentHash: rootComponent.hash, componentId: rootComponentId, instanceId: rootInstanceId, imports, gates },
     )
 
-    const computeFunctionSubject = createComputeFunctionSubject('gate')
+    const computeFunctionSubject = computeFunctionGateSubject
 
     const published = []
     let acked = false
@@ -292,7 +294,7 @@ test('computeFunction routes gate inject targets by alias when multiple gates sh
     assert.ok(gateInstanceByAlias.simpleCompFalseGate, 'simpleCompFalseGate instance missing')
     assert.ok(gateInstanceByAlias.simpleCompThirdGate, 'simpleCompThirdGate instance missing')
 
-    const computeFunctionSubject = createComputeFunctionSubject('data')
+    const computeFunctionSubject = computeFunctionDataSubject
 
     const cases = [
       { sourceName: 'simpleCompTrueValue', expectedAlias: 'simpleCompTrueGate', result: 'abc-true-gate' },
@@ -376,7 +378,7 @@ test('computeFunction routes identifier->gate inject to the same pod instance wh
 
     const { instanceVertexId: rootInstanceVertexId } = await getStateMachineId({ g, dataMapper, instanceId: rootInstanceId })
 
-    const computeFunctionSubject = createComputeFunctionSubject('data')
+    const computeFunctionSubject = computeFunctionDataSubject
 
     const aliases = ['left', 'right']
     for (const alias of aliases) {

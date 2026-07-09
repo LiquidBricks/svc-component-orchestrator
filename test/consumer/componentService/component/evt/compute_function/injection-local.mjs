@@ -4,7 +4,9 @@ import { component as componentBuilder } from '@liquid-bricks/lib-component-buil
 
 import {
   createBasicSubject,
-  createComputeFunctionSubject,
+  computeFunctionDataSubject,
+  computeFunctionGateSubject,
+  computeFunctionTaskSubject,
   assertDataStartDependantsPayload,
   withGraphContext,
   registerComponent,
@@ -16,7 +18,7 @@ import {
   pickFirst,
   runSpec,
   runInjectResultsCommands,
-  createInjectResultsSubject,
+  injectResultsSubject,
   computeFunctionSpec,
   startDependantsSpec,
   STATE_EDGE_STATUS_BY_TYPE,
@@ -56,7 +58,7 @@ test('computeFunction publishes injected computeFunction events for injection ta
     let acked = false
     const resultPayload = { injected: true }
     const message = {
-      subject: createComputeFunctionSubject('data'),
+      subject: computeFunctionDataSubject,
       ack: () => { acked = true },
       json: () => ({
         data: {
@@ -83,13 +85,12 @@ test('computeFunction publishes injected computeFunction events for injection ta
     assert.equal(pickFirst(updatedValues.status), STATE_EDGE_STATUS_BY_TYPE.data)
     assert.equal(pickFirst(updatedValues.result), JSON.stringify(resultPayload))
 
-    const computeFunctionSubject = createComputeFunctionSubject('data')
-    const computeFunctionSubjects = new Set([computeFunctionSubject, createComputeFunctionSubject('task')])
+    const computeFunctionSubject = computeFunctionDataSubject
+    const computeFunctionSubjects = new Set([computeFunctionSubject, computeFunctionTaskSubject])
     const startDependantsSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start_dependants.v1['*']).forPublish()
       .env('prod')
       .build()
 
-    const injectResultsSubject = createInjectResultsSubject()
     const injectResultsCommands = published.filter(p => p.subject === injectResultsSubject)
     const startDependantsEvents = published.filter(p => p.subject === startDependantsSubject)
 
@@ -150,7 +151,7 @@ test('injected result triggers dependant data and task start commands', async ()
     assert.ok(dependantDataStateEdgeId, 'dataDependent state edge missing')
     assert.ok(dependantTaskStateEdgeId, 'taskDependent state edge missing')
 
-    const computeFunctionSubject = createComputeFunctionSubject('data')
+    const computeFunctionSubject = computeFunctionDataSubject
     const startDependantsSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start_dependants.v1['*']).forPublish()
       .env('prod')
       .build()

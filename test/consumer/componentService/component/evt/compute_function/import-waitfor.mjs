@@ -4,7 +4,9 @@ import { component as componentBuilder } from '@liquid-bricks/lib-component-buil
 
 import {
   createBasicSubject,
-  createComputeFunctionSubject,
+  computeFunctionDataSubject,
+  computeFunctionGateSubject,
+  computeFunctionTaskSubject,
   withGraphContext,
   registerComponent,
   createInstance,
@@ -80,7 +82,7 @@ test('import start preserves injected data when waitFor delays the import', asyn
     const importStartSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.import.start.v1['*']).forPublish()
       .env('prod')
       .build()
-    const computeFunctionSubject = createComputeFunctionSubject('data')
+    const computeFunctionSubject = computeFunctionDataSubject
     const startDependantsSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start_dependants.v1['*']).forPublish()
       .env('prod')
       .build()

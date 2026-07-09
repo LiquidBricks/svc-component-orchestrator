@@ -10,7 +10,6 @@ import { createComponentServiceRouter } from '../../../../../../router.js'
 import { path as registerPath } from '../../../../../../core/componentAgent/cmd/registerComponent/index.js'
 import { DATA_STATE_EDGE_LABEL, DATA_STATE_EDGE_STATUS } from '../../../../../../core/component/evt/compute_function/data/constants.js'
 import { TASK_STATE_EDGE_LABEL, TASK_STATE_EDGE_STATUS } from '../../../../../../core/component/evt/compute_function/task/constants.js'
-import { createResultComputedSubject } from '../../../../../../core/domain/edge/has_data_state/result_computed/subject.js'
 
 import { validatePayload } from '../../../../../../core/component/evt/compute_function/_helper/validatePayload.js'
 import { componentImports } from '../../../../../../core/componentInstance/cmd/create/loadData/componentImports.js'
@@ -285,21 +284,28 @@ export async function getImportedInstance({ g, dataMapper, rootInstanceVertexId,
 }
 
 
-export function createComputeFunctionSubject(type) {
-  const subjectSpec = natsEvents['*'].component_service['*'].function_result.evt.component.compute_function.v1[type]
-  assert.ok(subjectSpec, 'computeFunction subject missing for type ' + type)
-  return createBasicSubject(subjectSpec).forPublish().env('prod').build()
-}
+export const computeFunctionDataSubject = createBasicSubject(natsEvents['*'].component_service['*'].function_result.evt.component.compute_function.v1.data)
+  .forPublish()
+  .env('prod')
+  .build()
 
-export function createInjectResultsSubject() {
-  return createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.injectResults.v1['*'])
-    .forPublish()
-    .env('prod')
-    .build()
-}
+export const computeFunctionGateSubject = createBasicSubject(natsEvents['*'].component_service['*'].function_result.evt.component.compute_function.v1.gate)
+  .forPublish()
+  .env('prod')
+  .build()
+
+export const computeFunctionTaskSubject = createBasicSubject(natsEvents['*'].component_service['*'].function_result.evt.component.compute_function.v1.task)
+  .forPublish()
+  .env('prod')
+  .build()
+
+export const injectResultsSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.injectResults.v1['*'])
+  .forPublish()
+  .env('prod')
+  .build()
 
 export async function runInjectResultsCommands({ rootCtx, events }) {
-  const subject = createInjectResultsSubject()
+  const subject = injectResultsSubject
   const published = []
 
   for (const event of events.filter(entry => entry.subject === subject)) {
@@ -324,7 +330,10 @@ export async function runInjectResultsCommands({ rootCtx, events }) {
   return published
 }
 
-const dataResultComputedSubject = createResultComputedSubject()
+const dataResultComputedSubject = createBasicSubject(natsEvents['*'].domain['*']['*'].edge.has_data_state.result_computed.v1['*'])
+  .forPublish()
+  .env('prod')
+  .build()
 
 function isDataResultComputedFact(event) {
   return event?.subject === dataResultComputedSubject
@@ -423,7 +432,6 @@ export async function runSpec({ spec, rootCtx, message, initialScope = {}, proce
 
 export {
   createBasicSubject,
-  createResultComputedSubject,
   domain,
   STATE_EDGE_LABEL_BY_TYPE,
   STATE_EDGE_STATUS_BY_TYPE,

@@ -4,7 +4,9 @@ import { component as componentBuilder } from '@liquid-bricks/lib-component-buil
 
 import {
   createBasicSubject,
-  createComputeFunctionSubject,
+  computeFunctionDataSubject,
+  computeFunctionGateSubject,
+  computeFunctionTaskSubject,
   assertDataStartDependantsPayload,
   withGraphContext,
   registerComponent,
@@ -84,8 +86,8 @@ test('computeFunction publishes injected events across imports using import inje
     const published = []
     let ackedTargetTask = false
     const resultPayload = { viaImportInject: true }
-    const computeFunctionSubject = createComputeFunctionSubject('data')
-    const computeFunctionSubjects = new Set([computeFunctionSubject, createComputeFunctionSubject('task')])
+    const computeFunctionSubject = computeFunctionDataSubject
+    const computeFunctionSubjects = new Set([computeFunctionSubject, computeFunctionTaskSubject])
 
     const rootCtx = {
       diagnostics,
@@ -190,7 +192,7 @@ test('computeFunction publishes injected computeFunction to imported component i
     let acked = false
     const resultPayload = { sentToImport: true }
     const message = {
-      subject: createComputeFunctionSubject('data'),
+      subject: computeFunctionDataSubject,
       ack: () => { acked = true },
       json: () => ({
         data: {
@@ -216,7 +218,7 @@ test('computeFunction publishes injected computeFunction to imported component i
     assert.equal(pickFirst(updatedValues.status), STATE_EDGE_STATUS_BY_TYPE.data)
     assert.equal(pickFirst(updatedValues.result), JSON.stringify(resultPayload))
 
-    const computeFunctionSubject = createComputeFunctionSubject('data')
+    const computeFunctionSubject = computeFunctionDataSubject
     const startDependantsSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start_dependants.v1['*']).forPublish()
       .env('prod')
       .build()
@@ -275,7 +277,7 @@ test('computeFunction skips unreachable injected targets in a different instance
     const providerDataStateEdgeId = await getStateEdgeId({ g, dataMapper, stateMachineId: providerStateMachineId, type: 'data', name: 'id' })
     assert.ok(providerDataStateEdgeId, 'provider data state edge missing')
 
-    const computeFunctionSubject = createComputeFunctionSubject('data')
+    const computeFunctionSubject = computeFunctionDataSubject
     const startDependantsSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start_dependants.v1['*']).forPublish()
       .env('prod')
       .build()
