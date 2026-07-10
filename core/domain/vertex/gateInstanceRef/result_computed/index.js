@@ -1,9 +1,10 @@
 import { ackMessage, decodeData } from '../../../../../middleware/index.js'
-import { completeStateMachineIfFinished } from '../../../../component/evt/compute_function/_helper/completeStateMachineIfFinished.js'
-import { handler } from '../../../../component/evt/compute_function/gate/handler.js'
-import { publishStartIfPassed } from '../../../../component/evt/compute_function/gate/publishStartIfPassed.js'
+import { completeStateMachineIfFinished } from './completeStateMachineIfFinished.js'
+import { publishStartIfPassed } from './publishStartIfPassed.js'
 import { validatePayload } from './validatePayload.js'
 import { path } from './subject.js'
+
+function handler() {}
 
 export { path }
 

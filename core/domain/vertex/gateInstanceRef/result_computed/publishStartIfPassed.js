@@ -1,5 +1,4 @@
 import { create as createBasicSubject } from '@liquid-bricks/lib-nats-subject/create/basic'
-import { domain } from '@liquid-bricks/spec-domain/domain'
 import { hasInstanceStarted } from '../../../../componentInstance/cmd/dependencyUtils.js'
 
 import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
@@ -35,4 +34,3 @@ export async function publishStartIfPassed({
     JSON.stringify({ data: { instanceId: gateInstanceId } }),
   )
 }
-

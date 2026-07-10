@@ -20,7 +20,7 @@ export async function publishResultComputedFact({
   const resultValue = result != null ? JSON.stringify(result) : ''
 
   await natsContext.publish(
-    createSubject(natsEvents['*'].domain['*']['*'].edge.uses_gate.result_computed.v1['*'])
+    createSubject(natsEvents['*'].domain['*']['*'].vertex.gateInstanceRef.result_computed.v1['*'])
       .forPublish()
       .env('prod')
       .build(),

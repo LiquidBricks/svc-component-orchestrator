@@ -25,7 +25,7 @@ export const routes = [
   [component.evt.compute_function.data.path, component.evt.compute_function.data.spec],
   [domain.edge.has_data_state.result_computed.path, domain.edge.has_data_state.result_computed.spec],
   [domain.edge.has_task_state.result_computed.path, domain.edge.has_task_state.result_computed.spec],
-  [domain.edge.uses_gate.result_computed.path, domain.edge.uses_gate.result_computed.spec],
+  [domain.vertex.gateInstanceRef.result_computed.path, domain.vertex.gateInstanceRef.result_computed.spec],
   [component.evt.compute_function.gate.path, component.evt.compute_function.gate.spec],
   [component.evt.compute_function.task.path, component.evt.compute_function.task.spec],
   [componentInstance.cmd.injectResults.path, componentInstance.cmd.injectResults.spec],

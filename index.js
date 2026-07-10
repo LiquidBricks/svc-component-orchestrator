@@ -23,6 +23,7 @@ export async function Consumer({ streamName, natsContext, g, diagnostics: d }) {
       createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd['>']).forSubscribe().build(),
       createBasicSubject(natsEvents['*'].component_service['*']['*'].evt['>']).forSubscribe().build(),
       createBasicSubject(natsEvents['*'].domain['*']['*'].edge['>']).forSubscribe().build(),
+      createBasicSubject(natsEvents['*'].domain['*']['*'].vertex.gateInstanceRef.result_computed.v1['*']).forSubscribe().build(),
     ],
   });
 

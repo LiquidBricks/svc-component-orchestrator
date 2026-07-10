@@ -15,31 +15,31 @@ export function validatePayload({
   handlerDiagnostics.require(
     typeof instanceId === 'string' && instanceId.length,
     Errors.PRECONDITION_REQUIRED,
-    'instanceId required for gate result_computed',
+    'instanceId required for gateInstanceRef result_computed',
     { field: 'instanceId' },
   )
   handlerDiagnostics.require(
     typeof instanceVertexId === 'string' && instanceVertexId.length,
     Errors.PRECONDITION_REQUIRED,
-    'instanceVertexId required for gate result_computed',
+    'instanceVertexId required for gateInstanceRef result_computed',
     { field: 'instanceVertexId' },
   )
   handlerDiagnostics.require(
     typeof stateMachineId === 'string' && stateMachineId.length,
     Errors.PRECONDITION_REQUIRED,
-    'stateMachineId required for gate result_computed',
+    'stateMachineId required for gateInstanceRef result_computed',
     { field: 'stateMachineId' },
   )
   handlerDiagnostics.require(
     typeof gateInstanceRefId === 'string' && gateInstanceRefId.length,
     Errors.PRECONDITION_REQUIRED,
-    'gateInstanceRefId required for gate result_computed',
+    'gateInstanceRefId required for gateInstanceRef result_computed',
     { field: 'gateInstanceRefId' },
   )
   handlerDiagnostics.require(
     typeof name === 'string' && name.length,
     Errors.PRECONDITION_REQUIRED,
-    'name required for gate result_computed',
+    'name required for gateInstanceRef result_computed',
     { field: 'name' },
   )
 
