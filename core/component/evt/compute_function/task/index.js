@@ -16,12 +16,13 @@ async function publishResultComputedFact({
     stateEdgeStatus,
   },
   rootCtx: { natsContext },
+  routeCtx: { emits },
 }) {
   const updatedAt = new Date().toISOString()
   const resultValue = result != null ? JSON.stringify(result) : ''
 
   await natsContext.publish(
-    createSubject(natsEvents['*'].domain['*']['*'].edge.has_task_state.result_computed.v1['*'])
+    createSubject(emits['domain.edge.has_task_state.result_computed.v1'])
       .forPublish()
       .env('prod')
       .build(),
@@ -51,7 +52,13 @@ export const path = createSubject(natsEvents['*'].component_service['*'].functio
   .forSubscribe()
   .toObject()
 
+export const emits = {
+  'domain.edge.has_task_state.result_computed.v1':
+    natsEvents['*'].domain['*']['*'].edge.has_task_state.result_computed.v1['*'],
+}
+
 export const spec = {
+  context: { emits },
   decode: [
     decodeData(['instanceId', 'name', 'result']),
   ],

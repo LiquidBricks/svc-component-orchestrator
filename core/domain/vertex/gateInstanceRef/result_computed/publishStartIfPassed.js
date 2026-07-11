@@ -1,9 +1,6 @@
 import { create as createBasicSubject } from '@liquid-bricks/lib-nats-subject/create/basic'
 import { hasInstanceStarted } from '../../../../componentInstance/cmd/dependencyUtils.js'
 
-import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
-
-
 function pickFirst(values) {
   return Array.isArray(values) ? values[0] : values
 }
@@ -11,6 +8,7 @@ function pickFirst(values) {
 export async function publishStartIfPassed({
   scope: { result, name, instanceVertexId },
   rootCtx: { g, dataMapper, natsContext },
+  routeCtx: { emits },
 }) {
   if (result !== true) return
   if (!name || !instanceVertexId) return
@@ -25,7 +23,7 @@ export async function publishStartIfPassed({
   const gateInstanceId = pickFirst(instanceValues?.instanceId ?? instanceValues)
   if (!gateInstanceId) return
 
-  const subject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start.v1['*']).forPublish()
+  const subject = createBasicSubject(emits['component_service.cmd.componentInstance.start.v1']).forPublish()
     .env('prod')
     .build()
 

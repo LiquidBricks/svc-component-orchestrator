@@ -7,7 +7,13 @@ export const path = createSubject(natsEvents['*'].component_service['*']['*'].cm
   .forSubscribe()
   .toObject()
 
+export const emits = {
+  'component_service.cmd.componentInstance.start.v1':
+    natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start.v1['*'],
+}
+
 export const spec = {
+  context: { emits },
   decode: [
     decodeData(['instanceId', 'parentInstanceId']),
   ],

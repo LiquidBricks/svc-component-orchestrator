@@ -1,5 +1,4 @@
 import { create as createSubject } from '@liquid-bricks/lib-nats-subject/create/basic'
-import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
 
 export async function publishResultComputedFact({
   scope: {
@@ -12,12 +11,13 @@ export async function publishResultComputedFact({
     stateEdgeStatus,
   },
   rootCtx: { natsContext },
+  routeCtx: { emits },
 }) {
   const updatedAt = new Date().toISOString()
   const resultValue = result != null ? JSON.stringify(result) : ''
 
   await natsContext.publish(
-    createSubject(natsEvents['*'].domain['*']['*'].edge.has_data_state.result_computed.v1['*'])
+    createSubject(emits['domain.edge.has_data_state.result_computed.v1'])
       .forPublish()
       .env('prod')
       .build(),

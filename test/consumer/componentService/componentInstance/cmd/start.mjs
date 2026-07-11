@@ -20,6 +20,7 @@ import { usesGateInstances } from '../../../../../core/componentInstance/cmd/sta
 import { componentImports } from '../../../../../core/componentInstance/cmd/create/loadData/componentImports.js'
 import { componentGates } from '../../../../../core/componentInstance/cmd/create/loadData/componentGates.js'
 import { handler as startGateHandler } from '../../../../../core/gate/cmd/start/handler.js'
+import { spec as gateStartSpec } from '../../../../../core/gate/cmd/start/index.js'
 import { serviceConfiguration } from '../../../../provider/serviceConfiguration/dotenv/index.js'
 import { invokeRoute, runHookGroup } from '../../../../util/invokeRoute.js'
 
@@ -267,6 +268,7 @@ test('publishEvents starts dependency-free states, imports, and emits startDone'
 
   await runHookGroup(publishStartInstanceEvents, {
     rootCtx: { natsContext },
+    routeCtx: startInstanceSpec.context,
     scope: { instanceId, dataStateIds, taskStateIds, usesImportInstances: importInstances },
   })
 
@@ -341,6 +343,7 @@ test('publishEvents dispatches gate start command and gate handler emits compute
 
     await runHookGroup(publishStartInstanceEvents, {
       rootCtx: { natsContext, g, dataMapper },
+      routeCtx: startInstanceSpec.context,
       scope: {
         instanceId,
         instanceVertexId,
@@ -380,6 +383,7 @@ test('publishEvents dispatches gate start command and gate handler emits compute
         natsContext: { publish: async (subject, payload) => gatePublishes.push({ subject, payload: JSON.parse(payload) }) },
         g, dataMapper,
       },
+      routeCtx: gateStartSpec.context,
       scope: gateStartEvents[0].payload.data,
     })
 

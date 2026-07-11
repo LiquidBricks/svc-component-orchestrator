@@ -1,22 +1,22 @@
 import { create as createBasicSubject } from '@liquid-bricks/lib-nats-subject/create/basic'
 
-import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
-
-
-export async function publishStartCommands({ rootCtx: { natsContext }, scope: {
-  starters } }) {
+export async function publishStartCommands({
+  rootCtx: { natsContext },
+  routeCtx: { emits },
+  scope: { starters },
+}) {
 
   for (const { dataStateIds, taskStateIds, importInstanceIds = [], gateStartRequests = [], instanceId } of starters) {
 
     const publishList = [
       {
         stateIds: dataStateIds,
-        startSubject: createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.data.start.v1['*']).forPublish()
+        startSubject: createBasicSubject(emits['component_service.cmd.data.start.v1']).forPublish()
           .env('prod'),
       },
       {
         stateIds: taskStateIds,
-        startSubject: createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.task.start.v1['*']).forPublish()
+        startSubject: createBasicSubject(emits['component_service.cmd.task.start.v1']).forPublish()
           .env('prod'),
       },
     ]
@@ -32,7 +32,7 @@ export async function publishStartCommands({ rootCtx: { natsContext }, scope: {
       }
     }
 
-    const importSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.import.start.v1['*']).forPublish()
+    const importSubject = createBasicSubject(emits['component_service.cmd.import.start.v1']).forPublish()
       .env('prod')
 
     const childInstanceIds = [...new Set(importInstanceIds ?? [])]
@@ -44,7 +44,7 @@ export async function publishStartCommands({ rootCtx: { natsContext }, scope: {
       )
     }
 
-    const gateSubject = createBasicSubject(natsEvents['*'].gateway['*']['*'].cmd.component.compute_function.v1['*']).forPublish()
+    const gateSubject = createBasicSubject(emits['gateway.cmd.component.compute_function.v1']).forPublish()
       .env('prod')
 
     const normalizedGates = (gateStartRequests ?? [])

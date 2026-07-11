@@ -1,26 +1,23 @@
 import { create as createBasicSubject } from '@liquid-bricks/lib-nats-subject/create/basic'
 import { Errors } from '../../../../../errors.js'
 
-import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
-
-
-const computeFunctionDataSubject = createBasicSubject(
-  natsEvents['*'].component_service['*'].function_result.evt.component.compute_function.v1.data
-).forPublish().env('prod').build()
-
-const computeFunctionTaskSubject = createBasicSubject(
-  natsEvents['*'].component_service['*'].function_result.evt.component.compute_function.v1.task
-).forPublish().env('prod').build()
-
-function computeFunctionSubjectForTargetType(targetType) {
+function computeFunctionSubjectForTargetType(emits, targetType) {
+  let subject
   switch (targetType) {
     case 'data':
-      return computeFunctionDataSubject
+      subject = emits['component_service.function_result.evt.component.compute_function.v1.data']
+      break
     case 'task':
-      return computeFunctionTaskSubject
+      subject = emits['component_service.function_result.evt.component.compute_function.v1.task']
+      break
     default:
       throw new TypeError('Unsupported injected compute_function target type: ' + targetType)
   }
+
+  return createBasicSubject(subject)
+    .forPublish()
+    .env('prod')
+    .build()
 }
 
 async function listInjectedTargetEdgeIds({ dataMapper, fromType, targetType, vertexId }) {
@@ -199,7 +196,11 @@ async function findStateEdgeForNode({ g, dataMapper, stateMachineId, targetNodeI
   return stateEdgeId
 }
 
-export async function publishInjectedComputeResultDoneEvents({ scope, rootCtx: { g, dataMapper, natsContext } }) {
+export async function publishInjectedComputeResultDoneEvents({
+  scope,
+  rootCtx: { g, dataMapper, natsContext },
+  routeCtx: { emits },
+}) {
   const { handlerDiagnostics, instanceId, instanceVertexId, stateMachineId, stateEdgeId, type, result } = scope
 
   const [providedNodeId] = type === 'task'
@@ -378,7 +379,7 @@ export async function publishInjectedComputeResultDoneEvents({ scope, rootCtx: {
       )
 
       await natsContext.publish(
-        computeFunctionSubjectForTargetType(targetType),
+        computeFunctionSubjectForTargetType(emits, targetType),
         JSON.stringify({
           data: {
             instanceId: targetInstanceId,

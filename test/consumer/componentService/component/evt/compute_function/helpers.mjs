@@ -476,7 +476,7 @@ export async function runSpec({ spec, rootCtx, message, initialScope = {}, proce
 
   const runStep = async (step) => {
     if (!step) return
-    const result = await runHookGroup(step, { message, rootCtx: activeRootCtx, scope })
+    const result = await runHookGroup(step, { message, rootCtx: activeRootCtx, routeCtx: spec.context, scope })
     if (result && typeof result === 'object') {
       Object.assign(scope, result)
     }

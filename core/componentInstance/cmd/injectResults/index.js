@@ -9,7 +9,15 @@ export const path = createSubject(natsEvents['*'].component_service['*']['*'].cm
   .forSubscribe()
   .toObject()
 
+export const emits = {
+  'component_service.function_result.evt.component.compute_function.v1.data':
+    natsEvents['*'].component_service['*'].function_result.evt.component.compute_function.v1.data,
+  'component_service.function_result.evt.component.compute_function.v1.task':
+    natsEvents['*'].component_service['*'].function_result.evt.component.compute_function.v1.task,
+}
+
 export const spec = {
+  context: { emits },
   decode: [
     decodeData(['instanceId', 'instanceVertexId', 'stateMachineId', 'stateEdgeId', 'type', 'result']),
   ],

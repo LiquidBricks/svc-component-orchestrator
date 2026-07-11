@@ -7,9 +7,6 @@ import {
   normalizeLifecycleWaitForValues,
 } from '../../../componentInstance/cmd/dependencyUtils.js'
 
-import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
-
-
 function normalizeWaitForValues(waitForValues = []) {
   const raw = Array.isArray(waitForValues) && waitForValues.length === 1 ? waitForValues[0] : waitForValues
   const list = Array.isArray(raw)
@@ -126,7 +123,11 @@ async function shouldStartImport({ g, dataMapper, importInstanceVertexId, parent
   return false
 }
 
-export async function handler({ rootCtx: { natsContext, g, dataMapper }, scope: { instanceId, parentInstanceId } }) {
+export async function handler({
+  rootCtx: { natsContext, g, dataMapper },
+  routeCtx: { emits },
+  scope: { instanceId, parentInstanceId },
+}) {
   if (!instanceId) return
 
   let readyToStart = true
@@ -140,7 +141,7 @@ export async function handler({ rootCtx: { natsContext, g, dataMapper }, scope: 
   }
   if (!readyToStart) return
 
-  const subject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start.v1['*']).forPublish()
+  const subject = createBasicSubject(emits['component_service.cmd.componentInstance.start.v1']).forPublish()
     .env('prod')
 
   await natsContext.publish(

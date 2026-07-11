@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { create as createBasicSubject } from '@liquid-bricks/lib-nats-subject/create/basic'
 
 import { publishEvents } from '../../../../../../../core/componentInstance/cmd/start_dependants/publishEvents/index.js'
+import { spec as startDependantsSpec } from '../../../../../../../core/componentInstance/cmd/start_dependants/index.js'
 import { runHookGroup } from '../../../../../../util/invokeRoute.js'
 
 import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
@@ -16,6 +17,7 @@ test('publishEvents publishes start commands for dependant states', async () => 
 
   await runHookGroup(publishEvents, {
     rootCtx: { natsContext },
+    routeCtx: startDependantsSpec.context,
     scope: {
       starters: [
         {
@@ -55,6 +57,7 @@ test('publishEvents publishes import start commands with parent instance context
 
   await runHookGroup(publishEvents, {
     rootCtx: { natsContext },
+    routeCtx: startDependantsSpec.context,
     scope: {
       starters: [
         {
@@ -87,6 +90,7 @@ test('publishEvents dispatches gate compute_function requests to component execu
 
   await runHookGroup(publishEvents, {
     rootCtx: { natsContext },
+    routeCtx: startDependantsSpec.context,
     scope: {
       starters: [
         {

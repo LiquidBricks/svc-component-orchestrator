@@ -16,6 +16,9 @@ import { publishStartCommands } from '../../../../core/componentInstance/cmd/sta
 import { usesImportInstances } from '../../../../core/componentInstance/cmd/start/loadData/usesImportInstances.js'
 import { startImports } from '../../../../core/componentInstance/cmd/start/publishEvents/startImports.js'
 import { handler as startImportHandler } from '../../../../core/import/cmd/start/handler.js'
+import { spec as startInstanceSpec } from '../../../../core/componentInstance/cmd/start/index.js'
+import { spec as startDependantsSpec } from '../../../../core/componentInstance/cmd/start_dependants/index.js'
+import { spec as importStartSpec } from '../../../../core/import/cmd/start/index.js'
 import { invokeRoute } from '../../../util/invokeRoute.js'
 
 import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
@@ -240,6 +243,7 @@ test('import waitFor lifecycle.done starts dependent import after referenced imp
         g: ctx.g, dataMapper,
         natsContext: { publish: async (subject, payload) => blockedPublishes.push({ subject, payload: JSON.parse(payload) }) },
       },
+      routeCtx: importStartSpec.context,
       scope: { instanceId: corednsImport.instanceId, parentInstanceId: rootInstanceId },
     })
     assert.equal(
@@ -274,6 +278,7 @@ test('import waitFor lifecycle.done starts dependent import after referenced imp
         g: ctx.g, dataMapper,
         natsContext: { publish: async (subject, payload) => readyPublishes.push({ subject, payload: JSON.parse(payload) }) },
       },
+      routeCtx: importStartSpec.context,
       scope: { instanceId: corednsImport.instanceId, parentInstanceId: rootInstanceId },
     })
     assert.ok(readyPublishes.some(({ subject, payload }) =>
@@ -330,6 +335,7 @@ test('import waitFor prevents starting child until dependency provided', async (
       .build()
     await startImports({
       rootCtx: { natsContext },
+      routeCtx: startInstanceSpec.context,
       scope: { instanceId, instanceVertexId, usesImportInstances: importInstances },
     })
     assert.equal(initialPublishes.length, 1)
@@ -343,6 +349,7 @@ test('import waitFor prevents starting child until dependency provided', async (
     }
     await startImportHandler({
       rootCtx: { natsContext: preGateImportStartContext, g: ctx.g, dataMapper },
+      routeCtx: importStartSpec.context,
       scope: initialPublishes[0].payload.data,
     })
     assert.equal(preGateImportStartPublishes.filter(({ subject }) => subject === startComponentInstanceSubject).length, 0)
@@ -370,6 +377,7 @@ test('import waitFor prevents starting child until dependency provided', async (
     const startContext = { publish: async (subject, payload) => published.push({ subject, payload: JSON.parse(payload) }) }
     await publishStartCommands({
       rootCtx: { natsContext: startContext },
+      routeCtx: startDependantsSpec.context,
       scope: dependants,
     })
     assert.ok(published.some(({ subject, payload }) =>
@@ -385,6 +393,7 @@ test('import waitFor prevents starting child until dependency provided', async (
     for (const publishedImportStartCommand of published.filter(({ subject }) => subject === startImportSubject)) {
       await startImportHandler({
         rootCtx: { natsContext: postGateImportStartContext, g: ctx.g, dataMapper },
+        routeCtx: importStartSpec.context,
         scope: publishedImportStartCommand.payload.data,
       })
     }

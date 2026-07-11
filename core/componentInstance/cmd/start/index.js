@@ -12,7 +12,21 @@ export const path = createSubject(natsEvents['*'].component_service['*']['*'].cm
   .forSubscribe()
   .toObject()
 
+export const emits = {
+  'component_service.cmd.data.start.v1':
+    natsEvents['*'].component_service['*']['*'].cmd.data.start.v1['*'],
+  'component_service.cmd.task.start.v1':
+    natsEvents['*'].component_service['*']['*'].cmd.task.start.v1['*'],
+  'component_service.cmd.import.start.v1':
+    natsEvents['*'].component_service['*']['*'].cmd.import.start.v1['*'],
+  'component_service.cmd.gate.start.v1':
+    natsEvents['*'].component_service['*']['*'].cmd.gate.start.v1['*'],
+  'component_service.evt.componentInstance.startDone.v1':
+    natsEvents['*'].component_service['*']['*'].evt.componentInstance.startDone.v1['*'],
+}
+
 export const spec = {
+  context: { emits },
   decode: [
     decodeData(['instanceId']),
   ],

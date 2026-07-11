@@ -1,5 +1,4 @@
 import { create as createSubject } from '@liquid-bricks/lib-nats-subject/create/basic'
-import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
 
 export async function publishResultComputedFact({
   scope: {
@@ -10,6 +9,7 @@ export async function publishResultComputedFact({
     result,
   },
   rootCtx: { dataMapper, natsContext },
+  routeCtx: { emits },
 }) {
   if (!instanceVertexId || !name) return { instanceId }
 
@@ -20,7 +20,7 @@ export async function publishResultComputedFact({
   const resultValue = result != null ? JSON.stringify(result) : ''
 
   await natsContext.publish(
-    createSubject(natsEvents['*'].domain['*']['*'].vertex.gateInstanceRef.result_computed.v1['*'])
+    createSubject(emits['domain.vertex.gateInstanceRef.result_computed.v1'])
       .forPublish()
       .env('prod')
       .build(),

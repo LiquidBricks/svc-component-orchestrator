@@ -1,11 +1,9 @@
 import { create as createBasicSubject } from '@liquid-bricks/lib-nats-subject/create/basic'
 
-import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
-
-
 export async function startImports({
   scope: { instanceId: parentInstanceId, usesImportInstances = [] },
   rootCtx: { natsContext },
+  routeCtx: { emits },
 }) {
   if (!usesImportInstances?.length) return
   const started = new Set()
@@ -13,7 +11,7 @@ export async function startImports({
     .map((entry) => (typeof entry === 'string' ? { instanceId: entry } : entry))
     .filter(Boolean)
 
-  const subject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.import.start.v1['*']).forPublish()
+  const subject = createBasicSubject(emits['component_service.cmd.import.start.v1']).forPublish()
     .env('prod')
   for (const { instanceId: importedInstanceId } of normalizedImports) {
     if (!importedInstanceId || started.has(importedInstanceId)) continue

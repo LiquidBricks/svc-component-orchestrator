@@ -26,6 +26,7 @@ import {
   STATE_EDGE_STATUS_BY_TYPE,
 } from './helpers.mjs'
 import { handler as startImportHandler } from '../../../../../../core/import/cmd/start/handler.js'
+import { spec as importStartSpec } from '../../../../../../core/import/cmd/start/index.js'
 
 import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
 
@@ -119,6 +120,7 @@ test('import start preserves injected data when waitFor delays the import', asyn
         dataMapper,
         natsContext: { publish: async (subject, payload) => targetPreGatePublishes.push({ subject, payload: JSON.parse(payload) }) },
       },
+      routeCtx: importStartSpec.context,
       scope: targetStartCommand.payload.data,
     })
     assert.equal(
@@ -137,6 +139,7 @@ test('import start preserves injected data when waitFor delays the import', asyn
         dataMapper,
         natsContext: { publish: async (subject, payload) => providerImportStartPublishes.push({ subject, payload: JSON.parse(payload) }) },
       },
+      routeCtx: importStartSpec.context,
       scope: providerStartCommand.payload.data,
     })
     const providerComponentStartEvent = providerImportStartPublishes.find(({ subject, payload }) =>
@@ -284,6 +287,7 @@ test('import start preserves injected data when waitFor delays the import', asyn
         dataMapper,
         natsContext: { publish: async (subject, payload) => targetImportStartPublishes.push({ subject, payload: JSON.parse(payload) }) },
       },
+      routeCtx: importStartSpec.context,
       scope: targetStartEvent.payload.data,
     })
     const targetComponentStartEvent = targetImportStartPublishes.find(({ subject, payload }) =>

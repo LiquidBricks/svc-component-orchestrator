@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { create as createBasicSubject } from '@liquid-bricks/lib-nats-subject/create/basic'
 
 import { publishEvents } from '../../../../../../../core/componentAgent/cmd/registerComponent/publishEvents/index.js'
+import { spec as registerComponentSpec } from '../../../../../../../core/componentAgent/cmd/registerComponent/index.js'
 import { runHookGroup } from '../../../../../../util/invokeRoute.js'
 
 import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
@@ -15,6 +16,7 @@ test('publishEvents publishes component registerDone and provider registration e
 
   await runHookGroup(publishEvents, {
     rootCtx: { natsContext },
+    routeCtx: registerComponentSpec.context,
     scope: { agentID: 'agent-1', component: { hash } },
   })
 

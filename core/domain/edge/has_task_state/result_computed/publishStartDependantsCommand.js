@@ -1,12 +1,10 @@
 import { create as createBasicSubject } from '@liquid-bricks/lib-nats-subject/create/basic'
 import { hasInstanceStarted } from '../../../../componentInstance/cmd/dependencyUtils.js'
 
-import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
-
-
 export async function publishStartDependantsCommand({
   scope: { instanceId, instanceVertexId, stateEdgeId, stateEdgeStatus, result },
   rootCtx: { natsContext, g, dataMapper },
+  routeCtx: { emits },
 }) {
   if (g && instanceVertexId) {
     const [gateInstanceRefId] = await dataMapper.query.findOwningGateInstanceRefId({ vertexId: instanceVertexId })
@@ -17,7 +15,7 @@ export async function publishStartDependantsCommand({
     }
   }
 
-  const subject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start_dependants.v1['*']).forPublish()
+  const subject = createBasicSubject(emits['component_service.cmd.componentInstance.start_dependants.v1']).forPublish()
     .env('prod')
 
   await natsContext.publish(

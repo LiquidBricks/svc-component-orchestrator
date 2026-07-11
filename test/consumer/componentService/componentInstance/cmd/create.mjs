@@ -12,6 +12,7 @@ import { path as registerPath } from '../../../../../core/componentAgent/cmd/reg
 import { dataMapper as createDataMapper, domain } from '@liquid-bricks/spec-domain/domain'
 import { publishEvents as publishCreateInstanceEvents } from '../../../../../core/componentInstance/cmd/create/publishEvents/index.js'
 import { publishEvents as publishStartInstanceEvents } from '../../../../../core/componentInstance/cmd/start/publishEvents/index.js'
+import { spec as startInstanceSpec } from '../../../../../core/componentInstance/cmd/start/index.js'
 import { usesImportInstances } from '../../../../../core/componentInstance/cmd/start/loadData/usesImportInstances.js'
 import { componentImports } from '../../../../../core/componentInstance/cmd/create/loadData/componentImports.js'
 import { componentGates } from '../../../../../core/componentInstance/cmd/create/loadData/componentGates.js'
@@ -347,7 +348,7 @@ test('publishEvents does not start imported componentInstances after creation', 
     const published = []
     const natsContext = { publish: async (subject, payload) => published.push({ subject, payload: JSON.parse(payload) }) }
 
-    await runHookGroup(publishCreateInstanceEvents, { rootCtx: { natsContext }, scope })
+    await runHookGroup(publishCreateInstanceEvents, { rootCtx: { natsContext }, routeCtx: createInstanceSpec.context, scope })
 
     const createSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.createDone.v1['*']).forPublish()
       .env('prod')
@@ -393,6 +394,7 @@ test('start publishes start commands for imported componentInstances', async () 
 
     await runHookGroup(publishStartInstanceEvents, {
       rootCtx: { natsContext },
+      routeCtx: startInstanceSpec.context,
       scope: {
         instanceId,
         dataStateIds: [],

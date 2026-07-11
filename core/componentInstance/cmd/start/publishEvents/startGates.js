@@ -1,11 +1,9 @@
 import { create as createBasicSubject } from '@liquid-bricks/lib-nats-subject/create/basic'
 
-import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
-
-
 export async function startGates({
   scope: { instanceId: parentInstanceId, usesGateInstances = [] },
   rootCtx: { natsContext },
+  routeCtx: { emits },
 }) {
   if (!usesGateInstances?.length) return
 
@@ -14,7 +12,7 @@ export async function startGates({
     .map((entry) => (typeof entry === 'string' ? { instanceId: entry } : entry))
     .filter(Boolean)
 
-  const subject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.gate.start.v1['*']).forPublish()
+  const subject = createBasicSubject(emits['component_service.cmd.gate.start.v1']).forPublish()
     .env('prod')
 
   for (const { instanceId: gateInstanceId } of normalizedGates) {

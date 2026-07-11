@@ -1,11 +1,11 @@
 import { create as createBasicSubject } from '@liquid-bricks/lib-nats-subject/create/basic'
-import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
 
 export async function publishInjectResultsCommand({
   scope: { instanceId, instanceVertexId, stateMachineId, stateEdgeId, result },
   rootCtx: { natsContext },
+  routeCtx: { emits },
 }) {
-  const subject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.injectResults.v1['*'])
+  const subject = createBasicSubject(emits['component_service.cmd.componentInstance.injectResults.v1'])
     .forPublish()
     .env('prod')
     .build()

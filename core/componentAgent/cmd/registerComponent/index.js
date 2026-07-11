@@ -12,7 +12,15 @@ export const path = createSubject(natsEvents['*'].component_service['*']['*'].cm
   .forSubscribe()
   .toObject()
 
+export const emits = {
+  'component_service.evt.component.registerDone.v1':
+    natsEvents['*'].component_service['*']['*'].evt.component.registerDone.v1['*'],
+  'component_service.exec.componentAgent.cmdRegisterProvidingAgentsComponent.v1':
+    natsEvents['*'].component_service['*']['*'].exec.componentAgent.cmdRegisterProvidingAgentsComponent.v1['*'],
+}
+
 export const spec = {
+  context: { emits },
   decode: [
     decodeData(['component', 'agentID']),
     validatePayload,

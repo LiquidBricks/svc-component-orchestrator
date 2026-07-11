@@ -10,9 +10,6 @@ import {
   vertexLabelToType,
 } from '../../../componentInstance/cmd/dependencyUtils.js'
 
-import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
-
-
 function pickFirst(values) {
   return Array.isArray(values) ? values[0] : values
 }
@@ -128,11 +125,12 @@ async function buildGateDependencyPayload({
 async function publishGateComputeRequest({
   natsContext,
   instanceId,
+  emits,
   componentHash,
   name,
   deps,
 }) {
-  const subject = createBasicSubject(natsEvents['*'].gateway['*']['*'].cmd.component.compute_function.v1['*']).forPublish()
+  const subject = createBasicSubject(emits['gateway.cmd.component.compute_function.v1']).forPublish()
     .env('prod')
     .build()
 
@@ -204,7 +202,11 @@ async function loadGateRefsForParent({
   return gateRefs
 }
 
-export async function handler({ rootCtx: { natsContext, g, dataMapper }, scope: { instanceId, parentInstanceId } }) {
+export async function handler({
+  rootCtx: { natsContext, g, dataMapper },
+  routeCtx: { emits },
+  scope: { instanceId, parentInstanceId },
+}) {
   if (!instanceId || !g) return
 
   const gateInstanceVertexId = await resolveInstanceVertexId({ g, dataMapper, instanceId })
@@ -269,6 +271,7 @@ export async function handler({ rootCtx: { natsContext, g, dataMapper }, scope: 
         componentHash: parentContext.componentHash,
         name,
         deps: gateDeps,
+        emits,
       })
     }
   }

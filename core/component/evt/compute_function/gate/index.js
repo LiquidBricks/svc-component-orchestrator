@@ -9,7 +9,13 @@ export const path = createSubject(natsEvents['*'].component_service['*'].functio
   .forSubscribe()
   .toObject()
 
+export const emits = {
+  'domain.vertex.gateInstanceRef.result_computed.v1':
+    natsEvents['*'].domain['*']['*'].vertex.gateInstanceRef.result_computed.v1['*'],
+}
+
 export const spec = {
+  context: { emits },
   decode: [
     decodeData(['instanceId', 'name', 'result']),
   ],

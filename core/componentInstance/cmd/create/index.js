@@ -10,7 +10,13 @@ export const path = createSubject(natsEvents['*'].component_service['*']['*'].cm
   .forSubscribe()
   .toObject()
 
+export const emits = {
+  'component_service.evt.componentInstance.createDone.v1':
+    natsEvents['*'].component_service['*']['*'].evt.componentInstance.createDone.v1['*'],
+}
+
 export const spec = {
+  context: { emits },
   decode: [
     decodeData(['componentHash', 'instanceId']),
     validatePayload,

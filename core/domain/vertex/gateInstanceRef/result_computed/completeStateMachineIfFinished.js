@@ -1,9 +1,6 @@
 import { create as createBasicSubject } from '@liquid-bricks/lib-nats-subject/create/basic'
 import { domain } from '@liquid-bricks/spec-domain/domain'
 
-import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
-
-
 const PROVIDED_STATUS = domain.edge.has_data_state.stateMachine_data.constants.Status.PROVIDED
 
 function pickFirst(values) {
@@ -49,8 +46,8 @@ async function areAllStatesProvided({ g, dataMapper, stateMachineId, stateStatus
   return true
 }
 
-async function publishCompletion({ natsContext, instanceId, stateMachineId }) {
-  const subject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.state_machine_completed.v1['*']).forPublish()
+async function publishCompletion({ emits, natsContext, instanceId, stateMachineId }) {
+  const subject = createBasicSubject(emits['component_service.evt.componentInstance.state_machine_completed.v1']).forPublish()
     .env('prod')
     .build()
 
@@ -171,7 +168,7 @@ async function isInstanceFinished({ g, dataMapper, instanceVertexId, stateMachin
   return true
 }
 
-async function completeInstanceChain({ g, dataMapper, natsContext, instanceVertexId, stateMachineId, instanceId, visited, finishedCache, stateStatusOverrides, gateResultOverrides }) {
+async function completeInstanceChain({ g, dataMapper, emits, natsContext, instanceVertexId, stateMachineId, instanceId, visited, finishedCache, stateStatusOverrides, gateResultOverrides }) {
   if (!instanceVertexId || !stateMachineId) return
   const visitKey = `${instanceVertexId}:${stateMachineId}`
   if (visited.has(visitKey)) return
@@ -181,18 +178,19 @@ async function completeInstanceChain({ g, dataMapper, natsContext, instanceVerte
   const currentState = await getCurrentState({ g, dataMapper, stateMachineId })
 
   if (finished && currentState !== domain.vertex.stateMachine.constants.STATES.COMPLETE) {
-    await publishCompletion({ natsContext, instanceId, stateMachineId })
+    await publishCompletion({ emits, natsContext, instanceId, stateMachineId })
   }
 
   const parents = await findParentInstances({ g, dataMapper, instanceVertexId })
   for (const parent of parents) {
-    await completeInstanceChain({ g, dataMapper, natsContext, ...parent, visited, finishedCache, stateStatusOverrides, gateResultOverrides })
+    await completeInstanceChain({ g, dataMapper, emits, natsContext, ...parent, visited, finishedCache, stateStatusOverrides, gateResultOverrides })
   }
 }
 
 export async function completeStateMachineIfFinished({
   scope: { handlerDiagnostics, stateMachineId, instanceId, instanceVertexId, stateEdgeId, stateEdgeStatus, status, gateInstanceRefId, result, resultValue },
   rootCtx: { g, dataMapper, natsContext },
+  routeCtx: { emits },
 }) {
   const visited = new Set()
   const finishedCache = new Map()
@@ -211,6 +209,7 @@ export async function completeStateMachineIfFinished({
 
   await completeInstanceChain({
     g,
+    emits,
     dataMapper,
     natsContext,
     instanceVertexId,

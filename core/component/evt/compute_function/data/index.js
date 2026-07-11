@@ -10,7 +10,13 @@ export const path = createSubject(natsEvents['*'].component_service['*'].functio
   .forSubscribe()
   .toObject()
 
+export const emits = {
+  'domain.edge.has_data_state.result_computed.v1':
+    natsEvents['*'].domain['*']['*'].edge.has_data_state.result_computed.v1['*'],
+}
+
 export const spec = {
+  context: { emits },
   decode: [
     decodeData(['instanceId', 'name', 'result']),
   ],
