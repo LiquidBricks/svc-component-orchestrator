@@ -62,7 +62,7 @@ async function getTaskStateEdgeId({ g, dataMapper, instanceId }) {
   return taskStateEdgeId
 }
 
-test('concurrent duplicate task starts should emit only one execution request', async () => {
+test('concurrent duplicate task starts should emit only one started fact', async () => {
   const taskSpec = getRouteSpec({ channel: 'cmd', entity: 'task', action: 'start' })
   assert.equal(taskSpec.pre[0].name, 'skipIfLocked')
 
@@ -101,16 +101,16 @@ test('concurrent duplicate task starts should emit only one execution request', 
       }),
     ])
 
-    const executionRequestSubject = createBasicSubject(natsEvents['*'].gateway['*']['*'].cmd.component.compute_function.v1['*']).forPublish()
+    const taskStartedSubject = createBasicSubject(natsEvents['*'].domain['*']['*'].edge.has_task_state.started.v1['*']).forPublish()
       .env('prod')
       .build()
 
-    const executionRequests = published.filter(({ subject }) => subject === executionRequestSubject)
+    const startedFacts = published.filter(({ subject }) => subject === taskStartedSubject)
 
     assert.equal(
-      executionRequests.length,
+      startedFacts.length,
       1,
-      `expected one execution request, got ${executionRequests.length}: ${JSON.stringify(executionRequests)}`
+      `expected one started fact, got ${startedFacts.length}: ${JSON.stringify(startedFacts)}`
     )
   })
 })

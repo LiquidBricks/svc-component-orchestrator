@@ -14,9 +14,9 @@ import { findDependencyFreeStates } from '../../../../core/componentInstance/cmd
 import { handler as startDependantsHandler } from '../../../../core/componentInstance/cmd/start_dependants/handler.js'
 import { publishStartCommands } from '../../../../core/componentInstance/cmd/start_dependants/publishEvents/publishStartCommands.js'
 import { usesImportInstances } from '../../../../core/componentInstance/cmd/start/loadData/usesImportInstances.js'
-import { startImports } from '../../../../core/componentInstance/cmd/start/publishEvents/startImports.js'
+import { startImports } from '../../../../core/domain/vertex/stateMachine/started/publishEvents/startImports.js'
 import { handler as startImportHandler } from '../../../../core/import/cmd/start/handler.js'
-import { spec as startInstanceSpec } from '../../../../core/componentInstance/cmd/start/index.js'
+import { spec as stateMachineStartedSpec } from '../../../../core/domain/vertex/stateMachine/started/index.js'
 import { spec as startDependantsSpec } from '../../../../core/componentInstance/cmd/start_dependants/index.js'
 import { spec as importStartSpec } from '../../../../core/import/cmd/start/index.js'
 import { invokeRoute } from '../../../util/invokeRoute.js'
@@ -335,7 +335,7 @@ test('import waitFor prevents starting child until dependency provided', async (
       .build()
     await startImports({
       rootCtx: { natsContext },
-      routeCtx: startInstanceSpec.context,
+      routeCtx: stateMachineStartedSpec.context,
       scope: { instanceId, instanceVertexId, usesImportInstances: importInstances },
     })
     assert.equal(initialPublishes.length, 1)

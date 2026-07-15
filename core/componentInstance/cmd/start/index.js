@@ -1,8 +1,7 @@
 import { ackMessage, decodeData } from '../../../../middleware/index.js'
 import { findDependencyFreeStates } from './findDependencyFreeStates.js'
 import { getStateMachine } from './getStateMachine.js'
-import { handler } from './handler.js'
-import { publishEvents } from './publishEvents/index.js'
+import { publishStartedFact } from './publishStartedFact.js'
 import { doesInstanceExist } from './doesInstanceExist.js'
 import { loadData } from './loadData/index.js'
 import { create as createSubject } from '@liquid-bricks/lib-nats-subject/create/basic'
@@ -13,16 +12,8 @@ export const path = createSubject(natsEvents['*'].component_service['*']['*'].cm
   .toObject()
 
 export const emits = {
-  'component_service.cmd.data.start.v1':
-    natsEvents['*'].component_service['*']['*'].cmd.data.start.v1['*'],
-  'component_service.cmd.task.start.v1':
-    natsEvents['*'].component_service['*']['*'].cmd.task.start.v1['*'],
-  'component_service.cmd.import.start.v1':
-    natsEvents['*'].component_service['*']['*'].cmd.import.start.v1['*'],
-  'component_service.cmd.gate.start.v1':
-    natsEvents['*'].component_service['*']['*'].cmd.gate.start.v1['*'],
-  'component_service.evt.componentInstance.startDone.v1':
-    natsEvents['*'].component_service['*']['*'].evt.componentInstance.startDone.v1['*'],
+  'domain.vertex.stateMachine.started.v1':
+    natsEvents['*'].domain['*']['*'].vertex.stateMachine.started.v1['*'],
 }
 
 export const spec = {
@@ -36,9 +27,8 @@ export const spec = {
     getStateMachine,
     findDependencyFreeStates,
   ],
-  handler,
+  handler: publishStartedFact,
   post: [
     ackMessage,
-    publishEvents,
   ]
 }

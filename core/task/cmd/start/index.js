@@ -1,7 +1,6 @@
 import { ackMessage, decodeData, skipIfLocked } from '../../../../middleware/index.js'
-import { handler } from './handler.js'
 import { loadData } from './loadData/index.js'
-import { publishExecutionRequest } from './publishExecutionRequest.js'
+import { publishStartedFact } from './publishStartedFact.js'
 import { create as createSubject } from '@liquid-bricks/lib-nats-subject/create/basic'
 import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
 
@@ -10,8 +9,8 @@ export const path = createSubject(natsEvents['*'].component_service['*']['*'].cm
   .toObject()
 
 export const emits = {
-  'gateway.cmd.component.compute_function.v1':
-    natsEvents['*'].gateway['*']['*'].cmd.component.compute_function.v1['*'],
+  'domain.edge.has_task_state.started.v1':
+    natsEvents['*'].domain['*']['*'].edge.has_task_state.started.v1['*'],
 }
 
 export const spec = {
@@ -23,9 +22,8 @@ export const spec = {
     skipIfLocked(['instanceId', 'stateId']),
     loadData,
   ],
-  handler,
+  handler: publishStartedFact,
   post: [
-    publishExecutionRequest,
     ackMessage,
   ]
 }

@@ -22,8 +22,12 @@ export async function Consumer({ streamName, natsContext, g, diagnostics: d }) {
     filter_subjects: [
       createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd['>']).forSubscribe().build(),
       createBasicSubject(natsEvents['*'].component_service['*']['*'].evt['>']).forSubscribe().build(),
-      createBasicSubject(natsEvents['*'].domain['*']['*'].edge['>']).forSubscribe().build(),
+      createBasicSubject(natsEvents['*'].domain['*']['*'].edge.has_data_state.result_computed.v1['*']).forSubscribe().build(),
+      createBasicSubject(natsEvents['*'].domain['*']['*'].edge.has_data_state.started.v1['*']).forSubscribe().build(),
+      createBasicSubject(natsEvents['*'].domain['*']['*'].edge.has_task_state.result_computed.v1['*']).forSubscribe().build(),
+      createBasicSubject(natsEvents['*'].domain['*']['*'].edge.has_task_state.started.v1['*']).forSubscribe().build(),
       createBasicSubject(natsEvents['*'].domain['*']['*'].vertex.gateInstanceRef.result_computed.v1['*']).forSubscribe().build(),
+      createBasicSubject(natsEvents['*'].domain['*']['*'].vertex.stateMachine.started.v1['*']).forSubscribe().build(),
     ],
   });
 

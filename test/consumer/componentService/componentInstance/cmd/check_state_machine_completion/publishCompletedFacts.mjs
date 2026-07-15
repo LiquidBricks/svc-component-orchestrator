@@ -15,6 +15,7 @@ test('publishes one state-machine completed domain fact per completed traversal 
 
   await publishCompletedFacts({
     scope: {
+      handlerDiagnostics: { require: condition => assert.ok(condition) },
       completedStateMachines: [
         { instanceId: 'instance-1', stateMachineId: 'state-machine-1' },
         { instanceId: 'instance-2', stateMachineId: 'state-machine-2' },
@@ -49,7 +50,10 @@ test('publishes no facts when no state machines completed', async () => {
   const calls = []
 
   await publishCompletedFacts({
-    scope: { completedStateMachines: [] },
+    scope: {
+      handlerDiagnostics: { require: condition => assert.ok(condition) },
+      completedStateMachines: [],
+    },
     rootCtx: { natsContext: { publish: async (...args) => calls.push(args) } },
     routeCtx: {
       emits: {

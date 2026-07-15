@@ -2,8 +2,8 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { create as createBasicSubject } from '@liquid-bricks/lib-nats-subject/create/basic'
 
-import { publishExecutionRequest } from '../../../../../../core/task/cmd/start/publishExecutionRequest.js'
-import { spec as taskStartSpec } from '../../../../../../core/task/cmd/start/index.js'
+import { publishExecutionRequest } from '../../../../../../core/domain/edge/has_task_state/started/publishExecutionRequest.js'
+import { spec as taskStartedSpec } from '../../../../../../core/domain/edge/has_task_state/started/index.js'
 
 import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
 
@@ -16,7 +16,7 @@ test('publishExecutionRequest emits task execution request', async () => {
 
   await publishExecutionRequest({
     rootCtx: { natsContext },
-    routeCtx: taskStartSpec.context,
+    routeCtx: taskStartedSpec.context,
     scope: {
       instanceId: 'instance-task',
       componentHash: 'hash-task',

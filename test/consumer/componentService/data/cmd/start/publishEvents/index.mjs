@@ -2,22 +2,22 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { create as createBasicSubject } from '@liquid-bricks/lib-nats-subject/create/basic'
 
-import { publishEvents } from '../../../../../../../core/data/cmd/start/publishEvents/index.js'
-import { spec as dataStartSpec } from '../../../../../../../core/data/cmd/start/index.js'
+import { publishExecutionRequest } from '../../../../../../../core/domain/edge/has_data_state/started/publishExecutionRequest.js'
+import { spec as dataStartedSpec } from '../../../../../../../core/domain/edge/has_data_state/started/index.js'
 import { runHookGroup } from '../../../../../../util/invokeRoute.js'
 
 import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
 
 
-test('publishEvents emits execution request for data', async () => {
+test('data started reaction emits execution request', async () => {
   const published = []
   const natsContext = {
     publish: async (subject, payload) => published.push({ subject, payload: JSON.parse(payload) }),
   }
 
-  await runHookGroup(publishEvents, {
+  await runHookGroup([publishExecutionRequest], {
     rootCtx: { natsContext },
-    routeCtx: dataStartSpec.context,
+    routeCtx: dataStartedSpec.context,
     scope: {
       instanceId: 'instance-data',
       componentHash: 'hash-data',

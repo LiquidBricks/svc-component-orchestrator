@@ -1,8 +1,8 @@
 import { componentInstanceStartDone } from './componentInstanceStartDone.js'
 import { startDataStates } from './startDataStates.js'
+import { startGates } from './startGates.js'
 import { startImports } from './startImports.js'
 import { startTaskStates } from './startTaskStates.js'
-import { startGates } from './startGates.js'
 
 export const publishEvents = {
   startDataStates,

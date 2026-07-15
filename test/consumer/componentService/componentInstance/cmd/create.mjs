@@ -11,8 +11,8 @@ import { createComponentServiceRouter } from '../../../../../router.js'
 import { path as registerPath } from '../../../../../core/componentAgent/cmd/registerComponent/index.js'
 import { dataMapper as createDataMapper, domain } from '@liquid-bricks/spec-domain/domain'
 import { publishEvents as publishCreateInstanceEvents } from '../../../../../core/componentInstance/cmd/create/publishEvents/index.js'
-import { publishEvents as publishStartInstanceEvents } from '../../../../../core/componentInstance/cmd/start/publishEvents/index.js'
-import { spec as startInstanceSpec } from '../../../../../core/componentInstance/cmd/start/index.js'
+import { publishEvents as publishStartInstanceEvents } from '../../../../../core/domain/vertex/stateMachine/started/publishEvents/index.js'
+import { spec as stateMachineStartedSpec } from '../../../../../core/domain/vertex/stateMachine/started/index.js'
 import { usesImportInstances } from '../../../../../core/componentInstance/cmd/start/loadData/usesImportInstances.js'
 import { componentImports } from '../../../../../core/componentInstance/cmd/create/loadData/componentImports.js'
 import { componentGates } from '../../../../../core/componentInstance/cmd/create/loadData/componentGates.js'
@@ -394,7 +394,7 @@ test('start publishes start commands for imported componentInstances', async () 
 
     await runHookGroup(publishStartInstanceEvents, {
       rootCtx: { natsContext },
-      routeCtx: startInstanceSpec.context,
+      routeCtx: stateMachineStartedSpec.context,
       scope: {
         instanceId,
         dataStateIds: [],

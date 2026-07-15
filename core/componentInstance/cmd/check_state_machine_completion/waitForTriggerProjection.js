@@ -58,10 +58,16 @@ export async function waitForTriggerProjection({
   const expected = expectedTriggerProjection(scope)
   const deadline = Date.now() + timeoutMs
   let observed
+  let lastReadError
 
   while (true) {
-    observed = await readTriggerProjection({ dataMapper, scope })
-    if (observed === expected) return
+    try {
+      observed = await readTriggerProjection({ dataMapper, scope })
+      lastReadError = undefined
+      if (observed === expected) return
+    } catch (error) {
+      lastReadError = error
+    }
 
     const remainingMs = deadline - Date.now()
     if (remainingMs <= 0) break
@@ -82,6 +88,13 @@ export async function waitForTriggerProjection({
       expected,
       observed,
       timeoutMs,
+      lastReadError: lastReadError
+        ? {
+            name: lastReadError.name,
+            code: lastReadError.code,
+            message: lastReadError.message ?? String(lastReadError),
+          }
+        : undefined,
     },
   )
 }

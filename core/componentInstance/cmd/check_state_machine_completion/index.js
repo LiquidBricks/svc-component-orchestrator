@@ -3,6 +3,7 @@ import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nat
 import { ackMessage, decodeData } from '../../../../middleware/index.js'
 import { handler } from './handler.js'
 import { publishCompletedFacts } from './publishCompletedFacts.js'
+import { retryProjectionTimeout } from './retryProjectionTimeout.js'
 import { validatePayload } from './validatePayload.js'
 import { waitForTriggerProjection } from './waitForTriggerProjection.js'
 
@@ -36,6 +37,9 @@ export const spec = {
   pre: [
     validatePayload,
     waitForTriggerProjection,
+  ],
+  onPreError: [
+    retryProjectionTimeout,
   ],
   handler,
   post: [

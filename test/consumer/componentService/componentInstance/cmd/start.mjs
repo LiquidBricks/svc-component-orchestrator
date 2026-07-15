@@ -10,9 +10,10 @@ import { ulid } from 'ulid'
 import { createComponentServiceRouter } from '../../../../../router.js'
 import { path as registerPath } from '../../../../../core/componentAgent/cmd/registerComponent/index.js'
 import { dataMapper as createDataMapper, domain } from '@liquid-bricks/spec-domain/domain'
+import { spec as stateMachineStartedSpec } from '../../../../../core/domain/vertex/stateMachine/started/index.js'
 import { findDependencyFreeStates } from '../../../../../core/componentInstance/cmd/start/findDependencyFreeStates.js'
 import { publishEvents as publishStartInstanceEvents }
-  from '../../../../../core/componentInstance/cmd/start/publishEvents/index.js'
+  from '../../../../../core/domain/vertex/stateMachine/started/publishEvents/index.js'
 import { doesInstanceExist } from '../../../../../core/componentInstance/cmd/start/doesInstanceExist.js'
 import { getStateMachine } from '../../../../../core/componentInstance/cmd/start/getStateMachine.js'
 import { usesImportInstances } from '../../../../../core/componentInstance/cmd/start/loadData/usesImportInstances.js'
@@ -113,7 +114,11 @@ async function createInstance(ctx, scope) {
 
 async function startInstance(ctx, scope) {
   const handlerDiagnostics = createHandlerDiagnostics(ctx.diagnostics, scope)
-  return startInstanceSpec.handler({ rootCtx: ctx, scope: { ...scope, handlerDiagnostics } })
+  return startInstanceSpec.handler({
+    rootCtx: ctx,
+    routeCtx: startInstanceSpec.context,
+    scope: { ...scope, handlerDiagnostics },
+  })
 }
 
 async function loadImports({ g, dataMapper, componentId }) {
@@ -158,28 +163,41 @@ async function namesForStateEdges(dataMapper, edgeIds) {
   return names
 }
 
-test('handler marks stateMachine running and updates timestamp', async () => {
-  await withGraphContext(async ({ diagnostics, dataMapper, g }) => {
-    const component = componentBuilder('StartRunningComponent').toJSON()
-
-    await registerComponent(component, { diagnostics, dataMapper, g })
-
-    const instanceId = 'instance-start-running'
-    const componentId = await getComponentId({ g, dataMapper, diagnostics, componentHash: component.hash })
-    const imports = await loadImports({ g, dataMapper, componentId })
-    await createInstance({ diagnostics, dataMapper, g }, { componentHash: component.hash, componentId, instanceId, imports })
-
-    const { stateMachineId } = await getStateMachineIdForInstance({ g, dataMapper, instanceId })
-    const [initialState] = await dataMapper.query.readInitialState({ vertexId: stateMachineId })
-    const initialUpdatedAt = pickFirst(initialState.updatedAt)
-    assert.equal(pickFirst(initialState.state), domain.vertex.stateMachine.constants.STATES.CREATED)
-
-    await startInstance({ diagnostics, g, dataMapper }, { stateMachineId })
-
-    const [stateRow] = await dataMapper.query.readStateMachineStateAndUpdatedAt({ vertexId: stateMachineId })
-    assert.equal(pickFirst(stateRow.state), domain.vertex.stateMachine.constants.STATES.RUNNING)
-    assert.notEqual(pickFirst(stateRow.updatedAt), initialUpdatedAt)
+test('handler publishes a deterministic stateMachine started fact', async () => {
+  const published = []
+  const diagnostics = makeDiagnosticsInstance()
+  await startInstance({
+    diagnostics,
+    natsContext: {
+      publish: async (subject, payload) => published.push({ subject, payload: JSON.parse(payload) }),
+    },
+  }, {
+    instanceId: 'instance-start-running',
+    instanceVertexId: 'instance-v-1',
+    stateMachineId: 'machine-1',
+    dataStateIds: ['data-state-1'],
+    taskStateIds: ['task-state-1'],
+    usesImportInstances: [{ instanceId: 'import-1' }],
+    usesGateInstances: [{ instanceId: 'gate-1' }],
   })
+
+  const subject = createBasicSubject(
+    natsEvents['*'].domain['*']['*'].vertex.stateMachine.started.v1['*'],
+  ).forPublish().env('prod').build()
+  assert.equal(published.length, 1)
+  assert.equal(published[0].subject, subject)
+  assert.deepEqual(published[0].payload.data, {
+    instanceId: 'instance-start-running',
+    instanceVertexId: 'instance-v-1',
+    stateMachineId: 'machine-1',
+    state: domain.vertex.stateMachine.constants.STATES.RUNNING,
+    dataStateIds: ['data-state-1'],
+    taskStateIds: ['task-state-1'],
+    importInstanceIds: ['import-1'],
+    gateInstanceIds: ['gate-1'],
+    updatedAt: published[0].payload.data.updatedAt,
+  })
+  assert.ok(!Number.isNaN(Date.parse(published[0].payload.data.updatedAt)))
 })
 
 test('findDependencyFreeStates returns only nodes without dependencies', async () => {
@@ -268,7 +286,7 @@ test('publishEvents starts dependency-free states, imports, and emits startDone'
 
   await runHookGroup(publishStartInstanceEvents, {
     rootCtx: { natsContext },
-    routeCtx: startInstanceSpec.context,
+    routeCtx: stateMachineStartedSpec.context,
     scope: { instanceId, dataStateIds, taskStateIds, usesImportInstances: importInstances },
   })
 
@@ -343,7 +361,7 @@ test('publishEvents dispatches gate start command and gate handler emits compute
 
     await runHookGroup(publishStartInstanceEvents, {
       rootCtx: { natsContext, g, dataMapper },
-      routeCtx: startInstanceSpec.context,
+      routeCtx: stateMachineStartedSpec.context,
       scope: {
         instanceId,
         instanceVertexId,
