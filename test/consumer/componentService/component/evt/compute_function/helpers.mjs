@@ -63,7 +63,7 @@ const taskResultComputedSpec = getTaskResultComputedSpec()
 const gateResultComputedSpec = getGateResultComputedSpec()
 const resultComputedSpecByType = Object.freeze({ data: dataResultComputedSpec, task: taskResultComputedSpec, gate: gateResultComputedSpec })
 const injectResultsSpec = getInjectResultsSpec()
-const stateMachineCompletedSpec = getStateMachineCompletedSpec()
+const checkStateMachineCompletionSpec = getCheckStateMachineCompletionSpec()
 const startDependantsSpec = getStartDependantsSpec()
 const dataStartSpec = getDataStartSpec()
 
@@ -187,7 +187,7 @@ function getInjectResultsSpec() {
   return route.config
 }
 
-function getStateMachineCompletedSpec() {
+function getCheckStateMachineCompletionSpec() {
   const router = createComponentServiceRouter({
     natsContext: {},
     g: {},
@@ -195,11 +195,11 @@ function getStateMachineCompletedSpec() {
     dataMapper: {},
   })
   const route = router.routes.find(({ values }) =>
-    values.channel === 'evt'
+    values.channel === 'cmd'
     && values.entity === 'componentInstance'
-    && values.action === 'state_machine_completed'
+    && values.action === 'check_state_machine_completion'
   )
-  assert.ok(route, 'state_machine_completed route not found')
+  assert.ok(route, 'check_state_machine_completion route not found')
   return route.config
 }
 
@@ -341,6 +341,20 @@ export const injectResultsSubject = createBasicSubject(natsEvents['*'].component
   .env('prod')
   .build()
 
+export const checkStateMachineCompletionSubject = createBasicSubject(
+  natsEvents['*'].component_service['*']['*'].cmd.componentInstance.check_state_machine_completion.v1['*'],
+)
+  .forPublish()
+  .env('prod')
+  .build()
+
+export const stateMachineCompletedFactSubject = createBasicSubject(
+  natsEvents['*'].domain['*']['*'].vertex.stateMachine.completed.v1['*'],
+)
+  .forPublish()
+  .env('prod')
+  .build()
+
 export async function runInjectResultsCommands({ rootCtx, events }) {
   const subject = injectResultsSubject
   const published = []
@@ -423,6 +437,49 @@ async function projectResultComputedFact({ rootCtx, payload }) {
     status: fact.stateEdgeStatus ?? fact.status,
     updatedAt: fact.updatedAt,
   })
+}
+
+async function projectStateMachineCompletedFact({ rootCtx, payload }) {
+  const { stateMachineId, updatedAt } = payload?.data ?? {}
+  await rootCtx.dataMapper.vertex.stateMachine.setComplete({ stateMachineId, updatedAt })
+}
+
+export async function runCheckStateMachineCompletionCommands({ rootCtx, events }) {
+  const published = []
+
+  for (const event of events.filter(({ subject }) => subject === checkStateMachineCompletionSubject)) {
+    await runSpec({
+      spec: checkStateMachineCompletionSpec,
+      rootCtx: {
+        ...rootCtx,
+        natsContext: {
+          ...rootCtx.natsContext,
+          publish: async (subject, payload) => {
+            let parsedPayload
+            try {
+              parsedPayload = JSON.parse(payload)
+            } catch {
+              parsedPayload = payload
+            }
+            published.push({ subject, payload: parsedPayload })
+            return rootCtx.natsContext?.publish?.(subject, payload)
+          },
+        },
+      },
+      message: {
+        subject: checkStateMachineCompletionSubject,
+        ack: () => { },
+        json: () => event.payload,
+      },
+      processDomainFacts: false,
+    })
+  }
+
+  for (const fact of published.filter(({ subject }) => subject === stateMachineCompletedFactSubject)) {
+    await projectStateMachineCompletedFact({ rootCtx, payload: fact.payload })
+  }
+
+  return published
 }
 
 async function processResultComputedFacts({ rootCtx, facts }) {
@@ -510,7 +567,7 @@ export {
   startInstanceSpec,
   computeFunctionSpec,
   injectResultsSpec,
-  stateMachineCompletedSpec,
+  checkStateMachineCompletionSpec,
   startDependantsSpec,
   dataStartSpec,
   dataResultComputedSubject,

@@ -11,6 +11,9 @@ import {
   computeFunctionTaskSubject,
   taskResultComputedSubject,
   gateResultComputedSubject,
+  checkStateMachineCompletionSubject,
+  stateMachineCompletedFactSubject,
+  runCheckStateMachineCompletionCommands,
   assertDataStartDependantsPayload,
   withGraphContext,
   registerComponent,
@@ -261,7 +264,7 @@ test('computeFunction gate route publishes result_computed domain fact only', as
   })
 })
 
-test('computeFunction stores state result, marks status provided, and publishes start_dependants', async () => {
+test('computeFunction stores state result and drives completion through command and domain fact', async () => {
   await withGraphContext(async ({ diagnostics, dataMapper, g }) => {
     const component = componentBuilder('ComputeResultDoneComponent')
       .data('dataInput', { deps: () => { } })
@@ -274,7 +277,7 @@ test('computeFunction stores state result, marks status provided, and publishes 
     const imports = await loadImports({ g, dataMapper, componentId })
     await createInstance({ diagnostics, dataMapper, g }, { componentHash: component.hash, componentId, instanceId, imports })
 
-    const { stateMachineId } = await getStateMachineId({ g, dataMapper, instanceId })
+    const { stateMachineId, instanceVertexId } = await getStateMachineId({ g, dataMapper, instanceId })
     const [stateEdgeId] = await dataMapper.query.findDataStateEdgeIdByName({ vertexId: stateMachineId, name: component.data[0].name })
     assert.ok(stateEdgeId, 'data state edge missing')
 
@@ -304,6 +307,7 @@ test('computeFunction stores state result, marks status provided, and publishes 
     }
 
     const finalScope = await runSpec({ spec: computeFunctionSpec, rootCtx, message })
+    await runCheckStateMachineCompletionCommands({ rootCtx, events: published })
 
     assert.equal(finalScope.stateEdgeId, stateEdgeId)
     assert.equal(acked, true)
@@ -316,10 +320,6 @@ test('computeFunction stores state result, marks status provided, and publishes 
     const startDependantsSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start_dependants.v1['*']).forPublish()
       .env('prod')
       .build()
-    const completionSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.state_machine_completed.v1['*']).forPublish()
-      .env('prod')
-      .build()
-
     const startDependantsEvents = published.filter(p => p.subject === startDependantsSubject)
     assert.equal(startDependantsEvents.length, 1)
     assertDataStartDependantsPayload(startDependantsEvents[0].payload.data, {
@@ -328,9 +328,31 @@ test('computeFunction stores state result, marks status provided, and publishes 
       result: { count: 2 },
     })
 
-    const completionEvents = published.filter(p => p.subject === completionSubject)
-    assert.equal(completionEvents.length, 1)
-    assert.deepEqual(completionEvents[0].payload.data, { instanceId, stateMachineId })
+    const checkEvents = published.filter(p => p.subject === checkStateMachineCompletionSubject)
+    assert.equal(checkEvents.length, 1)
+    assert.deepEqual(checkEvents[0].payload.data, {
+      instanceId,
+      instanceVertexId,
+      stateMachineId,
+      stateEdgeId,
+      stateEdgeStatus: STATE_EDGE_STATUS_BY_TYPE.data,
+      status: STATE_EDGE_STATUS_BY_TYPE.data,
+      type: 'data',
+      result: { count: 2 },
+      resultValue: JSON.stringify({ count: 2 }),
+    })
+
+    const completedFacts = published.filter(p => p.subject === stateMachineCompletedFactSubject)
+    assert.equal(completedFacts.length, 1)
+    const { updatedAt, ...completedData } = completedFacts[0].payload.data
+    assert.deepEqual(completedData, { instanceId, stateMachineId })
+    assert.equal(typeof updatedAt, 'string')
+
+    const [completedState] = await dataMapper.query.readStateMachineState({ vertexId: stateMachineId })
+    assert.equal(
+      pickFirst(completedState.state),
+      domain.vertex.stateMachine.constants.STATES.COMPLETE,
+    )
   })
 })
 

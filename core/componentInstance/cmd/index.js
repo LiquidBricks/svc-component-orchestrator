@@ -1,3 +1,4 @@
+export * as check_state_machine_completion from './check_state_machine_completion/index.js'
 export * as create from './create/index.js'
 export * as injectResults from './injectResults/index.js'
 export * as start from './start/index.js'

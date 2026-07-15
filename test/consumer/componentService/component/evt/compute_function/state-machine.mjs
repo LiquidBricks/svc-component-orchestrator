@@ -9,6 +9,8 @@ import {
   computeFunctionDataSubject,
   computeFunctionGateSubject,
   computeFunctionTaskSubject,
+  stateMachineCompletedFactSubject,
+  runCheckStateMachineCompletionCommands,
   withGraphContext,
   registerComponent,
   createInstance,
@@ -19,7 +21,6 @@ import {
   pickFirst,
   runSpec,
   computeFunctionSpec,
-  stateMachineCompletedSpec,
   domain,
 } from './helpers.mjs'
 
@@ -55,16 +56,18 @@ test('stateMachine state switches to complete once all states are provided', asy
 
     const published = []
     const computeFunctionSubject = computeFunctionDataSubject
+    const rootCtx = {
+      diagnostics,
+      g,
+      dataMapper,
+      natsContext: { publish: async (subject, payload) => published.push({ subject, payload: JSON.parse(payload) }) },
+    }
 
     let dataAcked = false
+    const dataEventOffset = published.length
     await runSpec({
       spec: computeFunctionSpec,
-      rootCtx: {
-        diagnostics,
-        g,
-        dataMapper,
-        natsContext: { publish: async (subject, payload) => published.push({ subject, payload: JSON.parse(payload) }) },
-      },
+      rootCtx,
       message: {
         subject: computeFunctionSubject,
         ack: () => { dataAcked = true },
@@ -78,20 +81,17 @@ test('stateMachine state switches to complete once all states are provided', asy
         }),
       },
     })
+    await runCheckStateMachineCompletionCommands({ rootCtx, events: published.slice(dataEventOffset) })
     assert.equal(dataAcked, true)
 
     const [runningState] = await dataMapper.query.readRunningState({ vertexId: stateMachineId })
     assert.equal(pickFirst(runningState.state), domain.vertex.stateMachine.constants.STATES.RUNNING)
 
     let taskAcked = false
+    const taskEventOffset = published.length
     await runSpec({
       spec: computeFunctionSpec,
-      rootCtx: {
-        diagnostics,
-        g,
-        dataMapper,
-        natsContext: { publish: async (subject, payload) => published.push({ subject, payload: JSON.parse(payload) }) },
-      },
+      rootCtx,
       message: {
         subject: computeFunctionSubject,
         ack: () => { taskAcked = true },
@@ -105,25 +105,14 @@ test('stateMachine state switches to complete once all states are provided', asy
         }),
       },
     })
+    await runCheckStateMachineCompletionCommands({ rootCtx, events: published.slice(taskEventOffset) })
     assert.equal(taskAcked, true)
 
-    const stateMachineCompletedSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.state_machine_completed.v1['*']).forPublish()
-      .env('prod')
-      .build()
-    const completionEvent = published.find(p => p.subject === stateMachineCompletedSubject)
-    assert.ok(completionEvent, 'state_machine_completed event not published')
-
-    let completionAcked = false
-    await runSpec({
-      spec: stateMachineCompletedSpec,
-      rootCtx: { diagnostics, g, dataMapper },
-      message: {
-        subject: stateMachineCompletedSubject,
-        ack: () => { completionAcked = true },
-        json: () => completionEvent.payload,
-      },
-    })
-    assert.equal(completionAcked, true)
+    const completionFact = published.find(p =>
+      p.subject === stateMachineCompletedFactSubject
+      && p.payload?.data?.stateMachineId === stateMachineId
+    )
+    assert.ok(completionFact, 'stateMachine.completed fact not published')
 
     const [completedState] = await dataMapper.query.readCompletedState({ vertexId: stateMachineId })
     assert.equal(pickFirst(completedState.state), domain.vertex.stateMachine.constants.STATES.COMPLETE)
@@ -159,18 +148,16 @@ test('componentInstance completes when only imports exist and imports finish', a
 
     const published = []
     const computeFunctionSubject = computeFunctionDataSubject
-    const stateMachineCompletedSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.state_machine_completed.v1['*']).forPublish()
-      .env('prod')
-      .build()
 
+    const rootCtx = {
+      diagnostics,
+      g,
+      dataMapper,
+      natsContext: { publish: async (subject, payload) => published.push({ subject, payload: JSON.parse(payload) }) },
+    }
     await runSpec({
       spec: computeFunctionSpec,
-      rootCtx: {
-        diagnostics,
-        g,
-        dataMapper,
-        natsContext: { publish: async (subject, payload) => published.push({ subject, payload: JSON.parse(payload) }) },
-      },
+      rootCtx,
       message: {
         subject: computeFunctionSubject,
         ack: () => { },
@@ -184,18 +171,15 @@ test('componentInstance completes when only imports exist and imports finish', a
         }),
       },
     })
+    await runCheckStateMachineCompletionCommands({ rootCtx, events: published })
 
-    for (const event of published.filter(({ subject }) => subject === stateMachineCompletedSubject)) {
-      await runSpec({
-        spec: stateMachineCompletedSpec,
-        rootCtx: { diagnostics, g, dataMapper },
-        message: {
-          subject: stateMachineCompletedSubject,
-          ack: () => { },
-          json: () => event.payload,
-        },
-      })
-    }
+    const completedInstanceIds = published
+      .filter(({ subject }) => subject === stateMachineCompletedFactSubject)
+      .map(({ payload }) => payload.data.instanceId)
+    assert.deepEqual(
+      new Set(completedInstanceIds),
+      new Set([childInstanceId, rootInstanceId]),
+    )
 
     const [rootState] = await dataMapper.query.readStateMachineStateByInstanceId({ instanceId: rootInstanceId })
     const rootStateValue = pickFirst((rootState?.state ?? rootState))
@@ -258,16 +242,15 @@ test('componentInstance completes after false gates settle and true gates comple
     const startSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start.v1['*']).forPublish()
       .env('prod')
       .build()
-    const stateMachineCompletedSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.state_machine_completed.v1['*']).forPublish()
-      .env('prod')
-      .build()
     const natsContext = {
       publish: async (subject, payload) => published.push({ subject, payload: JSON.parse(payload) }),
     }
+    const rootCtx = { diagnostics, g, dataMapper, natsContext }
 
+    let completionCommandOffset = published.length
     await runSpec({
       spec: computeFunctionSpec,
-      rootCtx: { diagnostics, g, dataMapper, natsContext },
+      rootCtx,
       message: {
         subject: computeFunctionSubject,
         ack: () => { },
@@ -281,6 +264,10 @@ test('componentInstance completes after false gates settle and true gates comple
         }),
       },
     })
+    await runCheckStateMachineCompletionCommands({
+      rootCtx,
+      events: published.slice(completionCommandOffset),
+    })
 
     const passedGateStartEvent = published.find(({ subject, payload }) =>
       subject === startSubject
@@ -292,9 +279,10 @@ test('componentInstance completes after false gates settle and true gates comple
     const passedGateStarted = await hasInstanceStarted({ g, dataMapper, instanceVertexId: passedGateInstanceVertexId })
     assert.equal(passedGateStarted, true, 'passed gate instance should be started')
 
+    completionCommandOffset = published.length
     await runSpec({
       spec: computeFunctionSpec,
-      rootCtx: { diagnostics, g, dataMapper, natsContext },
+      rootCtx,
       message: {
         subject: computeFunctionSubject,
         ack: () => { },
@@ -308,31 +296,27 @@ test('componentInstance completes after false gates settle and true gates comple
         }),
       },
     })
+    await runCheckStateMachineCompletionCommands({
+      rootCtx,
+      events: published.slice(completionCommandOffset),
+    })
 
     const passedGateCompletionEvent = published.find(({ subject, payload }) =>
-      subject === stateMachineCompletedSubject
+      subject === stateMachineCompletedFactSubject
       && payload?.data?.instanceId === passedGateInstanceId
     )
     assert.ok(passedGateCompletionEvent, 'passed gate component should publish completion')
-    await runSpec({
-      spec: stateMachineCompletedSpec,
-      rootCtx: { diagnostics, g, dataMapper },
-      message: {
-        subject: stateMachineCompletedSubject,
-        ack: () => { },
-        json: () => passedGateCompletionEvent.payload,
-      },
-    })
 
     const prematureRootCompletionEvent = published.find(({ subject, payload }) =>
-      subject === stateMachineCompletedSubject
+      subject === stateMachineCompletedFactSubject
       && payload?.data?.instanceId === rootInstanceId
     )
     assert.equal(prematureRootCompletionEvent, undefined, 'root should not complete before every gate has settled')
 
+    completionCommandOffset = published.length
     await runSpec({
       spec: computeFunctionSpec,
-      rootCtx: { diagnostics, g, dataMapper, natsContext },
+      rootCtx,
       message: {
         subject: computeFunctionSubject,
         ack: () => { },
@@ -345,6 +329,10 @@ test('componentInstance completes after false gates settle and true gates comple
           }
         }),
       },
+    })
+    await runCheckStateMachineCompletionCommands({
+      rootCtx,
+      events: published.slice(completionCommandOffset),
     })
 
     const blockedGateStarted = await hasInstanceStarted({ g, dataMapper, instanceVertexId: blockedGateInstanceVertexId })
@@ -363,19 +351,10 @@ test('componentInstance completes after false gates settle and true gates comple
     assert.equal(blockedGateStartEvent, undefined, 'blocked gate should not publish a start command')
 
     const rootCompletionEvent = published.find(({ subject, payload }) =>
-      subject === stateMachineCompletedSubject
+      subject === stateMachineCompletedFactSubject
       && payload?.data?.instanceId === rootInstanceId
     )
     assert.ok(rootCompletionEvent, 'root should complete after all gates are settled')
-    await runSpec({
-      spec: stateMachineCompletedSpec,
-      rootCtx: { diagnostics, g, dataMapper },
-      message: {
-        subject: stateMachineCompletedSubject,
-        ack: () => { },
-        json: () => rootCompletionEvent.payload,
-      },
-    })
 
     const [rootState] = await dataMapper.query.readStateMachineState({ vertexId: rootStateMachineId })
     assert.equal(

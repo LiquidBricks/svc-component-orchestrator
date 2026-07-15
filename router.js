@@ -17,6 +17,7 @@ export const routes = [
   [componentInstance.cmd.create.path, componentInstance.cmd.create.spec],
   [componentInstance.cmd.start.path, componentInstance.cmd.start.spec],
   [componentInstance.cmd.start_dependants.path, componentInstance.cmd.start_dependants.spec],
+  [componentInstance.cmd.check_state_machine_completion.path, componentInstance.cmd.check_state_machine_completion.spec],
   [data.cmd.start.path, data.cmd.start.spec],
   [gate.cmd.start.path, gate.cmd.start.spec],
   [importEntity.cmd.start.path, importEntity.cmd.start.spec],
@@ -29,7 +30,6 @@ export const routes = [
   [component.evt.compute_function.gate.path, component.evt.compute_function.gate.spec],
   [component.evt.compute_function.task.path, component.evt.compute_function.task.spec],
   [componentInstance.cmd.injectResults.path, componentInstance.cmd.injectResults.spec],
-  [componentInstance.evt.state_machine_completed.path, componentInstance.evt.state_machine_completed.spec],
   [componentInstance.evt.startDone.path, componentInstance.evt.startDone.spec],
 ]
 
@@ -38,10 +38,19 @@ export function createComponentServiceRouter({
   g,
   diagnostics,
   dataMapper = createDataMapper({ g, diagnostics }),
+  projectionReadinessTimeoutMs,
+  projectionReadinessIntervalMs,
 }) {
   return router({
     tokens: ['env', 'ns', 'tenant', 'context', 'channel', 'entity', 'action', 'version', 'id'],
-    context: { natsContext, g, diagnostics, dataMapper },
+    context: {
+      natsContext,
+      g,
+      diagnostics,
+      dataMapper,
+      projectionReadinessTimeoutMs,
+      projectionReadinessIntervalMs,
+    },
   })
     .before(({ rootCtx: { diagnostics }, scope, message }) => {
       // diagnostics.trace('event received', { subject: message.subject, message: message.json() })
