@@ -5,7 +5,7 @@ import { componentGates } from '../loadData/componentGates.js'
 import { domain } from '@liquid-bricks/spec-domain/domain'
 
 export async function handler({ rootCtx: { g, dataMapper }, scope: { instanceId, componentId, imports, gates } }) {
-  const { instanceVertexId } = await createComponentInstance({ g, dataMapper, componentId, instanceId })
+  const { instanceVertexId, stateMachineId: rootStateMachineId } = await createComponentInstance({ g, dataMapper, componentId, instanceId })
 
   async function createImportInstances({ imports: importsToCreate, parentComponentId, parentInstanceVertexId }) {
     const created = []
@@ -18,7 +18,7 @@ export async function handler({ rootCtx: { g, dataMapper }, scope: { instanceId,
       importRefId,
     } of importsToCreate ?? []) {
       const importedInstanceId = ulid()
-      const { instanceVertexId: importedInstanceVertexId } = await createComponentInstance({
+      const { instanceVertexId: importedInstanceVertexId, stateMachineId: importedStateMachineId } = await createComponentInstance({
         g,
         dataMapper,
         componentId: importedComponentId,
@@ -62,6 +62,7 @@ export async function handler({ rootCtx: { g, dataMapper }, scope: { instanceId,
         gates: nestedGates?.gates ?? [],
         parentComponentId: importedComponentId,
         parentInstanceVertexId: importedInstanceVertexId,
+        parentStateMachineId: importedStateMachineId,
       })
 
       await createImportInstances({
@@ -81,7 +82,7 @@ export async function handler({ rootCtx: { g, dataMapper }, scope: { instanceId,
     return created
   }
 
-  async function createGateInstances({ gates: gatesToCreate, parentComponentId, parentInstanceVertexId }) {
+  async function createGateInstances({ gates: gatesToCreate, parentComponentId, parentInstanceVertexId, parentStateMachineId }) {
     const created = []
 
     for (const {
@@ -93,7 +94,7 @@ export async function handler({ rootCtx: { g, dataMapper }, scope: { instanceId,
       gateRefId,
     } of gatesToCreate ?? []) {
       const gatedInstanceId = ulid()
-      const { instanceVertexId: gatedInstanceVertexId } = await createComponentInstance({
+      const { instanceVertexId: gatedInstanceVertexId, stateMachineId: gatedStateMachineId } = await createComponentInstance({
         g,
         dataMapper,
         componentId: gatedComponentId,
@@ -103,6 +104,10 @@ export async function handler({ rootCtx: { g, dataMapper }, scope: { instanceId,
       const { id: gateInstanceRefId } = await dataMapper.vertex.gateInstanceRef.create()
       await dataMapper.edge.uses_gate.componentInstance_gateInstanceRef.create({
         fromId: parentInstanceVertexId,
+        toId: gateInstanceRefId,
+      })
+      await dataMapper.edge.has_gate_state.stateMachine_gateInstanceRef.create({
+        fromId: parentStateMachineId,
         toId: gateInstanceRefId,
       })
       await dataMapper.edge.uses_gate.gateInstanceRef_componentInstance.create({
@@ -130,6 +135,7 @@ export async function handler({ rootCtx: { g, dataMapper }, scope: { instanceId,
         gates: nestedGates?.gates ?? [],
         parentComponentId: gatedComponentId,
         parentInstanceVertexId: gatedInstanceVertexId,
+        parentStateMachineId: gatedStateMachineId,
       })
 
       await createImportInstances({
@@ -160,6 +166,7 @@ export async function handler({ rootCtx: { g, dataMapper }, scope: { instanceId,
     gates,
     parentComponentId: componentId,
     parentInstanceVertexId: instanceVertexId,
+    parentStateMachineId: rootStateMachineId,
   })
 
   return { importedInstances }

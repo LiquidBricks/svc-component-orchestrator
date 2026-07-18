@@ -2,6 +2,7 @@ import { create as createSubject } from '@liquid-bricks/lib-nats-subject/create/
 import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
 import { ackMessage, decodeData } from '../../../../../middleware/index.js'
 import { publishResultComputedFact } from './publishResultComputedFact.js'
+import { findStateEdge } from './findStateEdge.js'
 import { loadData } from '../_helper/loadData.js'
 import { validatePayload } from '../_helper/validatePayload.js'
 
@@ -10,8 +11,8 @@ export const path = createSubject(natsEvents['*'].component_service['*'].functio
   .toObject()
 
 export const emits = {
-  'domain.vertex.gateInstanceRef.result_computed.v1':
-    natsEvents['*'].domain['*']['*'].vertex.gateInstanceRef.result_computed.v1['*'],
+  'domain.edge.has_gate_state.result_computed.v1':
+    natsEvents['*'].domain['*']['*'].edge.has_gate_state.result_computed.v1['*'],
 }
 
 export const spec = {
@@ -22,6 +23,7 @@ export const spec = {
   pre: [
     validatePayload,
     loadData,
+    findStateEdge,
   ],
   handler: publishResultComputedFact,
   post: [

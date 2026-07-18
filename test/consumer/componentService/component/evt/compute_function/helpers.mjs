@@ -163,11 +163,11 @@ function getGateResultComputedSpec() {
   })
   const route = router.routes.find(({ values }) =>
     values.ns === 'domain'
-    && values.channel === 'vertex'
-    && values.entity === 'gateInstanceRef'
+    && values.channel === 'edge'
+    && values.entity === 'has_gate_state'
     && values.action === 'result_computed'
   )
-  assert.ok(route, 'gateInstanceRef result_computed domain route not found')
+  assert.ok(route, 'has_gate_state result_computed domain route not found')
   return route.config
 }
 
@@ -391,7 +391,7 @@ const taskResultComputedSubject = createBasicSubject(natsEvents['*'].domain['*']
   .env('prod')
   .build()
 
-const gateResultComputedSubject = createBasicSubject(natsEvents['*'].domain['*']['*'].vertex.gateInstanceRef.result_computed.v1['*'])
+const gateResultComputedSubject = createBasicSubject(natsEvents['*'].domain['*']['*'].edge.has_gate_state.result_computed.v1['*'])
   .forPublish()
   .env('prod')
   .build()
@@ -406,6 +406,7 @@ function isResultComputedFact(event) {
   const type = event?.payload?.data?.type
   if (type === 'gate') {
     return event?.subject === resultComputedSubjectByType.gate
+      && event?.payload?.data?.stateEdgeId
       && event?.payload?.data?.gateInstanceRefId
   }
 
@@ -419,8 +420,8 @@ async function projectResultComputedFact({ rootCtx, payload }) {
     ? fact.resultValue
     : (fact.result != null ? JSON.stringify(fact.result) : '')
   if (fact.type === 'gate') {
-    await rootCtx.dataMapper.vertex.gateInstanceRef.setResultAndUpdatedAt({
-      gateInstanceRefId: fact.gateInstanceRefId,
+    await rootCtx.dataMapper.edge.has_gate_state.stateMachine_gateInstanceRef.setResultAndUpdatedAt({
+      edgeId: fact.stateEdgeId,
       result,
       updatedAt: fact.updatedAt,
     })

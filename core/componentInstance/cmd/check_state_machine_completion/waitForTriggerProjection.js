@@ -24,7 +24,7 @@ function expectedGateResult({ result, resultValue }) {
 async function readTriggerProjection({ dataMapper, scope }) {
   if (scope.type === 'gate') {
     const [resultValues] = await dataMapper.query.readResultValues({
-      vertexId: scope.gateInstanceRefId,
+      edgeId: scope.stateEdgeId,
     })
     return valueFor(resultValues, 'result')
   }
@@ -75,7 +75,7 @@ export async function waitForTriggerProjection({
   }
 
   const trigger = scope.type === 'gate'
-    ? { gateInstanceRefId: scope.gateInstanceRefId }
+    ? { stateEdgeId: scope.stateEdgeId, gateInstanceRefId: scope.gateInstanceRefId }
     : { stateEdgeId: scope.stateEdgeId }
 
   scope.handlerDiagnostics.require(

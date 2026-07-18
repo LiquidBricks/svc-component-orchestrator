@@ -215,6 +215,8 @@ test('computeFunction gate route publishes result_computed domain fact only', as
     const { stateMachineId, instanceVertexId } = await getStateMachineId({ g, dataMapper, instanceId })
     const [gateInstanceRefId] = await dataMapper.query.findGateInstanceRefIdByAlias({ vertexId: instanceVertexId, alias: 'setup' })
     assert.ok(gateInstanceRefId, 'gate instance ref missing')
+    const [stateEdgeId] = await dataMapper.query.findGateStateEdgeIdForTargetNode({ vertexId: stateMachineId, id: gateInstanceRefId })
+    assert.ok(stateEdgeId, 'gate state edge missing')
 
     const resultPayload = true
     const published = []
@@ -241,6 +243,7 @@ test('computeFunction gate route publishes result_computed domain fact only', as
     const finalScope = await runSpec({ spec: computeFunctionSpec, rootCtx, message, processDomainFacts: false })
 
     assert.equal(finalScope.gateInstanceRefId, gateInstanceRefId)
+    assert.equal(finalScope.stateEdgeId, stateEdgeId)
     assert.equal(acked, true)
     assert.equal(published.length, 1)
     assert.equal(published[0].subject, gateResultComputedSubject)
@@ -251,6 +254,8 @@ test('computeFunction gate route publishes result_computed domain fact only', as
       instanceId,
       instanceVertexId,
       stateMachineId,
+      stateEdgeId,
+      stateId: stateEdgeId,
       gateInstanceRefId,
       type: 'gate',
       name: 'setup',
@@ -259,7 +264,7 @@ test('computeFunction gate route publishes result_computed domain fact only', as
       updatedAt: '<updatedAt>',
     })
 
-    const [unchangedValues] = await dataMapper.query.readResultValues({ vertexId: gateInstanceRefId })
+    const [unchangedValues] = await dataMapper.query.readResultValues({ edgeId: stateEdgeId })
     assert.equal(pickFirst(unchangedValues?.result), null)
   })
 })

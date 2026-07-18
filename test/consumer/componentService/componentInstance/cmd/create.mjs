@@ -167,6 +167,12 @@ test('handler creates gate instances and links them to gate refs', async () => {
     const gateInstanceRefs = await dataMapper.query.readGateInstanceRefs({ vertexId: rootInstanceVertexId })
     assert.equal(gateInstanceRefs.length, 1)
 
+    const [rootStateMachineId] = await dataMapper.query.readStateMachineId({ vertexId: rootInstanceVertexId })
+    const gateStateEdgeIds = await dataMapper.query.listGateStateEdgeIds({ vertexId: rootStateMachineId })
+    assert.equal(gateStateEdgeIds.length, 1)
+    const [gateStateTargetId] = await dataMapper.query.findEdgeTargetNodeId({ edgeId: gateStateEdgeIds[0] })
+    assert.equal(gateStateTargetId, gateInstanceRefs[0])
+
     const [gateRefId] = await dataMapper.query.listGateRefIds({ vertexId: rootComponentId })
     assert.ok(gateRefId, 'gateRef missing')
 

@@ -52,6 +52,12 @@ export function validatePayload({
   }
 
   handlerDiagnostics.require(
+    typeof stateEdgeId === 'string' && stateEdgeId.length,
+    Errors.PRECONDITION_REQUIRED,
+    'stateEdgeId required for gate completion check',
+    { field: 'stateEdgeId' },
+  )
+  handlerDiagnostics.require(
     typeof gateInstanceRefId === 'string' && gateInstanceRefId.length,
     Errors.PRECONDITION_REQUIRED,
     'gateInstanceRefId required for gate completion check',

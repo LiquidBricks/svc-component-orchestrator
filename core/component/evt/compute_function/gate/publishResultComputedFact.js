@@ -5,22 +5,19 @@ export async function publishResultComputedFact({
     instanceId,
     instanceVertexId,
     stateMachineId,
+    stateEdgeId,
+    gateInstanceRefId,
     name,
     result,
   },
-  rootCtx: { dataMapper, natsContext },
+  rootCtx: { natsContext },
   routeCtx: { emits },
 }) {
-  if (!instanceVertexId || !name) return { instanceId }
-
-  const [gateInstanceRefId] = await dataMapper.query.findGateInstanceRefIdByAlias({ vertexId: instanceVertexId, alias: name })
-  if (!gateInstanceRefId) return { instanceId }
-
   const updatedAt = new Date().toISOString()
   const resultValue = result != null ? JSON.stringify(result) : ''
 
   await natsContext.publish(
-    createSubject(emits['domain.vertex.gateInstanceRef.result_computed.v1'])
+    createSubject(emits['domain.edge.has_gate_state.result_computed.v1'])
       .forPublish()
       .env('prod')
       .build(),
@@ -29,6 +26,8 @@ export async function publishResultComputedFact({
         instanceId,
         instanceVertexId,
         stateMachineId,
+        stateEdgeId,
+        stateId: stateEdgeId,
         gateInstanceRefId,
         type: 'gate',
         name,
@@ -39,5 +38,5 @@ export async function publishResultComputedFact({
     }),
   )
 
-  return { instanceId, gateInstanceRefId, updatedAt }
+  return { instanceId, stateEdgeId, gateInstanceRefId, updatedAt }
 }

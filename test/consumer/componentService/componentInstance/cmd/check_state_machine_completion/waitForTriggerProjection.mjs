@@ -65,6 +65,7 @@ test('returns immediately when the triggering state status is already projected'
 test('returns immediately when the triggering gate result is already projected', async () => {
   const scope = {
     type: 'gate',
+    stateEdgeId: 'gate-state-edge-1',
     gateInstanceRefId: 'gate-ref-1',
     result: false,
     resultValue: 'false',
@@ -79,9 +80,9 @@ test('returns immediately when the triggering gate result is already projected',
       projectionReadinessIntervalMs: 0,
       dataMapper: {
         query: {
-          readResultValues: async ({ vertexId }) => {
+          readResultValues: async ({ edgeId }) => {
             reads += 1
-            assert.equal(vertexId, 'gate-ref-1')
+            assert.equal(edgeId, 'gate-state-edge-1')
             return values('result', 'false')
           },
         },

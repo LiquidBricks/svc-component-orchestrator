@@ -29,7 +29,7 @@ test('uses the in-flight state status and traverses parent instances once', asyn
       return values('status', DATA_PROVIDED)
     },
     listImportInstanceVertexIds: async () => [],
-    listGateInstanceRefIds: async () => [],
+    listGateStateEdgeIds: async () => [],
     readStateMachineState: async () => values('state', 'running'),
     listImportParentInstanceVertexIds: async ({ vertexId }) =>
       vertexId === 'instance-child' ? ['instance-parent'] : [],
@@ -83,8 +83,12 @@ test('uses the in-flight passing gate result while traversing the gated instance
       return values('status', DATA_PROVIDED)
     },
     listImportInstanceVertexIds: async () => [],
-    listGateInstanceRefIds: async ({ vertexId }) =>
-      vertexId === 'instance-root' ? ['gate-ref-in-flight'] : [],
+    listGateStateEdgeIds: async ({ vertexId }) =>
+      vertexId === 'state-machine-root' ? ['gate-edge-in-flight'] : [],
+    findEdgeTargetNodeId: async ({ edgeId }) => {
+      assert.equal(edgeId, 'gate-edge-in-flight')
+      return ['gate-ref-in-flight']
+    },
     readResultValues: async () => {
       assert.fail('the in-flight gate result must not be read from storage')
     },
@@ -110,6 +114,7 @@ test('uses the in-flight passing gate result while traversing the gated instance
       instanceId: 'instance-root-id',
       instanceVertexId: 'instance-root',
       stateMachineId: 'state-machine-root',
+      stateEdgeId: 'gate-edge-in-flight',
       gateInstanceRefId: 'gate-ref-in-flight',
       resultValue: 'true',
       type: 'gate',

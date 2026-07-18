@@ -23,6 +23,8 @@ export const spec = {
       'instanceId',
       'instanceVertexId',
       'stateMachineId',
+      'stateEdgeId',
+      'stateId',
       'gateInstanceRefId',
       'type',
       'name',

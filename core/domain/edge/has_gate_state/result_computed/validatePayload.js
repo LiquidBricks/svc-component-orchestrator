@@ -6,6 +6,7 @@ export function validatePayload({
     instanceId,
     instanceVertexId,
     stateMachineId,
+    stateEdgeId,
     gateInstanceRefId,
     name,
     result,
@@ -15,31 +16,37 @@ export function validatePayload({
   handlerDiagnostics.require(
     typeof instanceId === 'string' && instanceId.length,
     Errors.PRECONDITION_REQUIRED,
-    'instanceId required for gateInstanceRef result_computed',
+    'instanceId required for has_gate_state result_computed',
     { field: 'instanceId' },
   )
   handlerDiagnostics.require(
     typeof instanceVertexId === 'string' && instanceVertexId.length,
     Errors.PRECONDITION_REQUIRED,
-    'instanceVertexId required for gateInstanceRef result_computed',
+    'instanceVertexId required for has_gate_state result_computed',
     { field: 'instanceVertexId' },
   )
   handlerDiagnostics.require(
     typeof stateMachineId === 'string' && stateMachineId.length,
     Errors.PRECONDITION_REQUIRED,
-    'stateMachineId required for gateInstanceRef result_computed',
+    'stateMachineId required for has_gate_state result_computed',
     { field: 'stateMachineId' },
+  )
+  handlerDiagnostics.require(
+    typeof stateEdgeId === 'string' && stateEdgeId.length,
+    Errors.PRECONDITION_REQUIRED,
+    'stateEdgeId required for has_gate_state result_computed',
+    { field: 'stateEdgeId' },
   )
   handlerDiagnostics.require(
     typeof gateInstanceRefId === 'string' && gateInstanceRefId.length,
     Errors.PRECONDITION_REQUIRED,
-    'gateInstanceRefId required for gateInstanceRef result_computed',
+    'gateInstanceRefId required for has_gate_state result_computed',
     { field: 'gateInstanceRefId' },
   )
   handlerDiagnostics.require(
     typeof name === 'string' && name.length,
     Errors.PRECONDITION_REQUIRED,
-    'name required for gateInstanceRef result_computed',
+    'name required for has_gate_state result_computed',
     { field: 'name' },
   )
 

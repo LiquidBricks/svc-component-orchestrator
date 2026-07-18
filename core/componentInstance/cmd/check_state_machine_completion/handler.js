@@ -75,19 +75,22 @@ async function findParentInstances({ dataMapper, instanceVertexId }) {
 
 async function isGateFinished({
   dataMapper,
-  gateInstanceRefId,
+  gateStateEdgeId,
   cache,
   stateStatusOverrides,
   gateResultOverrides,
 }) {
-  let rawResult = gateResultOverrides.get(gateInstanceRefId)
+  let rawResult = gateResultOverrides.get(gateStateEdgeId)
   if (rawResult === undefined) {
-    const [resultValues] = await dataMapper.query.readResultValues({ vertexId: gateInstanceRefId })
+    const [resultValues] = await dataMapper.query.readResultValues({ edgeId: gateStateEdgeId })
     rawResult = valueFor(resultValues, 'result')
   }
   if (rawResult === undefined || rawResult === null || rawResult === '') return false
 
   if (normalizeResult(rawResult) !== true) return true
+
+  const [gateInstanceRefId] = await dataMapper.query.findEdgeTargetNodeId({ edgeId: gateStateEdgeId })
+  if (!gateInstanceRefId) return false
 
   const [gateInstanceVertexId] = await dataMapper.query.findGateInstanceVertexIdForRef({ vertexId: gateInstanceRefId })
   if (!gateInstanceVertexId) return false
@@ -107,18 +110,18 @@ async function isGateFinished({
 
 async function areAllGatesFinished({
   dataMapper,
-  instanceVertexId,
+  stateMachineId,
   cache,
   stateStatusOverrides,
   gateResultOverrides,
 }) {
-  const gateInstanceRefIds = await dataMapper.query.listGateInstanceRefIds({ vertexId: instanceVertexId })
+  const gateStateEdgeIds = await dataMapper.query.listGateStateEdgeIds({ vertexId: stateMachineId })
 
-  for (const gateInstanceRefId of gateInstanceRefIds ?? []) {
-    if (!gateInstanceRefId) continue
+  for (const gateStateEdgeId of gateStateEdgeIds ?? []) {
+    if (!gateStateEdgeId) continue
     const finished = await isGateFinished({
       dataMapper,
-      gateInstanceRefId,
+      gateStateEdgeId,
       cache,
       stateStatusOverrides,
       gateResultOverrides,
@@ -170,7 +173,7 @@ async function isInstanceFinished({
 
   const gatesFinished = await areAllGatesFinished({
     dataMapper,
-    instanceVertexId,
+    stateMachineId,
     cache,
     stateStatusOverrides,
     gateResultOverrides,
@@ -244,11 +247,11 @@ export async function handler({
   }
 
   const gateResultOverrides = new Map()
-  if (gateInstanceRefId) {
+  if (gateInstanceRefId && stateEdgeId) {
     const serializedResult = typeof resultValue === 'string'
       ? resultValue
       : (result !== undefined ? JSON.stringify(result) : '')
-    gateResultOverrides.set(gateInstanceRefId, serializedResult)
+    gateResultOverrides.set(stateEdgeId, serializedResult)
   }
 
   const completedStateMachines = []
