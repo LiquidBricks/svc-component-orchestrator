@@ -108,7 +108,32 @@ async function getComponentId({ g, dataMapper, diagnostics, componentHash }) {
   return componentId
 }
 
-test('handler creates componentInstance stateMachine and links data/task states', async () => {
+function readProperty(row, property) {
+  const value = row?.[property] ?? row
+  return Array.isArray(value) ? value[0] : value
+}
+
+function normalizeState(value) {
+  if (typeof value !== 'string') return value
+  try {
+    return JSON.parse(value)
+  } catch {
+    return value
+  }
+}
+
+async function readComponentSnapshot({ dataMapper, instanceVertexId }) {
+  const componentStateIds = await dataMapper.query.readComponentStateId({ vertexId: instanceVertexId })
+  assert.equal(componentStateIds.length, 1, 'componentInstance must have exactly one componentState')
+
+  const [row] = await dataMapper.query.readComponentState({ vertexId: componentStateIds[0] })
+  return {
+    componentStateId: componentStateIds[0],
+    state: normalizeState(readProperty(row, 'state')),
+  }
+}
+
+test('handler creates componentInstance snapshot stateMachine and links data/task states', async () => {
   await withGraphContext(async ({ diagnostics, dataMapper, g }) => {
     const component = componentBuilder('ComponentStateMachine')
       .task('taskA', {})
@@ -128,6 +153,14 @@ test('handler creates componentInstance stateMachine and links data/task states'
 
     const instanceOfIds = await dataMapper.query.listInstanceOfIds({ vertexId: instanceVertexId })
     assert.deepEqual(instanceOfIds, [componentId])
+
+    const snapshot = await readComponentSnapshot({ dataMapper, instanceVertexId })
+    assert.ok(snapshot.componentStateId)
+    assert.deepEqual(snapshot.state, {
+      'data.dataA': null,
+      'task.taskA': null,
+      'task.taskB': null,
+    })
 
     const [stateMachineId] = await dataMapper.query.readStateMachineId({ vertexId: instanceVertexId })
     assert.ok(stateMachineId, 'stateMachine vertex missing')
@@ -182,6 +215,12 @@ test('handler creates gate instances and links them to gate refs', async () => {
     const [gatedInstanceVertexId] = await dataMapper.query.findGatedInstanceVertexIdForRef({ vertexId: gateInstanceRefs[0] })
     assert.ok(gatedInstanceVertexId, 'gated instance missing')
 
+    const rootSnapshot = await readComponentSnapshot({ dataMapper, instanceVertexId: rootInstanceVertexId })
+    assert.deepEqual(rootSnapshot.state, { 'gate.setup': null })
+
+    const gatedSnapshot = await readComponentSnapshot({ dataMapper, instanceVertexId: gatedInstanceVertexId })
+    assert.deepEqual(gatedSnapshot.state, { 'data.ready': null })
+
     const [gatedComponentId] = await dataMapper.query.findGatedComponentIdForGateRef({ vertexId: gateRefId })
     const [gatedInstanceComponentId] = await dataMapper.query.findGatedInstanceComponentId({ vertexId: gatedInstanceVertexId })
     assert.equal(gatedInstanceComponentId, gatedComponentId)
@@ -211,6 +250,13 @@ test('create builds componentInstances for imports and links via importInstanceR
 
     const [importInstanceRefId] = importInstanceRefIds
     const [importedInstanceVertexId] = await dataMapper.query.findImportedInstanceVertexIdForRef({ vertexId: importInstanceRefId })
+
+    const parentSnapshot = await readComponentSnapshot({ dataMapper, instanceVertexId: parentInstanceVertexId })
+    assert.deepEqual(parentSnapshot.state, {})
+
+    const importedSnapshot = await readComponentSnapshot({ dataMapper, instanceVertexId: importedInstanceVertexId })
+    assert.deepEqual(importedSnapshot.state, {})
+
     const [importRefId] = await dataMapper.query.findImportRefIdForInstanceRef({ vertexId: importInstanceRefId })
     const [importRefValues] = await dataMapper.query.readImportRefValues({ vertexId: importRefId })
     const aliasValue = Array.isArray(importRefValues.alias) ? importRefValues.alias[0] : importRefValues.alias
