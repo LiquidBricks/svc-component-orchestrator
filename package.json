@@ -18,7 +18,7 @@
     "@liquid-bricks/lib-nats-context": "github:LiquidBricks/lib-nats-context#756ba42db21d10d311892cd21aa7b56243f6c2c0",
     "@liquid-bricks/lib-nats-graph": "github:LiquidBricks/lib-nats-graph#dcbbcd0b215a2e8cac8b745bd42203a174163eb7",
     "@liquid-bricks/lib-nats-subject": "github:LiquidBricks/lib-nats-subject#635653c36ee8b2c00c7e24a8f2356c439a73e7ef",
-    "@liquid-bricks/spec-domain": "github:LiquidBricks/spec-domain#4c52f835e4e896d5f519740846b533fe9131f792",
+    "@liquid-bricks/spec-domain": "github:LiquidBricks/spec-domain#b49657be64202dc1cc705cd638e6ea683753fc73",
     "@nats-io/jetstream": "^3.0.2",
     "@nats-io/kv": "^3.0.2",
     "@nats-io/transport-node": "^3.0.2",
