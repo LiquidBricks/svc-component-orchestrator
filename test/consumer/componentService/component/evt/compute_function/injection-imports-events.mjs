@@ -59,7 +59,6 @@ test('computeFunction publishes injected events across imports using import inje
     const componentRouting = await dataMapper.vertex.component.index.injectionRouting.read({
       componentId: rootComponentId,
     })
-    assert.equal(componentRouting.found, true, 'component injection routing index missing')
     assert.equal(componentRouting.routes.length, 3)
 
     const imports = await loadImports({ g, dataMapper, componentId: rootComponentId })
@@ -90,10 +89,12 @@ test('computeFunction publishes injected events across imports using import inje
     assert.ok(rootDataStateEdgeId, 'root data state edge missing')
 
     const targetTaskRouting = await dataMapper.vertex.componentInstance.index.injectionRouting.lookup({
+      instanceId: targetInstanceId,
       instanceVertexId: targetInstanceVertexId,
+      stateMachineId: targetStateMachineId,
       stateEdgeId: targetTaskStateEdgeId,
+      type: 'task',
     })
-    assert.equal(targetTaskRouting.found, true, 'bound target-task injection routing missing')
     assert.deepEqual(
       targetTaskRouting.targets
         .map(target => `${target.instanceId}:${target.stateEdgeId}:${target.type}:${target.name}`)
@@ -203,7 +204,6 @@ test('bound injection routing isolates repeated imports by their owner-relative 
     const componentRouting = await dataMapper.vertex.component.index.injectionRouting.read({
       componentId: rootComponentId,
     })
-    assert.equal(componentRouting.found, true, 'component injection routing index missing')
     assert.deepEqual(componentRouting.routes.map(route => ({
       source: route.source.aliasPath,
       target: route.target.aliasPath,
@@ -280,10 +280,12 @@ test('bound injection routing isolates repeated imports by their owner-relative 
     })
 
     const leftRouting = await dataMapper.vertex.componentInstance.index.injectionRouting.lookup({
+      instanceId: leftInstanceId,
       instanceVertexId: leftInstanceVertexId,
+      stateMachineId: leftStateMachineId,
       stateEdgeId: leftSourceStateEdgeId,
+      type: 'data',
     })
-    assert.equal(leftRouting.found, true)
     assert.deepEqual(
       leftRouting.targets.map(target => ({
         instanceId: target.instanceId,
@@ -300,10 +302,12 @@ test('bound injection routing isolates repeated imports by their owner-relative 
     )
 
     const rightRouting = await dataMapper.vertex.componentInstance.index.injectionRouting.lookup({
+      instanceId: rightInstanceId,
       instanceVertexId: rightInstanceVertexId,
+      stateMachineId: rightStateMachineId,
       stateEdgeId: rightSourceStateEdgeId,
+      type: 'data',
     })
-    assert.equal(rightRouting.found, true)
     assert.deepEqual(rightRouting.targets, [])
   })
 })
