@@ -3,8 +3,12 @@ import { createComponentInstance } from './createComponentInstance.js'
 import { componentImports } from '../loadData/componentImports.js'
 import { componentGates } from '../loadData/componentGates.js'
 import { domain } from '@liquid-bricks/spec-domain/domain'
+import { Errors } from '../../../../../errors.js'
 
-export async function handler({ rootCtx: { g, dataMapper }, scope: { instanceId, componentId, imports, gates } }) {
+export async function handler({
+  rootCtx: { g, dataMapper },
+  scope: { handlerDiagnostics, instanceId, componentId, imports, gates },
+}) {
   const { instanceVertexId, stateMachineId: rootStateMachineId } = await createComponentInstance({ g, dataMapper, componentId, instanceId })
 
   async function createImportInstances({ imports: importsToCreate, parentComponentId, parentInstanceVertexId }) {
@@ -168,6 +172,27 @@ export async function handler({ rootCtx: { g, dataMapper }, scope: { instanceId,
     parentInstanceVertexId: instanceVertexId,
     parentStateMachineId: rootStateMachineId,
   })
+
+  try {
+    const binding = await dataMapper.vertex.componentInstance.index.injectionRouting.bind({
+      rootInstanceVertexId: instanceVertexId,
+    })
+    if (!binding.bound) {
+      handlerDiagnostics.warn(
+        false,
+        Errors.COMPONENT_INSTANCE_INDEX_BUILD_FAILED,
+        'Component instance injection routing index was not bound; canonical fallback remains active',
+        { instanceId, instanceVertexId, binding },
+      )
+    }
+  } catch (error) {
+    handlerDiagnostics.warn(
+      false,
+      Errors.COMPONENT_INSTANCE_INDEX_BUILD_FAILED,
+      'Unable to bind component instance injection routing index; canonical fallback remains active',
+      { instanceId, instanceVertexId, error },
+    )
+  }
 
   return { importedInstances }
 }

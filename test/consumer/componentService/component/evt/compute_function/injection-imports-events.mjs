@@ -56,6 +56,12 @@ test('computeFunction publishes injected events across imports using import inje
 
     const rootInstanceId = 'instance-import-inject-root-events'
     const rootComponentId = await getComponentId({ g, dataMapper, diagnostics, componentHash: rootComponent.hash })
+    const componentRouting = await dataMapper.vertex.component.index.injectionRouting.read({
+      componentId: rootComponentId,
+    })
+    assert.equal(componentRouting.found, true, 'component injection routing index missing')
+    assert.equal(componentRouting.routes.length, 3)
+
     const imports = await loadImports({ g, dataMapper, componentId: rootComponentId })
     await createInstance({ diagnostics, dataMapper, g }, { componentHash: rootComponent.hash, componentId: rootComponentId, instanceId: rootInstanceId, imports })
 
@@ -82,6 +88,21 @@ test('computeFunction publishes injected events across imports using import inje
     assert.ok(targetDataStateEdgeId, 'target data state edge missing')
     assert.ok(targetTaskStateEdgeId, 'target task state edge missing')
     assert.ok(rootDataStateEdgeId, 'root data state edge missing')
+
+    const targetTaskRouting = await dataMapper.vertex.componentInstance.index.injectionRouting.lookup({
+      instanceVertexId: targetInstanceVertexId,
+      stateEdgeId: targetTaskStateEdgeId,
+    })
+    assert.equal(targetTaskRouting.found, true, 'bound target-task injection routing missing')
+    assert.deepEqual(
+      targetTaskRouting.targets
+        .map(target => `${target.instanceId}:${target.stateEdgeId}:${target.type}:${target.name}`)
+        .sort(),
+      [
+        `${providerInstanceId}:${providerDataStateEdgeId}:data:providerData`,
+        `${rootInstanceId}:${rootDataStateEdgeId}:data:rootData`,
+      ].sort(),
+    )
 
     const published = []
     let ackedTargetTask = false
@@ -153,6 +174,137 @@ test('computeFunction publishes injected events across imports using import inje
     assert.deepEqual(dataInjectedEvents, [
       { instanceId: providerInstanceId, stateId: providerTaskStateEdgeId, name: 'providerTask', type: 'task', result: resultPayload },
     ])
+  })
+})
+
+test('bound injection routing isolates repeated imports by their owner-relative aliases', async () => {
+  await withGraphContext(async ({ diagnostics, dataMapper, g }) => {
+    const childComponent = componentBuilder('RepeatedInjectionChild')
+      .data('source', { deps: () => { } })
+      .data('target', { deps: () => { } })
+      .toJSON()
+    const rootComponent = componentBuilder('RepeatedInjectionRoot')
+      .import('left', {
+        hash: childComponent.hash,
+        inject: _ => [_.right.data.target(_.left.data.source)],
+      })
+      .import('right', { hash: childComponent.hash })
+      .toJSON()
+
+    await registerComponent(childComponent, { diagnostics, dataMapper, g })
+    await registerComponent(rootComponent, { diagnostics, dataMapper, g })
+
+    const rootComponentId = await getComponentId({
+      g,
+      dataMapper,
+      diagnostics,
+      componentHash: rootComponent.hash,
+    })
+    const componentRouting = await dataMapper.vertex.component.index.injectionRouting.read({
+      componentId: rootComponentId,
+    })
+    assert.equal(componentRouting.found, true, 'component injection routing index missing')
+    assert.deepEqual(componentRouting.routes.map(route => ({
+      source: route.source.aliasPath,
+      target: route.target.aliasPath,
+    })), [{ source: ['left'], target: ['right'] }])
+
+    const rootInstanceId = 'instance-repeated-injection-root'
+    const imports = await loadImports({ g, dataMapper, componentId: rootComponentId })
+    await createInstance(
+      { diagnostics, dataMapper, g },
+      {
+        componentHash: rootComponent.hash,
+        componentId: rootComponentId,
+        instanceId: rootInstanceId,
+        imports,
+      },
+    )
+
+    const { instanceVertexId: rootInstanceVertexId } = await getStateMachineId({
+      g,
+      dataMapper,
+      instanceId: rootInstanceId,
+    })
+    const leftInstanceVertexId = await getImportedInstance({
+      g,
+      dataMapper,
+      rootInstanceVertexId,
+      aliasPath: ['left'],
+    })
+    const rightInstanceVertexId = await getImportedInstance({
+      g,
+      dataMapper,
+      rootInstanceVertexId,
+      aliasPath: ['right'],
+    })
+
+    const [leftValues] = await dataMapper.query.readComponentInstanceId({
+      vertexId: leftInstanceVertexId,
+    })
+    const [rightValues] = await dataMapper.query.readComponentInstanceId({
+      vertexId: rightInstanceVertexId,
+    })
+    const leftInstanceId = pickFirst(leftValues?.instanceId ?? leftValues)
+    const rightInstanceId = pickFirst(rightValues?.instanceId ?? rightValues)
+    const { stateMachineId: leftStateMachineId } = await getStateMachineId({
+      g,
+      dataMapper,
+      instanceId: leftInstanceId,
+    })
+    const { stateMachineId: rightStateMachineId } = await getStateMachineId({
+      g,
+      dataMapper,
+      instanceId: rightInstanceId,
+    })
+    const leftSourceStateEdgeId = await getStateEdgeId({
+      g,
+      dataMapper,
+      stateMachineId: leftStateMachineId,
+      type: 'data',
+      name: 'source',
+    })
+    const rightSourceStateEdgeId = await getStateEdgeId({
+      g,
+      dataMapper,
+      stateMachineId: rightStateMachineId,
+      type: 'data',
+      name: 'source',
+    })
+    const rightTargetStateEdgeId = await getStateEdgeId({
+      g,
+      dataMapper,
+      stateMachineId: rightStateMachineId,
+      type: 'data',
+      name: 'target',
+    })
+
+    const leftRouting = await dataMapper.vertex.componentInstance.index.injectionRouting.lookup({
+      instanceVertexId: leftInstanceVertexId,
+      stateEdgeId: leftSourceStateEdgeId,
+    })
+    assert.equal(leftRouting.found, true)
+    assert.deepEqual(
+      leftRouting.targets.map(target => ({
+        instanceId: target.instanceId,
+        stateEdgeId: target.stateEdgeId,
+        name: target.name,
+        type: target.type,
+      })),
+      [{
+        instanceId: rightInstanceId,
+        stateEdgeId: rightTargetStateEdgeId,
+        name: 'target',
+        type: 'data',
+      }],
+    )
+
+    const rightRouting = await dataMapper.vertex.componentInstance.index.injectionRouting.lookup({
+      instanceVertexId: rightInstanceVertexId,
+      stateEdgeId: rightSourceStateEdgeId,
+    })
+    assert.equal(rightRouting.found, true)
+    assert.deepEqual(rightRouting.targets, [])
   })
 })
 

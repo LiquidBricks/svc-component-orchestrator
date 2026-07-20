@@ -127,30 +127,29 @@ async function resolveInjectionNodeId({
   return nodeId
 }
 
-function createEdgeFactory({ dataMapper }) {
-  return async function createEdge({ fromType, toType, fromId, toId, targetImportPath = [] }) {
-    const hasTargetImportPath = Array.isArray(targetImportPath) && targetImportPath.length > 0
-    const payload = hasTargetImportPath
-      ? { fromId, toId, targetAliasPath: JSON.stringify(targetImportPath) }
-      : { fromId, toId }
+function createEdgeFactory({ dataMapper, ownerComponentId }) {
+  return async function createEdge({ fromType, toType, fromId, toId, sourceImportPath = [], targetImportPath = [] }) {
+    const payload = {
+      fromId,
+      toId,
+      ownerComponentId,
+      sourceAliasPath: JSON.stringify(sourceImportPath),
+      targetAliasPath: JSON.stringify(targetImportPath),
+    }
 
     if (fromType === 'task') {
       if (toType === 'task') {
-        if (hasTargetImportPath) await dataMapper.edge.injects_into.task_task.createWithTargetAliasPath(payload)
-        else await dataMapper.edge.injects_into.task_task.create(payload)
+        await dataMapper.edge.injects_into.task_task.create(payload)
       }
       if (toType === 'data') {
-        if (hasTargetImportPath) await dataMapper.edge.injects_into.task_data.createWithTargetAliasPath(payload)
-        else await dataMapper.edge.injects_into.task_data.create(payload)
+        await dataMapper.edge.injects_into.task_data.create(payload)
       }
     } else if (fromType === 'data') {
       if (toType === 'task') {
-        if (hasTargetImportPath) await dataMapper.edge.injects_into.data_task.createWithTargetAliasPath(payload)
-        else await dataMapper.edge.injects_into.data_task.create(payload)
+        await dataMapper.edge.injects_into.data_task.create(payload)
       }
       if (toType === 'data') {
-        if (hasTargetImportPath) await dataMapper.edge.injects_into.data_data.createWithTargetAliasPath(payload)
-        else await dataMapper.edge.injects_into.data_data.create(payload)
+        await dataMapper.edge.injects_into.data_data.create(payload)
       }
     }
   }
@@ -166,7 +165,7 @@ export async function linkImportInjections({
   const gates = component?.gates ?? []
   if (!imports.length && !gates.length) return
 
-  const createEdge = createEdgeFactory({ g, dataMapper })
+  const createEdge = createEdgeFactory({ dataMapper, ownerComponentId: componentVID })
   const createdEdges = new Set()
 
   const refEntries = [
@@ -248,7 +247,7 @@ export async function linkImportInjections({
           refType,
         })
 
-        const edgeKey = `${sourceId}:${targetId}:${targetImportPath.join('.')}`
+        const edgeKey = `${sourceId}:${sourceImportPath.join('.')}:${targetId}:${targetImportPath.join('.')}`
         if (createdEdges.has(edgeKey)) continue
         createdEdges.add(edgeKey)
 
@@ -257,6 +256,7 @@ export async function linkImportInjections({
           toType: targetType,
           fromId: sourceId,
           toId: targetId,
+          sourceImportPath,
           targetImportPath,
         })
       }

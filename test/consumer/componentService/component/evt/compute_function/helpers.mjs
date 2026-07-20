@@ -13,6 +13,7 @@ import { TASK_STATE_EDGE_LABEL, TASK_STATE_EDGE_STATUS } from '../../../../../..
 
 import { validatePayload } from '../../../../../../core/component/evt/compute_function/_helper/validatePayload.js'
 import { componentImports } from '../../../../../../core/componentInstance/cmd/create/loadData/componentImports.js'
+import { spec as stateMachineStartedSpec } from '../../../../../../core/domain/vertex/stateMachine/started/index.js'
 import { dataMapper as createDataMapper, domain } from '@liquid-bricks/spec-domain/domain'
 import { serviceConfiguration } from '../../../../../provider/serviceConfiguration/dotenv/index.js'
 import { invokeRoute, runHookGroup } from '../../../../../util/invokeRoute.js'
@@ -250,9 +251,8 @@ export async function createInstance(ctx, scope) {
   return createInstanceSpec.handler({ rootCtx: ctx, scope: { ...scope, handlerDiagnostics } })
 }
 
-export async function startInstance(ctx, scope) {
-  const handlerDiagnostics = createHandlerDiagnostics(ctx.diagnostics, scope)
-  return startInstanceSpec.handler({ rootCtx: ctx, scope: { ...scope, handlerDiagnostics } })
+export async function projectStateMachineStarted({ dataMapper }, { stateMachineId }) {
+  await dataMapper.vertex.stateMachine.setRunning({ stateMachineId })
 }
 
 export async function loadImports({ g, dataMapper, componentId }) {
@@ -350,6 +350,13 @@ export const checkStateMachineCompletionSubject = createBasicSubject(
 
 export const stateMachineCompletedFactSubject = createBasicSubject(
   natsEvents['*'].domain['*']['*'].vertex.stateMachine.completed.v1['*'],
+)
+  .forPublish()
+  .env('prod')
+  .build()
+
+const stateMachineStartedFactSubject = createBasicSubject(
+  natsEvents['*'].domain['*']['*'].vertex.stateMachine.started.v1['*'],
 )
   .forPublish()
   .env('prod')
@@ -499,6 +506,24 @@ async function processResultComputedFacts({ rootCtx, facts }) {
   }
 }
 
+async function processStateMachineStartedFacts({ rootCtx, facts }) {
+  for (const fact of facts.filter(({ subject }) => subject === stateMachineStartedFactSubject)) {
+    await rootCtx.dataMapper.vertex.stateMachine.setRunning({
+      stateMachineId: fact.payload.data.stateMachineId,
+    })
+    await runSpec({
+      spec: stateMachineStartedSpec,
+      rootCtx,
+      message: {
+        subject: fact.subject,
+        ack: () => { },
+        json: () => fact.payload,
+      },
+      processDomainFacts: false,
+    })
+  }
+}
+
 export async function runSpec({ spec, rootCtx, message, initialScope = {}, processDomainFacts = true }) {
   const messagePayload = initialScope.handlerDiagnostics ? undefined : message?.json?.()
   const requestedSpec = spec
@@ -508,9 +533,12 @@ export async function runSpec({ spec, rootCtx, message, initialScope = {}, proce
     spec = computeFunctionSpecs[resultType]
     assert.ok(spec, 'computeFunction route missing for type ' + resultType)
   }
-  const processEmittedFacts = processDomainFacts
+  const shouldProcessResultComputedFacts = processDomainFacts
     && requestedSpec === computeFunctionSpec
     && ['data', 'task', 'gate'].includes(resultType)
+  const shouldProcessStartedFacts = processDomainFacts
+    && requestedSpec === startInstanceSpec
+  const processEmittedFacts = shouldProcessResultComputedFacts || shouldProcessStartedFacts
   const publishedDuringRoute = []
   const activeRootCtx = processEmittedFacts && rootCtx?.natsContext?.publish
     ? {
@@ -551,8 +579,11 @@ export async function runSpec({ spec, rootCtx, message, initialScope = {}, proce
     await runStep(post)
   }
 
-  if (processEmittedFacts) {
+  if (shouldProcessResultComputedFacts) {
     await processResultComputedFacts({ rootCtx, facts: publishedDuringRoute })
+  }
+  if (shouldProcessStartedFacts) {
+    await processStateMachineStartedFacts({ rootCtx, facts: publishedDuringRoute })
   }
 
   return scope

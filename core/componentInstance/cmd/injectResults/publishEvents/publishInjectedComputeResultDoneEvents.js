@@ -74,40 +74,6 @@ function normalizeAliasPath(value) {
   return trimmed.split('.').filter(Boolean)
 }
 
-async function findImportPath({ g, dataMapper, fromComponentId, toComponentId }) {
-  const visited = new Set()
-  const queue = [{ componentId: fromComponentId, path: [] }]
-
-  while (queue.length) {
-    const { componentId, path } = queue.shift()
-    if (componentId === toComponentId) return path
-    if (visited.has(componentId)) continue
-    visited.add(componentId)
-
-    const importRefIds = await dataMapper.query.listImportRefIds({ vertexId: componentId })
-
-    for (const importRefId of importRefIds ?? []) {
-      const [edgeValues] = await dataMapper.query.readImportRefAlias({ vertexId: importRefId })
-      const aliasValues = edgeValues?.alias ?? edgeValues
-      const alias = Array.isArray(aliasValues) ? aliasValues[0] : aliasValues
-      const [nextComponentId] = await dataMapper.query.findImportedComponentIdForImportRef({ vertexId: importRefId })
-      if (!alias || !nextComponentId) continue
-      queue.push({ componentId: nextComponentId, path: [...path, alias] })
-    }
-
-    const gateRefIds = await dataMapper.query.listGateRefIds({ vertexId: componentId })
-    for (const gateRefId of gateRefIds ?? []) {
-      const [edgeValues] = await dataMapper.query.readGateRefAlias({ vertexId: gateRefId })
-      const aliasValues = edgeValues?.alias ?? edgeValues
-      const alias = Array.isArray(aliasValues) ? aliasValues[0] : aliasValues
-      const [nextComponentId] = await dataMapper.query.findGatedComponentIdForGateRef({ vertexId: gateRefId })
-      if (!alias || !nextComponentId) continue
-      queue.push({ componentId: nextComponentId, path: [...path, alias] })
-    }
-  }
-  return null
-}
-
 async function findInstanceForImportPath({ g, dataMapper, rootInstanceVertexId, aliasPath }) {
   let currentInstanceVertexId = rootInstanceVertexId
   for (const alias of aliasPath ?? []) {
@@ -141,52 +107,41 @@ async function findParentInstanceVertexId({ g, dataMapper, instanceVertexId }) {
   return parentGateId ?? null
 }
 
-async function findInstanceForAliasPathInAncestors({ g, dataMapper, instanceVertexId, aliasPath, targetComponentId }) {
-  let currentInstanceId = instanceVertexId
-  while (currentInstanceId) {
-    const resolvedInstanceVertexId = await findInstanceForImportPath({
-      g, dataMapper,
-      rootInstanceVertexId: currentInstanceId,
-      aliasPath,
+async function findRouteOwnerInstance({
+  g,
+  dataMapper,
+  instanceVertexId,
+  ownerComponentId,
+  sourceAliasPath,
+}) {
+  let candidateInstanceVertexId = instanceVertexId
+
+  while (candidateInstanceVertexId) {
+    const candidateComponentId = await findComponentIdForInstance({
+      g,
+      dataMapper,
+      instanceVertexId: candidateInstanceVertexId,
     })
-    if (resolvedInstanceVertexId) {
-      const resolvedComponentId = await findComponentIdForInstance({
-        g, dataMapper,
-        instanceVertexId: resolvedInstanceVertexId,
+    if (candidateComponentId === ownerComponentId) {
+      const resolvedSourceInstanceVertexId = await findInstanceForImportPath({
+        g,
+        dataMapper,
+        rootInstanceVertexId: candidateInstanceVertexId,
+        aliasPath: sourceAliasPath,
       })
-      if (!targetComponentId || resolvedComponentId === targetComponentId) {
-        return { resolvedInstanceVertexId, importRootInstanceVertexId: currentInstanceId }
+      if (resolvedSourceInstanceVertexId === instanceVertexId) {
+        return candidateInstanceVertexId
       }
     }
 
-    currentInstanceId = await findParentInstanceVertexId({ g, dataMapper, instanceVertexId: currentInstanceId })
+    candidateInstanceVertexId = await findParentInstanceVertexId({
+      g,
+      dataMapper,
+      instanceVertexId: candidateInstanceVertexId,
+    })
   }
 
-  return { resolvedInstanceVertexId: null, importRootInstanceVertexId: null }
-}
-
-async function findRootInstanceVertexId({ g, dataMapper, instanceVertexId }) {
-  let current = instanceVertexId
-  while (true) {
-    const parentInstanceVertexId = await findParentInstanceVertexId({ g, dataMapper, instanceVertexId: current })
-    if (!parentInstanceVertexId) break
-    current = parentInstanceVertexId
-  }
-  return current
-}
-
-async function findRootComponentContext({ g, dataMapper, handlerDiagnostics, instanceVertexId, instanceId }) {
-  const rootInstanceVertexId = await findRootInstanceVertexId({ g, dataMapper, instanceVertexId })
-  const [rootComponentId] = await dataMapper.query.findComponentIdForInstance({ vertexId: rootInstanceVertexId })
-
-  handlerDiagnostics.require(
-    rootComponentId,
-    Errors.PRECONDITION_INVALID,
-    `Root component missing for instance ${instanceId}`,
-    { instanceId },
-  )
-
-  return { rootInstanceVertexId, rootComponentId }
+  return null
 }
 
 async function findStateEdgeForNode({ g, dataMapper, stateMachineId, targetNodeId, targetType }) {
@@ -196,12 +151,119 @@ async function findStateEdgeForNode({ g, dataMapper, stateMachineId, targetNodeI
   return stateEdgeId
 }
 
+function indexedSourceMatches({ source, instanceId, instanceVertexId, stateMachineId, stateEdgeId, type }) {
+  return Boolean(
+    source
+    && source.instanceId === instanceId
+    && source.instanceVertexId === instanceVertexId
+    && source.stateMachineId === stateMachineId
+    && source.stateEdgeId === stateEdgeId
+    && source.type === type
+    && source.nodeId
+  )
+}
+
+function indexedTargetIsValid(target) {
+  return Boolean(
+    target
+    && target.instanceId
+    && target.instanceVertexId
+    && target.stateMachineId
+    && target.stateEdgeId
+    && target.nodeId
+    && (target.type === 'data' || target.type === 'task')
+    && typeof target.name === 'string'
+    && target.name.length
+  )
+}
+
+async function publishIndexedTargets({
+  natsContext,
+  emits,
+  source,
+  targets,
+  result,
+}) {
+  const publishedTargets = new Set()
+
+  for (const target of targets ?? []) {
+    const targetKey = `${target.instanceId}:${target.stateEdgeId}`
+    if (
+      publishedTargets.has(targetKey)
+      || (target.instanceId === source.instanceId && target.stateEdgeId === source.stateEdgeId)
+    ) continue
+    publishedTargets.add(targetKey)
+
+    await natsContext.publish(
+      computeFunctionSubjectForTargetType(emits, target.type),
+      JSON.stringify({
+        data: {
+          instanceId: target.instanceId,
+          stateId: target.stateEdgeId,
+          name: target.name,
+          type: target.type,
+          result,
+        }
+      })
+    )
+  }
+}
+
 export async function publishInjectedComputeResultDoneEvents({
   scope,
   rootCtx: { g, dataMapper, natsContext },
   routeCtx: { emits },
 }) {
   const { handlerDiagnostics, instanceId, instanceVertexId, stateMachineId, stateEdgeId, type, result } = scope
+
+  let indexedRouting = { found: false }
+  try {
+    indexedRouting = await dataMapper.vertex.componentInstance.index.injectionRouting.lookup({
+      instanceVertexId,
+      stateEdgeId,
+    })
+  } catch (error) {
+    handlerDiagnostics.warn(
+      false,
+      Errors.COMPONENT_INSTANCE_INDEX_LOOKUP_FAILED,
+      'Unable to read component instance injection routing index; canonical fallback remains active',
+      { instanceId, instanceVertexId, stateEdgeId, error },
+    )
+  }
+
+  if (indexedRouting.found) {
+    const sourceMatches = indexedSourceMatches({
+      source: indexedRouting.source,
+      instanceId,
+      instanceVertexId,
+      stateMachineId,
+      stateEdgeId,
+      type,
+    })
+    const targetsAreValid = Array.isArray(indexedRouting.targets)
+      && indexedRouting.targets.every(indexedTargetIsValid)
+
+    if (sourceMatches && targetsAreValid) {
+      await publishIndexedTargets({
+        natsContext,
+        emits,
+        source: indexedRouting.source,
+        targets: indexedRouting.targets,
+        result,
+      })
+      return
+    }
+
+    handlerDiagnostics.warn(
+      false,
+      Errors.COMPONENT_INSTANCE_INDEX_LOOKUP_FAILED,
+      'Component instance injection routing index is stale or invalid; canonical fallback remains active',
+      {
+        expected: { instanceId, instanceVertexId, stateMachineId, stateEdgeId, type },
+        indexedRouting,
+      },
+    )
+  }
 
   const [providedNodeId] = type === 'task'
     ? await dataMapper.query.findTaskStateEdgeTargetNodeId({ id: stateEdgeId, vertexId: stateMachineId })
@@ -227,7 +289,6 @@ export async function publishInjectedComputeResultDoneEvents({
   const targetTypes = ['data', 'task']
 
   const publishedTargets = new Set()
-  let rootContext = null
 
   for (const targetType of targetTypes) {
     const targetEdgeIds = await listInjectedTargetEdgeIds({ dataMapper, fromType: type, targetType, vertexId: providedNodeId })
@@ -237,8 +298,17 @@ export async function publishInjectedComputeResultDoneEvents({
       const [targetNodeId] = await dataMapper.query.findEdgeTargetNodeId({ edgeId: targetEdgeId })
       if (!targetNodeId) continue
       const [targetEdgeValues] = await dataMapper.query.readTargetEdgeValues({ edgeId: targetEdgeId })
+      const ownerComponentIdValues = targetEdgeValues?.ownerComponentId
+      const ownerComponentId = Array.isArray(ownerComponentIdValues)
+        ? ownerComponentIdValues[0]
+        : ownerComponentIdValues
+      const sourceAliasPathValues = targetEdgeValues?.sourceAliasPath
+      const sourceAliasPathRaw = Array.isArray(sourceAliasPathValues)
+        ? sourceAliasPathValues[0]
+        : sourceAliasPathValues
       const targetAliasPathValues = targetEdgeValues?.targetAliasPath ?? targetEdgeValues
       const targetAliasPathRaw = Array.isArray(targetAliasPathValues) ? targetAliasPathValues[0] : targetAliasPathValues
+      const sourceAliasPath = normalizeAliasPath(sourceAliasPathRaw)
       const targetAliasPath = normalizeAliasPath(targetAliasPathRaw)
 
       const targetName = await findNodeName({ g, dataMapper, nodeId: targetNodeId })
@@ -251,6 +321,20 @@ export async function publishInjectedComputeResultDoneEvents({
         ...additional,
       })
 
+      if (
+        typeof ownerComponentId !== 'string'
+        || typeof sourceAliasPathRaw !== 'string'
+        || typeof targetAliasPathRaw !== 'string'
+      ) {
+        handlerDiagnostics.warn(
+          false,
+          Errors.PRECONDITION_INVALID,
+          'Skipping injection edge without canonical owner and alias provenance',
+          buildDiagnostics({ targetEdgeId }),
+        )
+        continue
+      }
+
       handlerDiagnostics.require(
         targetComponentId,
         Errors.PRECONDITION_INVALID,
@@ -258,81 +342,45 @@ export async function publishInjectedComputeResultDoneEvents({
         buildDiagnostics()
       )
 
-      let targetInstanceVertexId = instanceVertexId
-      let importPath = []
-      let importRootInstanceVertexId = instanceVertexId
+      const ownerInstanceVertexId = await findRouteOwnerInstance({
+        g,
+        dataMapper,
+        instanceVertexId,
+        ownerComponentId,
+        sourceAliasPath,
+      })
+      if (!ownerInstanceVertexId) continue
 
-      if (targetComponentId !== providedComponentId) {
-        let resolvedInstanceVertexId = null
-        if (targetAliasPath.length) {
-          importPath = targetAliasPath
-          const aliasPathResolution = await findInstanceForAliasPathInAncestors({
-            g, dataMapper,
-            instanceVertexId,
-            aliasPath: targetAliasPath,
-            targetComponentId,
-          })
-          resolvedInstanceVertexId = aliasPathResolution.resolvedInstanceVertexId
-          importRootInstanceVertexId = aliasPathResolution.importRootInstanceVertexId ?? importRootInstanceVertexId
+      const targetInstanceVertexId = await findInstanceForImportPath({
+        g,
+        dataMapper,
+        rootInstanceVertexId: ownerInstanceVertexId,
+        aliasPath: targetAliasPath,
+      })
+      handlerDiagnostics.require(
+        targetInstanceVertexId,
+        Errors.PRECONDITION_INVALID,
+        'Injected target instance missing for canonical alias path',
+        buildDiagnostics({ ownerComponentId, ownerInstanceVertexId, sourceAliasPath, targetAliasPath }),
+      )
 
-          if (!resolvedInstanceVertexId) {
-            if (!rootContext) {
-              rootContext = await findRootComponentContext({ g, dataMapper, handlerDiagnostics, instanceVertexId, instanceId })
-            }
-            importRootInstanceVertexId = rootContext.rootInstanceVertexId
-            resolvedInstanceVertexId = await findInstanceForImportPath({
-              g, dataMapper,
-              rootInstanceVertexId: importRootInstanceVertexId,
-              aliasPath: importPath,
-            })
-          }
-        }
-
-        if (!resolvedInstanceVertexId) {
-          importPath = await findImportPath({
-            g, dataMapper,
-            fromComponentId: providedComponentId,
-            toComponentId: targetComponentId,
-          })
-
-          if (!importPath) {
-            if (!rootContext) {
-              rootContext = await findRootComponentContext({ g, dataMapper, handlerDiagnostics, instanceVertexId, instanceId })
-            }
-            importRootInstanceVertexId = rootContext.rootInstanceVertexId
-            importPath = await findImportPath({
-              g, dataMapper,
-              fromComponentId: rootContext.rootComponentId,
-              toComponentId: targetComponentId,
-            })
-          }
-
-          if (!importPath) {
-            handlerDiagnostics.warn(
-              false,
-              Errors.PRECONDITION_INVALID,
-              `Skipping injected target component not reachable via imports`,
-              buildDiagnostics({ importPath, targetAliasPath })
-            )
-            continue
-          }
-
-          resolvedInstanceVertexId = await findInstanceForImportPath({
-            g, dataMapper,
-            rootInstanceVertexId: importRootInstanceVertexId,
-            aliasPath: importPath,
-          })
-        }
-
-        handlerDiagnostics.require(
-          resolvedInstanceVertexId,
-          Errors.PRECONDITION_INVALID,
-          `Injected target instance missing for import path`,
-          buildDiagnostics({ importPath, targetAliasPath })
-        )
-
-        targetInstanceVertexId = resolvedInstanceVertexId
-      }
+      const resolvedTargetComponentId = await findComponentIdForInstance({
+        g,
+        dataMapper,
+        instanceVertexId: targetInstanceVertexId,
+      })
+      handlerDiagnostics.require(
+        resolvedTargetComponentId === targetComponentId,
+        Errors.PRECONDITION_INVALID,
+        'Injected target instance does not match canonical route component',
+        buildDiagnostics({
+          ownerComponentId,
+          ownerInstanceVertexId,
+          sourceAliasPath,
+          targetAliasPath,
+          resolvedTargetComponentId,
+        }),
+      )
 
       const [targetInstanceMap] = await dataMapper.query.readTargetInstanceMap({ vertexId: targetInstanceVertexId })
       const targetInstanceValues = targetInstanceMap?.instanceId ?? targetInstanceMap
@@ -342,7 +390,7 @@ export async function publishInjectedComputeResultDoneEvents({
         targetInstanceId,
         Errors.PRECONDITION_INVALID,
         `Injected target instanceId missing`,
-        buildDiagnostics({ targetInstanceVertexId, importPath, targetAliasPath })
+        buildDiagnostics({ targetInstanceVertexId, ownerComponentId, sourceAliasPath, targetAliasPath })
       )
 
       const [targetStateMachineId] = await dataMapper.query.readTargetStateMachineId({ vertexId: targetInstanceVertexId })

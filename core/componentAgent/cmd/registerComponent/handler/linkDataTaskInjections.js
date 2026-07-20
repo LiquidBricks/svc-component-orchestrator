@@ -159,12 +159,20 @@ export async function linkDataTaskInjections({
         inject: trimmedInjection,
       })
 
+      const edgePayload = {
+        fromId: id,
+        toId: targetId,
+        ownerComponentId: componentVID,
+        sourceAliasPath: JSON.stringify([]),
+        targetAliasPath: JSON.stringify(importPath),
+      }
+
       if (dependencyType === 'task') {
-        if (targetType === 'task') await dataMapper.edge.injects_into.task_task.create({ fromId: id, toId: targetId })
-        if (targetType === 'data') await dataMapper.edge.injects_into.task_data.create({ fromId: id, toId: targetId })
+        if (targetType === 'task') await dataMapper.edge.injects_into.task_task.create(edgePayload)
+        if (targetType === 'data') await dataMapper.edge.injects_into.task_data.create(edgePayload)
       } else if (dependencyType === 'data') {
-        if (targetType === 'task') await dataMapper.edge.injects_into.data_task.create({ fromId: id, toId: targetId })
-        if (targetType === 'data') await dataMapper.edge.injects_into.data_data.create({ fromId: id, toId: targetId })
+        if (targetType === 'task') await dataMapper.edge.injects_into.data_task.create(edgePayload)
+        if (targetType === 'data') await dataMapper.edge.injects_into.data_data.create(edgePayload)
       }
     }
   }

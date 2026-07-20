@@ -10,7 +10,6 @@ import {
   withGraphContext,
   registerComponent,
   createInstance,
-  startInstance,
   loadImports,
   getComponentId,
   getStateMachineId,

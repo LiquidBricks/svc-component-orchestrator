@@ -9,6 +9,7 @@ import { linkDataTaskInjections } from './linkDataTaskInjections.js'
 import { linkImportInjections } from './linkImportInjections.js'
 import { attachImportWaitFor } from './attachImportWaitFor.js'
 import { attachComponentGates } from './attachComponentGates.js'
+import { compileInjectionRoutingIndex } from './compileInjectionRoutingIndex.js'
 
 export const handler = [
   createComponentVertex,
@@ -22,4 +23,5 @@ export const handler = [
   linkDataTaskDependencies,
   linkDataTaskInjections,
   linkImportInjections,
+  compileInjectionRoutingIndex,
 ]

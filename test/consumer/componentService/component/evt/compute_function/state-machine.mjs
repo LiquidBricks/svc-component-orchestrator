@@ -14,7 +14,7 @@ import {
   withGraphContext,
   registerComponent,
   createInstance,
-  startInstance,
+  projectStateMachineStarted,
   loadImports,
   getComponentId,
   getStateMachineId,
@@ -52,7 +52,7 @@ test('stateMachine state switches to complete once all states are provided', asy
     await createInstance({ diagnostics, dataMapper, g }, { componentHash: component.hash, componentId, instanceId, imports })
 
     const { stateMachineId } = await getStateMachineId({ g, dataMapper, instanceId })
-    await startInstance({ diagnostics, g, dataMapper }, { stateMachineId })
+    await projectStateMachineStarted({ dataMapper }, { stateMachineId })
 
     const published = []
     const computeFunctionSubject = computeFunctionDataSubject
@@ -143,8 +143,8 @@ test('componentInstance completes when only imports exist and imports finish', a
     const { stateMachineId: rootStateMachineId } = await getStateMachineId({ g, dataMapper, instanceId: rootInstanceId })
     const { stateMachineId: childStateMachineId } = await getStateMachineId({ g, dataMapper, instanceId: childInstanceId })
 
-    await startInstance({ diagnostics, dataMapper, g }, { stateMachineId: rootStateMachineId })
-    await startInstance({ diagnostics, dataMapper, g }, { stateMachineId: childStateMachineId })
+    await projectStateMachineStarted({ dataMapper }, { stateMachineId: rootStateMachineId })
+    await projectStateMachineStarted({ dataMapper }, { stateMachineId: childStateMachineId })
 
     const published = []
     const computeFunctionSubject = computeFunctionDataSubject
@@ -221,7 +221,7 @@ test('componentInstance completes after false gates settle and true gates comple
       g, dataMapper,
       instanceId: rootInstanceId,
     })
-    await startInstance({ diagnostics, dataMapper, g }, { stateMachineId: rootStateMachineId })
+    await projectStateMachineStarted({ dataMapper }, { stateMachineId: rootStateMachineId })
 
     const passedGateInstanceId = await getGateInstanceId({ g, dataMapper, rootInstanceVertexId, alias: 'passedGate' })
     const blockedGateInstanceId = await getGateInstanceId({ g, dataMapper, rootInstanceVertexId, alias: 'blockedGate' })
@@ -275,7 +275,7 @@ test('componentInstance completes after false gates settle and true gates comple
     )
     assert.ok(passedGateStartEvent, 'passed gate should start its component instance')
 
-    await startInstance({ diagnostics, dataMapper, g }, { stateMachineId: passedGateStateMachineId })
+    await projectStateMachineStarted({ dataMapper }, { stateMachineId: passedGateStateMachineId })
     const passedGateStarted = await hasInstanceStarted({ g, dataMapper, instanceVertexId: passedGateInstanceVertexId })
     assert.equal(passedGateStarted, true, 'passed gate instance should be started')
 
