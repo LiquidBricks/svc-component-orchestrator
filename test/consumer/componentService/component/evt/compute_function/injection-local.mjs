@@ -102,6 +102,7 @@ test('computeFunction publishes injected computeFunction events for injection ta
       stateEdgeId: sourceEdgeId,
       type: 'data',
       result: resultPayload,
+      updatedAt: finalScope.updatedAt,
     })
 
     const injectedPublishes = await runInjectResultsCommands({ rootCtx, events: published })

@@ -1,6 +1,4 @@
 import { ackMessage, decodeData } from '../../../../../middleware/index.js'
-import { publishCheckStateMachineCompletionCommand } from '../../../_helper/publishCheckStateMachineCompletionCommand.js'
-import { publishInjectResultsCommand } from './publishInjectResultsCommand.js'
 import { publishStartDependantsCommand } from './publishStartDependantsCommand.js'
 import { validatePayload } from './validatePayload.js'
 import { path } from './subject.js'
@@ -11,10 +9,6 @@ function handler() {}
 export { path }
 
 export const emits = {
-  'component_service.cmd.componentInstance.check_state_machine_completion.v1':
-    natsEvents['*'].component_service['*']['*'].cmd.componentInstance.check_state_machine_completion.v1['*'],
-  'component_service.cmd.componentInstance.injectResults.v1':
-    natsEvents['*'].component_service['*']['*'].cmd.componentInstance.injectResults.v1['*'],
   'component_service.cmd.componentInstance.start_dependants.v1':
     natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start_dependants.v1['*'],
 }
@@ -43,8 +37,6 @@ export const spec = {
   handler,
   post: [
     {
-      publishCheckStateMachineCompletionCommand,
-      publishInjectResultsCommand,
       publishStartDependantsCommand,
     },
     ackMessage,

@@ -1,17 +1,17 @@
-import { create as createBasicSubject } from '@liquid-bricks/lib-nats-subject/create/basic'
+import { create as createSubject } from '@liquid-bricks/lib-nats-subject/create/basic'
 
 function computeFunctionSubjectForTargetType(emits, targetType) {
   const subject = targetType === 'data'
     ? emits['component_service.function_result.evt.component.compute_function.v1.data']
     : emits['component_service.function_result.evt.component.compute_function.v1.task']
 
-  return createBasicSubject(subject)
+  return createSubject(subject)
     .forPublish()
     .env('prod')
     .build()
 }
 
-export async function publishInjectedComputeResultDoneEvents({
+export async function publishComputeFunctionEvents({
   scope,
   rootCtx: { dataMapper, natsContext },
   routeCtx: { emits },

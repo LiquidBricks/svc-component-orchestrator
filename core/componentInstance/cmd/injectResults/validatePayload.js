@@ -1,15 +1,16 @@
 import { Errors } from '../../../../errors.js'
-import { DATA_STATE_EDGE_LABEL } from '../../../component/evt/compute_function/data/constants.js'
-import { TASK_STATE_EDGE_LABEL } from '../../../component/evt/compute_function/task/constants.js'
+import { isIsoDateTime } from '../../../domain/_helper/isIsoDateTime.js'
 
-const STATE_EDGE_LABEL_BY_TYPE = Object.freeze({
-  data: DATA_STATE_EDGE_LABEL,
-  task: TASK_STATE_EDGE_LABEL,
-})
-
-export function validatePayload({
-  scope: { handlerDiagnostics, instanceId, instanceVertexId, stateMachineId, stateEdgeId, type },
-}) {
+export function validatePayload({ scope }) {
+  const {
+    handlerDiagnostics,
+    instanceId,
+    instanceVertexId,
+    stateMachineId,
+    stateEdgeId,
+    type,
+    updatedAt,
+  } = scope
   handlerDiagnostics.require(
     typeof instanceId === 'string' && instanceId.length,
     Errors.PRECONDITION_REQUIRED,
@@ -40,8 +41,22 @@ export function validatePayload({
     'type must be data or task for injectResults',
     { field: 'type', type },
   )
-
-  return {
-    stateEdgeLabel: STATE_EDGE_LABEL_BY_TYPE[type],
-  }
+  handlerDiagnostics.require(
+    Object.prototype.hasOwnProperty.call(scope, 'result'),
+    Errors.PRECONDITION_REQUIRED,
+    'result required for injectResults',
+    { field: 'result' },
+  )
+  handlerDiagnostics.require(
+    typeof updatedAt === 'string' && updatedAt.length,
+    Errors.PRECONDITION_REQUIRED,
+    'updatedAt required for injectResults',
+    { field: 'updatedAt' },
+  )
+  handlerDiagnostics.require(
+    isIsoDateTime(updatedAt),
+    Errors.PRECONDITION_INVALID,
+    'updatedAt must be an ISO date-time for injectResults',
+    { field: 'updatedAt' },
+  )
 }

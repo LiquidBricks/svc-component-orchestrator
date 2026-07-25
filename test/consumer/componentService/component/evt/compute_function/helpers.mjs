@@ -63,7 +63,13 @@ const dataResultComputedSpec = getDataResultComputedSpec()
 const taskResultComputedSpec = getTaskResultComputedSpec()
 const gateResultComputedSpec = getGateResultComputedSpec()
 const resultComputedSpecByType = Object.freeze({ data: dataResultComputedSpec, task: taskResultComputedSpec, gate: gateResultComputedSpec })
+const snapshotResultSpecByType = Object.freeze({
+  data: getSnapshotResultSpec('data'),
+  gate: getSnapshotResultSpec('gate'),
+  task: getSnapshotResultSpec('task'),
+})
 const injectResultsSpec = getInjectResultsSpec()
+const injectedSpec = getInjectedSpec()
 const checkStateMachineCompletionSpec = getCheckStateMachineCompletionSpec()
 const startDependantsSpec = getStartDependantsSpec()
 const dataStartSpec = getDataStartSpec()
@@ -172,6 +178,23 @@ function getGateResultComputedSpec() {
   return route.config
 }
 
+function getSnapshotResultSpec(type) {
+  const router = createComponentServiceRouter({
+    natsContext: {},
+    g: {},
+    diagnostics: makeDiagnosticsInstance(),
+    dataMapper: {},
+  })
+  const route = router.routes.find(({ values }) =>
+    values.ns === 'domain'
+    && values.channel === 'snapshot'
+    && values.entity === type
+    && values.action === 'result'
+  )
+  assert.ok(route, `${type} snapshot result domain route not found`)
+  return route.config
+}
+
 function getInjectResultsSpec() {
   const router = createComponentServiceRouter({
     natsContext: {},
@@ -185,6 +208,23 @@ function getInjectResultsSpec() {
     && values.action === 'injectResults'
   )
   assert.ok(route, 'injectResults route not found')
+  return route.config
+}
+
+function getInjectedSpec() {
+  const router = createComponentServiceRouter({
+    natsContext: {},
+    g: {},
+    diagnostics: makeDiagnosticsInstance(),
+    dataMapper: {},
+  })
+  const route = router.routes.find(({ values }) =>
+    values.ns === 'domain'
+    && values.channel === 'edge'
+    && values.entity === 'injects_into'
+    && values.action === 'injected'
+  )
+  assert.ok(route, 'injects_into injected domain route not found')
   return route.config
 }
 
@@ -341,6 +381,11 @@ export const injectResultsSubject = createBasicSubject(natsEvents['*'].component
   .env('prod')
   .build()
 
+const injectedFactSubject = createBasicSubject(natsEvents['*'].domain['*']['*'].edge.injects_into.injected.v1['*'])
+  .forPublish()
+  .env('prod')
+  .build()
+
 export const checkStateMachineCompletionSubject = createBasicSubject(
   natsEvents['*'].component_service['*']['*'].cmd.componentInstance.check_state_machine_completion.v1['*'],
 )
@@ -363,12 +408,31 @@ const stateMachineStartedFactSubject = createBasicSubject(
   .build()
 
 export async function runInjectResultsCommands({ rootCtx, events }) {
-  const subject = injectResultsSubject
+  const injectedFacts = []
   const published = []
 
-  for (const event of events.filter(entry => entry.subject === subject)) {
+  for (const event of events.filter(entry => entry.subject === injectResultsSubject)) {
     await runSpec({
       spec: injectResultsSpec,
+      rootCtx: {
+        ...rootCtx,
+        natsContext: {
+          publish: async (publishedSubject, payload) => {
+            injectedFacts.push({ subject: publishedSubject, payload: JSON.parse(payload) })
+          },
+        },
+      },
+      message: {
+        subject: injectResultsSubject,
+        ack: () => { },
+        json: () => event.payload,
+      },
+    })
+  }
+
+  for (const fact of injectedFacts.filter(entry => entry.subject === injectedFactSubject)) {
+    await runSpec({
+      spec: injectedSpec,
       rootCtx: {
         ...rootCtx,
         natsContext: {
@@ -378,9 +442,9 @@ export async function runInjectResultsCommands({ rootCtx, events }) {
         },
       },
       message: {
-        subject,
+        subject: fact.subject,
         ack: () => { },
-        json: () => event.payload,
+        json: () => fact.payload,
       },
     })
   }
@@ -402,6 +466,21 @@ const gateResultComputedSubject = createBasicSubject(natsEvents['*'].domain['*']
   .forPublish()
   .env('prod')
   .build()
+
+const snapshotResultSubjectByType = Object.freeze({
+  data: createBasicSubject(natsEvents['*'].domain['*']['*'].snapshot.data.result.v1['*'])
+    .forPublish()
+    .set({ env: 'prod', context: 'delta' })
+    .build(),
+  gate: createBasicSubject(natsEvents['*'].domain['*']['*'].snapshot.gate.result.v1['*'])
+    .forPublish()
+    .set({ env: 'prod', context: 'delta' })
+    .build(),
+  task: createBasicSubject(natsEvents['*'].domain['*']['*'].snapshot.task.result.v1['*'])
+    .forPublish()
+    .set({ env: 'prod', context: 'delta' })
+    .build(),
+})
 
 const resultComputedSubjectByType = Object.freeze({
   data: dataResultComputedSubject,
@@ -500,6 +579,37 @@ async function processResultComputedFacts({ rootCtx, facts }) {
         subject: fact.subject,
         ack: () => { },
         json: () => fact.payload,
+      },
+      processDomainFacts: false,
+    })
+
+    const resultData = fact.payload.data
+    const snapshotSpec = snapshotResultSpecByType[resultData.type]
+
+    const snapshotPayload = {
+      data: {
+        instanceId: resultData.instanceId,
+        instanceVertexId: resultData.instanceVertexId,
+        componentStateId: `component-state:${resultData.instanceVertexId}`,
+        stateMachineId: resultData.stateMachineId,
+        stateEdgeId: resultData.stateEdgeId,
+        gateInstanceRefId: resultData.gateInstanceRefId,
+        type: resultData.type,
+        name: resultData.name,
+        delta: {
+          [`${resultData.type}.${resultData.name}`]: resultData.result,
+        },
+        updatedAt: resultData.updatedAt,
+      },
+    }
+
+    await runSpec({
+      spec: snapshotSpec,
+      rootCtx,
+      message: {
+        subject: snapshotResultSubjectByType[resultData.type],
+        ack: () => { },
+        json: () => snapshotPayload,
       },
       processDomainFacts: false,
     })

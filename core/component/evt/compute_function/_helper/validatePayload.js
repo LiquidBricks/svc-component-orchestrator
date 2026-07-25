@@ -1,6 +1,7 @@
 import { Errors } from '../../../../../errors.js'
 
-export function validatePayload({ scope: { handlerDiagnostics, instanceId, name } }) {
+export function validatePayload({ scope }) {
+  const { handlerDiagnostics, instanceId, name } = scope
   handlerDiagnostics.require(
     typeof instanceId === 'string' && instanceId.length,
     Errors.PRECONDITION_REQUIRED,
@@ -12,5 +13,11 @@ export function validatePayload({ scope: { handlerDiagnostics, instanceId, name 
     Errors.PRECONDITION_REQUIRED,
     'name required for compute_function',
     { field: 'name' }
+  )
+  handlerDiagnostics.require(
+    Object.prototype.hasOwnProperty.call(scope, 'result'),
+    Errors.PRECONDITION_REQUIRED,
+    'result required for compute_function',
+    { field: 'result' },
   )
 }

@@ -363,9 +363,9 @@ test('computeFunction stores state result and drives completion through command 
 
 test('validatePayload accepts payloads without a type field', () => {
   const diagnostics = makeDiagnosticsInstance()
-  const handlerDiagnostics = createHandlerDiagnostics(diagnostics, { instanceId: 'i-1', name: 'x' })
+  const handlerDiagnostics = createHandlerDiagnostics(diagnostics, { instanceId: 'i-1', name: 'x', result: null })
   assert.doesNotThrow(() => validatePayload({
-    scope: { handlerDiagnostics, instanceId: 'i-1', name: 'x' },
+    scope: { handlerDiagnostics, instanceId: 'i-1', name: 'x', result: null },
     rootCtx: { diagnostics },
   }))
 })
@@ -375,6 +375,15 @@ test('validatePayload rejects a missing name', () => {
   const handlerDiagnostics = createHandlerDiagnostics(diagnostics, { instanceId: 'i-1' })
   assert.throws(
     () => validatePayload({ scope: { handlerDiagnostics, instanceId: 'i-1', name: '' }, rootCtx: { diagnostics } }),
+    diagnostics.DiagnosticError,
+  )
+})
+
+test('validatePayload rejects a missing native result', () => {
+  const diagnostics = makeDiagnosticsInstance()
+  const handlerDiagnostics = createHandlerDiagnostics(diagnostics, { instanceId: 'i-1', name: 'x' })
+  assert.throws(
+    () => validatePayload({ scope: { handlerDiagnostics, instanceId: 'i-1', name: 'x' }, rootCtx: { diagnostics } }),
     diagnostics.DiagnosticError,
   )
 })
