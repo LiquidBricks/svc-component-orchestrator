@@ -112,7 +112,6 @@ test('computeFunction publishes injected computeFunction events for injection ta
     assertDataStartDependantsPayload(startDependantsEvents[0].payload.data, {
       instanceId,
       stateEdgeId: sourceEdgeId,
-      result: resultPayload,
     })
 
     const injectedPayloads = injectedEvents
@@ -219,7 +218,6 @@ test('injected result triggers dependant data and task start commands', async ()
     assertDataStartDependantsPayload(targetStartDependants[0].payload.data, {
       instanceId,
       stateEdgeId: dataTargetStateEdgeId,
-      result: injectedEvent.payload.data.result,
     })
 
     const dependantPublishes = []

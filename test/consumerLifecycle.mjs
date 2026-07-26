@@ -8,12 +8,14 @@ import {
   ensureConsumer,
 } from '../index.js'
 
-test('consumer configuration includes data/gate/task snapshot continuations', () => {
+test('consumer configuration uses snapshots instead of raw data/task result facts', () => {
   const { filter_subjects: subjects } = createConsumerConfig()
 
   assert.ok(subjects.includes('*.domain.*.delta.snapshot.data.result.v1.*'))
   assert.ok(subjects.includes('*.domain.*.delta.snapshot.gate.result.v1.*'))
   assert.ok(subjects.includes('*.domain.*.delta.snapshot.task.result.v1.*'))
+  assert.equal(subjects.includes('*.domain.*.*.edge.has_data_state.result_computed.v1.*'), false)
+  assert.equal(subjects.includes('*.domain.*.*.edge.has_task_state.result_computed.v1.*'), false)
 })
 
 test('ensureConsumer preserves a durable whose filters are current', async () => {

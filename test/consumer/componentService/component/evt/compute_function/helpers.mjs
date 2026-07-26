@@ -59,10 +59,7 @@ const createInstanceSpec = getCreateInstanceSpec()
 const startInstanceSpec = getStartInstanceSpec()
 const computeFunctionSpecs = getComputeFunctionSpecs()
 const computeFunctionSpec = Symbol('computeFunctionSpec')
-const dataResultComputedSpec = getDataResultComputedSpec()
-const taskResultComputedSpec = getTaskResultComputedSpec()
 const gateResultComputedSpec = getGateResultComputedSpec()
-const resultComputedSpecByType = Object.freeze({ data: dataResultComputedSpec, task: taskResultComputedSpec, gate: gateResultComputedSpec })
 const snapshotResultSpecByType = Object.freeze({
   data: getSnapshotResultSpec('data'),
   gate: getSnapshotResultSpec('gate'),
@@ -125,40 +122,6 @@ function getComputeFunctionSpecs() {
     'computeFunction routes missing',
   )
   return Object.fromEntries(routes.map(({ values, config }) => [values.id, config]))
-}
-
-function getDataResultComputedSpec() {
-  const router = createComponentServiceRouter({
-    natsContext: {},
-    g: {},
-    diagnostics: makeDiagnosticsInstance(),
-    dataMapper: {},
-  })
-  const route = router.routes.find(({ values }) =>
-    values.ns === 'domain'
-    && values.channel === 'edge'
-    && values.entity === 'has_data_state'
-    && values.action === 'result_computed'
-  )
-  assert.ok(route, 'data result_computed domain route not found')
-  return route.config
-}
-
-function getTaskResultComputedSpec() {
-  const router = createComponentServiceRouter({
-    natsContext: {},
-    g: {},
-    diagnostics: makeDiagnosticsInstance(),
-    dataMapper: {},
-  })
-  const route = router.routes.find(({ values }) =>
-    values.ns === 'domain'
-    && values.channel === 'edge'
-    && values.entity === 'has_task_state'
-    && values.action === 'result_computed'
-  )
-  assert.ok(route, 'task result_computed domain route not found')
-  return route.config
 }
 
 function getGateResultComputedSpec() {
@@ -315,21 +278,11 @@ export function pickFirst(values) {
   return values ?? null
 }
 
-export function assertDataStartDependantsPayload(actual, { instanceId, stateEdgeId, result }) {
-  assert.deepEqual({
-    instanceId: actual.instanceId,
-    stateEdgeId: actual.stateEdgeId,
-    type: actual.type,
-    status: actual.status,
-    stateEdgeStatus: actual.stateEdgeStatus,
-    result: actual.result,
-  }, {
+export function assertDataStartDependantsPayload(actual, { instanceId, stateEdgeId }) {
+  assert.deepEqual(actual, {
     instanceId,
     stateEdgeId,
     type: 'data',
-    status: STATE_EDGE_STATUS_BY_TYPE.data,
-    stateEdgeStatus: STATE_EDGE_STATUS_BY_TYPE.data,
-    result,
   })
 }
 
@@ -572,16 +525,18 @@ export async function runCheckStateMachineCompletionCommands({ rootCtx, events }
 async function processResultComputedFacts({ rootCtx, facts }) {
   for (const fact of facts.filter(isResultComputedFact)) {
     await projectResultComputedFact({ rootCtx, payload: fact.payload })
-    await runSpec({
-      spec: resultComputedSpecByType[fact.payload.data.type],
-      rootCtx,
-      message: {
-        subject: fact.subject,
-        ack: () => { },
-        json: () => fact.payload,
-      },
-      processDomainFacts: false,
-    })
+    if (fact.payload.data.type === 'gate') {
+      await runSpec({
+        spec: gateResultComputedSpec,
+        rootCtx,
+        message: {
+          subject: fact.subject,
+          ack: () => { },
+          json: () => fact.payload,
+        },
+        processDomainFacts: false,
+      })
+    }
 
     const resultData = fact.payload.data
     const snapshotSpec = snapshotResultSpecByType[resultData.type]

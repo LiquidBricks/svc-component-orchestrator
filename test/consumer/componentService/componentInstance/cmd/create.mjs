@@ -10,7 +10,7 @@ import { ulid } from 'ulid'
 import { createComponentServiceRouter } from '../../../../../router.js'
 import { path as registerPath } from '../../../../../core/componentAgent/cmd/registerComponent/index.js'
 import { dataMapper as createDataMapper, domain } from '@liquid-bricks/spec-domain/domain'
-import { publishEvents as publishCreateInstanceEvents } from '../../../../../core/componentInstance/cmd/create/publishEvents/index.js'
+import { publishCreatedFacts } from '../../../../../core/componentInstance/cmd/create/publishCreatedFacts.js'
 import { publishEvents as publishStartInstanceEvents } from '../../../../../core/domain/vertex/stateMachine/started/publishEvents/index.js'
 import { spec as stateMachineStartedSpec } from '../../../../../core/domain/vertex/stateMachine/started/index.js'
 import { usesImportInstances } from '../../../../../core/componentInstance/cmd/start/loadData/usesImportInstances.js'
@@ -113,27 +113,7 @@ function readProperty(row, property) {
   return Array.isArray(value) ? value[0] : value
 }
 
-function normalizeState(value) {
-  if (typeof value !== 'string') return value
-  try {
-    return JSON.parse(value)
-  } catch {
-    return value
-  }
-}
-
-async function readComponentSnapshot({ dataMapper, instanceVertexId }) {
-  const componentStateIds = await dataMapper.query.readComponentStateId({ vertexId: instanceVertexId })
-  assert.equal(componentStateIds.length, 1, 'componentInstance must have exactly one componentState')
-
-  const [row] = await dataMapper.query.readComponentState({ vertexId: componentStateIds[0] })
-  return {
-    componentStateId: componentStateIds[0],
-    state: normalizeState(readProperty(row, 'state')),
-  }
-}
-
-test('handler creates componentInstance snapshot stateMachine and links data/task states', async () => {
+test('handler creates componentInstance topology and returns its initial snapshot state', async () => {
   await withGraphContext(async ({ diagnostics, dataMapper, g }) => {
     const component = componentBuilder('ComponentStateMachine')
       .task('taskA', {})
@@ -146,7 +126,10 @@ test('handler creates componentInstance snapshot stateMachine and links data/tas
     const [componentId] = await dataMapper.query.findComponentIdByHash({ hash: component.hash })
     const instanceId = 'instance-state-machine'
     const imports = await loadImports({ g, dataMapper, componentId })
-    await createInstance({ diagnostics, dataMapper, g }, { componentHash: component.hash, componentId, instanceId, imports })
+    const { createdInstances } = await createInstance(
+      { diagnostics, dataMapper, g },
+      { componentHash: component.hash, componentId, instanceId, imports },
+    )
 
     const [instanceVertexId] = await dataMapper.query.findInstanceVertexId({ instanceId })
     assert.ok(instanceVertexId, 'componentInstance vertex missing')
@@ -154,13 +137,17 @@ test('handler creates componentInstance snapshot stateMachine and links data/tas
     const instanceOfIds = await dataMapper.query.listInstanceOfIds({ vertexId: instanceVertexId })
     assert.deepEqual(instanceOfIds, [componentId])
 
-    const snapshot = await readComponentSnapshot({ dataMapper, instanceVertexId })
-    assert.ok(snapshot.componentStateId)
-    assert.deepEqual(snapshot.state, {
+    assert.equal(createdInstances.length, 1)
+    assert.deepEqual(createdInstances[0].state, {
       'data.dataA': null,
       'task.taskA': null,
       'task.taskB': null,
     })
+    assert.deepEqual(
+      await dataMapper.query.readComponentStateId({ vertexId: instanceVertexId }),
+      [],
+      'snapshot creation belongs to svc-domain-snapshot',
+    )
 
     const [stateMachineId] = await dataMapper.query.readStateMachineId({ vertexId: instanceVertexId })
     assert.ok(stateMachineId, 'stateMachine vertex missing')
@@ -192,7 +179,10 @@ test('handler creates gate instances and links them to gate refs', async () => {
     const gates = await loadGates({ g, dataMapper, componentId: rootComponentId })
 
     const instanceId = 'instance-gate-root'
-    await createInstance({ diagnostics, dataMapper, g }, { componentHash: rootComponent.hash, componentId: rootComponentId, instanceId, imports: [], gates })
+    const { createdInstances } = await createInstance(
+      { diagnostics, dataMapper, g },
+      { componentHash: rootComponent.hash, componentId: rootComponentId, instanceId, imports: [], gates },
+    )
 
     const [rootInstanceVertexId] = await dataMapper.query.findRootInstanceVertexId({ instanceId })
     assert.ok(rootInstanceVertexId, 'root instance missing')
@@ -215,11 +205,11 @@ test('handler creates gate instances and links them to gate refs', async () => {
     const [gatedInstanceVertexId] = await dataMapper.query.findGatedInstanceVertexIdForRef({ vertexId: gateInstanceRefs[0] })
     assert.ok(gatedInstanceVertexId, 'gated instance missing')
 
-    const rootSnapshot = await readComponentSnapshot({ dataMapper, instanceVertexId: rootInstanceVertexId })
-    assert.deepEqual(rootSnapshot.state, { 'gate.setup': null })
+    const rootSnapshot = createdInstances.find(({ instanceVertexId }) => instanceVertexId === rootInstanceVertexId)
+    assert.deepEqual(rootSnapshot?.state, { 'gate.setup': null })
 
-    const gatedSnapshot = await readComponentSnapshot({ dataMapper, instanceVertexId: gatedInstanceVertexId })
-    assert.deepEqual(gatedSnapshot.state, { 'data.ready': null })
+    const gatedSnapshot = createdInstances.find(({ instanceVertexId }) => instanceVertexId === gatedInstanceVertexId)
+    assert.deepEqual(gatedSnapshot?.state, { 'data.ready': null })
 
     const [gatedComponentId] = await dataMapper.query.findGatedComponentIdForGateRef({ vertexId: gateRefId })
     const [gatedInstanceComponentId] = await dataMapper.query.findGatedInstanceComponentId({ vertexId: gatedInstanceVertexId })
@@ -240,7 +230,10 @@ test('create builds componentInstances for imports and links via importInstanceR
     const instanceId = 'parent-instance'
     const componentId = await getComponentId({ g, dataMapper, diagnostics, componentHash: component.hash })
     const imports = await loadImports({ g, dataMapper, componentId })
-    await createInstance({ diagnostics, dataMapper, g }, { componentHash: component.hash, componentId, instanceId, imports })
+    const { createdInstances } = await createInstance(
+      { diagnostics, dataMapper, g },
+      { componentHash: component.hash, componentId, instanceId, imports },
+    )
 
     const [parentInstanceVertexId] = await dataMapper.query.findParentInstanceVertexId({ instanceId })
     assert.ok(parentInstanceVertexId, 'parent componentInstance missing')
@@ -251,11 +244,11 @@ test('create builds componentInstances for imports and links via importInstanceR
     const [importInstanceRefId] = importInstanceRefIds
     const [importedInstanceVertexId] = await dataMapper.query.findImportedInstanceVertexIdForRef({ vertexId: importInstanceRefId })
 
-    const parentSnapshot = await readComponentSnapshot({ dataMapper, instanceVertexId: parentInstanceVertexId })
-    assert.deepEqual(parentSnapshot.state, {})
+    const parentSnapshot = createdInstances.find(({ instanceVertexId }) => instanceVertexId === parentInstanceVertexId)
+    assert.deepEqual(parentSnapshot?.state, {})
 
-    const importedSnapshot = await readComponentSnapshot({ dataMapper, instanceVertexId: importedInstanceVertexId })
-    assert.deepEqual(importedSnapshot.state, {})
+    const importedSnapshot = createdInstances.find(({ instanceVertexId }) => instanceVertexId === importedInstanceVertexId)
+    assert.deepEqual(importedSnapshot?.state, {})
 
     const [importRefId] = await dataMapper.query.findImportRefIdForInstanceRef({ vertexId: importInstanceRefId })
     const [importRefValues] = await dataMapper.query.readImportRefValues({ vertexId: importRefId })
@@ -294,12 +287,13 @@ test('create recursively builds componentInstances for nested imports', async ()
     const instanceId = 'root-instance-nested'
     const rootComponentId = await getComponentId({ g, dataMapper, diagnostics, componentHash: rootComponent.hash })
     const imports = await loadImports({ g, dataMapper, componentId: rootComponentId })
-    const { importedInstances } = await createInstance(
+    const { importedInstances, createdInstances } = await createInstance(
       { diagnostics, dataMapper, g },
       { componentHash: rootComponent.hash, componentId: rootComponentId, instanceId, imports },
     )
 
     assert.equal(importedInstances.length, rootComponent.imports.length)
+    assert.equal(createdInstances.length, 3, 'root and every nested import must produce a snapshot fact record')
 
     const [rootInstanceVertexId] = await dataMapper.query.findRootInstanceVertexId({ instanceId })
     assert.ok(rootInstanceVertexId, 'root componentInstance missing')
@@ -381,7 +375,7 @@ test('create handles multiple imports of the same component hash with unique ali
   })
 })
 
-test('publishEvents does not start imported componentInstances after creation', async () => {
+test('publishes one componentInstance created domain fact per instance and no start commands', async () => {
   await withGraphContext(async ({ diagnostics, dataMapper, g }) => {
     const sharedComponent = componentBuilder('SharedComponentTwo').toJSON()
     const component = componentBuilder('ParentComponentTwo')
@@ -395,20 +389,33 @@ test('publishEvents does not start imported componentInstances after creation', 
     const componentId = await getComponentId({ g, dataMapper, diagnostics, componentHash: component.hash })
     const imports = await loadImports({ g, dataMapper, componentId })
     const handlerResult = await createInstance({ diagnostics, dataMapper, g }, { componentHash: component.hash, componentId, instanceId, imports })
-    const scope = { componentHash: component.hash, instanceId, ...handlerResult }
+    const scope = {
+      ...handlerResult,
+      handlerDiagnostics: createHandlerDiagnostics(diagnostics, handlerResult),
+    }
 
     const published = []
     const natsContext = { publish: async (subject, payload) => published.push({ subject, payload: JSON.parse(payload) }) }
 
-    await runHookGroup(publishCreateInstanceEvents, { rootCtx: { natsContext }, routeCtx: createInstanceSpec.context, scope })
+    await publishCreatedFacts({ rootCtx: { natsContext }, routeCtx: createInstanceSpec.context, scope })
 
-    const createSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.componentInstance.createDone.v1['*']).forPublish()
+    const createdSubject = createBasicSubject(natsEvents['*'].domain['*']['*'].vertex.componentInstance.created.v1['*']).forPublish()
       .env('prod')
       .build()
 
-    const createEvents = published.filter(({ subject }) => subject === createSubject)
-    assert.equal(createEvents.length, 1)
-    assert.deepEqual(createEvents[0].payload.data, { instanceId, componentHash: component.hash })
+    const createdFacts = published.filter(({ subject }) => subject === createdSubject)
+    assert.equal(createdFacts.length, 2)
+    for (const { payload: { data } } of createdFacts) {
+      assert.equal(typeof data.updatedAt, 'string')
+      assert.equal(Number.isNaN(Date.parse(data.updatedAt)), false)
+      assert.equal(typeof data.instanceId, 'string')
+      assert.equal(typeof data.instanceVertexId, 'string')
+      assert.equal(typeof data.componentId, 'string')
+      assert.equal(typeof data.componentHash, 'string')
+      assert.equal(typeof data.stateMachineId, 'string')
+      assert.deepEqual(data.state, {})
+    }
+    assert.ok(createdFacts.some(({ payload }) => payload.data.instanceId === instanceId))
     assert.equal(handlerResult.importedInstances.length, component.imports.length)
 
     const startCommands = published.filter(({ subject }) => subject.includes('.cmd.componentInstance.start.'))

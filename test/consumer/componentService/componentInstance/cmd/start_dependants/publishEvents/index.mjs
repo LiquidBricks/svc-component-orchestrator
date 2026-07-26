@@ -82,7 +82,7 @@ test('publishEvents publishes import start commands with parent instance context
   })
 })
 
-test('publishEvents dispatches gate compute_function requests to component execution', async () => {
+test('publishEvents delegates gate work to gate.start', async () => {
   const published = []
   const natsContext = {
     publish: async (subject, payload) => published.push({ subject, payload: JSON.parse(payload) }),
@@ -97,37 +97,26 @@ test('publishEvents dispatches gate compute_function requests to component execu
           instanceId: 'instance-gate-parent',
           dataStateIds: [],
           taskStateIds: [],
-          gateStartRequests: [
-            {
-              instanceId: 'instance-gate-parent',
-              componentHash: 'hash-parent',
-              name: 'setup',
-              type: 'gate',
-              deps: { data: { ready: true } },
-            },
-          ],
+          gateInstanceIds: ['instance-gate-child'],
         },
       ],
     },
   })
 
-  const gateSubject = createBasicSubject(natsEvents['*'].gateway['*']['*'].cmd.component.compute_function.v1['*']).forPublish()
+  const gateStartSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.gate.start.v1['*']).forPublish()
     .env('prod')
     .build()
-  const startInstanceSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start.v1['*']).forPublish()
+  const gateComputeSubject = createBasicSubject(natsEvents['*'].gateway['*']['*'].cmd.component.compute_function.v1['*']).forPublish()
     .env('prod')
     .build()
 
-  const gateEvents = published.filter(({ subject }) => subject === gateSubject)
-  assert.equal(gateEvents.length, 1)
-  assert.deepEqual(gateEvents[0].payload.data, {
-    instanceId: 'instance-gate-parent',
-    componentHash: 'hash-parent',
-    name: 'setup',
-    type: 'gate',
-    deps: { data: { ready: true } },
+  const gateStartEvents = published.filter(({ subject }) => subject === gateStartSubject)
+  assert.equal(gateStartEvents.length, 1)
+  assert.deepEqual(gateStartEvents[0].payload.data, {
+    instanceId: 'instance-gate-child',
+    parentInstanceId: 'instance-gate-parent',
   })
 
-  const directStartEvents = published.filter(({ subject }) => subject === startInstanceSubject)
-  assert.equal(directStartEvents.length, 0)
+  const directComputeEvents = published.filter(({ subject }) => subject === gateComputeSubject)
+  assert.equal(directComputeEvents.length, 0, 'gate compute_function should be emitted by gate.cmd.start handler')
 })

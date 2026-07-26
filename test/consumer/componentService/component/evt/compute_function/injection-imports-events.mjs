@@ -387,7 +387,6 @@ test('computeFunction publishes injected computeFunction to imported component i
     assertDataStartDependantsPayload(startDependantsEvents[0].payload.data, {
       instanceId: rootInstanceId,
       stateEdgeId: rootDataStateEdgeId,
-      result: resultPayload,
     })
 
     assert.equal(injectedEvents.length, 1)
@@ -473,7 +472,6 @@ test('computeFunction skips unreachable injected targets in a different instance
     assertDataStartDependantsPayload(startDependantsEvents[0].payload.data, {
       instanceId: providerInstanceId,
       stateEdgeId: providerDataStateEdgeId,
-      result: { context: 'standalone-provider' },
     })
   })
 })

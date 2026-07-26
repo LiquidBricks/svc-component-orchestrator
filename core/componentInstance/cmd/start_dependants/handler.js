@@ -1,18 +1,13 @@
 import {
-  findImportPathBetweenComponents,
-  findStateEdgeForNodeInInstanceTree,
   hasInstanceStarted,
   isNodeProvided,
   LIFECYCLE_WAIT_FOR_PROPERTY,
   normalizeLifecycleWaitForValues,
-  normalizeResult,
-  setNested,
-  vertexLabelToType,
 } from '../dependencyUtils.js'
 import { STATE_WAITING_STATUS_BY_TYPE } from './constants.js'
 
 export async function handler({ rootCtx: { g, dataMapper }, scope: {
-  instanceId, instanceVertexId, stateMachineId, providedNodeId, type, stateEdgeId, stateEdgeLabel, stateEdgeStatus, status, result } }) {
+  instanceId, instanceVertexId, stateMachineId, providedNodeId, type, stateEdgeId, stateEdgeLabel } }) {
   const { dependentTaskNodeIds, dependentDataNodeIds } = await gatherDependentNodes({ g, dataMapper, providedNodeId, type })
   const instances = await collectInstanceChain({
     g, dataMapper, startInstanceVertexId: instanceVertexId,
@@ -21,18 +16,9 @@ export async function handler({ rootCtx: { g, dataMapper }, scope: {
 
   const stateEdgeCache = new Map()
   const pathResolutionCache = new Map()
-  const stateStatusOverrides = new Map()
-  const stateResultOverrides = new Map()
-  const providedStatus = stateEdgeStatus ?? status
 
   if (providedNodeId && stateEdgeId) {
     stateEdgeCache.set(instanceVertexId + ':' + providedNodeId, { stateMachineId, stateEdgeId, stateEdgeLabel, instanceVertexId })
-  }
-  if (stateEdgeId && providedStatus !== undefined) {
-    stateStatusOverrides.set(stateEdgeId, providedStatus)
-  }
-  if (stateEdgeId && result !== undefined) {
-    stateResultOverrides.set(stateEdgeId, result)
   }
   const starters = []
   for (const instance of instances) {
@@ -47,30 +33,23 @@ export async function handler({ rootCtx: { g, dataMapper }, scope: {
       dependentDataNodeIds,
       stateEdgeCache,
       pathResolutionCache,
-      stateStatusOverrides,
     })
     const importInstanceIds = await findReadyImportsForInstance({
       g, dataMapper,
       instanceVertexId: targetInstanceVertexId,
       stateEdgeCache,
       pathResolutionCache,
-      stateStatusOverrides,
     })
-    const gateStartRequests = await findReadyGatesForInstance({
-      g, dataMapper,
-      instanceId: targetInstanceId,
+    const gateInstanceIds = await findGateInstanceIdsForInstance({
+      dataMapper,
       instanceVertexId: targetInstanceVertexId,
-      stateEdgeCache,
-      pathResolutionCache,
-      stateStatusOverrides,
-      stateResultOverrides,
     })
     starters.push({
       instanceId: targetInstanceId,
       dataStateIds,
       taskStateIds,
       importInstanceIds,
-      gateStartRequests,
+      gateInstanceIds,
     })
 
   }
@@ -167,7 +146,6 @@ async function findReadyStatesForInstance({
   dependentDataNodeIds,
   stateEdgeCache,
   pathResolutionCache,
-  stateStatusOverrides,
 }) {
   const [taskStateIds, dataStateIds] = await Promise.all([
     findReadyStatesForType({
@@ -179,7 +157,6 @@ async function findReadyStatesForInstance({
       expectedStatus: STATE_WAITING_STATUS_BY_TYPE.task,
       stateEdgeCache,
       pathResolutionCache,
-      stateStatusOverrides,
     }),
     findReadyStatesForType({
       g, dataMapper,
@@ -190,7 +167,6 @@ async function findReadyStatesForInstance({
       expectedStatus: STATE_WAITING_STATUS_BY_TYPE.data,
       stateEdgeCache,
       pathResolutionCache,
-      stateStatusOverrides,
     }),
   ])
 
@@ -206,7 +182,6 @@ async function findReadyStatesForType({
   expectedStatus,
   stateEdgeCache,
   pathResolutionCache,
-  stateStatusOverrides,
 }) {
   const ready = []
   const seen = new Set()
@@ -232,7 +207,6 @@ async function findReadyStatesForType({
       instanceVertexId,
       stateEdgeCache,
       pathResolutionCache,
-      stateStatusOverrides,
     })
     if (!depsReady) continue
 
@@ -241,7 +215,7 @@ async function findReadyStatesForType({
   return ready
 }
 
-async function dependenciesProvided({ g, dataMapper, nodeId, nodeType, instanceVertexId, stateEdgeCache, pathResolutionCache, stateStatusOverrides }) {
+async function dependenciesProvided({ g, dataMapper, nodeId, nodeType, instanceVertexId, stateEdgeCache, pathResolutionCache }) {
   const dependencyNodeIds = nodeType === 'task'
     ? await dataMapper.query.listTaskDependencyAndWaitForNodeIds({ vertexId: nodeId })
     : await dataMapper.query.listDataDependencyAndWaitForNodeIds({ vertexId: nodeId })
@@ -256,7 +230,6 @@ async function dependenciesProvided({ g, dataMapper, nodeId, nodeType, instanceV
       targetNodeId: depNodeId,
       stateEdgeCache,
       pathResolutionCache,
-      stateStatusOverrides,
     })
     if (!ready) return false
   }
@@ -275,7 +248,7 @@ function normalizeWaitForValues(waitForValues = []) {
   ))
 }
 
-async function areWaitForsProvided({ g, dataMapper, rootInstanceVertexId, waitFor = [], stateEdgeCache, pathResolutionCache, stateStatusOverrides }) {
+async function areWaitForsProvided({ g, dataMapper, rootInstanceVertexId, waitFor = [], stateEdgeCache, pathResolutionCache }) {
   if (!waitFor?.length) return true
   for (const targetNodeId of waitFor) {
     const ready = await isNodeProvided({
@@ -284,85 +257,10 @@ async function areWaitForsProvided({ g, dataMapper, rootInstanceVertexId, waitFo
       targetNodeId,
       stateEdgeCache,
       pathResolutionCache,
-      stateStatusOverrides,
     })
     if (!ready) return false
   }
   return true
-}
-
-async function resolveDependencyComponentId({ g, dataMapper, depNodeId, depType }) {
-  if (depType === 'task') {
-    const [depComponentId] = await dataMapper.query.findComponentIdForTask({ vertexId: depNodeId })
-    return depComponentId
-  }
-  if (depType === 'data') {
-    const [depComponentId] = await dataMapper.query.findComponentIdForData({ vertexId: depNodeId })
-    return depComponentId
-  }
-  return null
-}
-
-async function buildGateDependencyPayload({
-  g, dataMapper,
-  rootInstanceVertexId,
-  dependentComponentId,
-  dependencyNodeIds = [],
-  stateEdgeCache,
-  importPathCache,
-  stateResultOverrides,
-}) {
-  const deps = {}
-  const seen = new Set()
-
-  for (const depNodeId of dependencyNodeIds ?? []) {
-    if (!depNodeId || seen.has(depNodeId)) continue
-    seen.add(depNodeId)
-
-    const stateEdgeInfo = await findStateEdgeForNodeInInstanceTree({
-      g, dataMapper,
-      rootInstanceVertexId,
-      targetNodeId: depNodeId,
-      stateEdgeCache,
-    })
-    if (!stateEdgeInfo) continue
-
-    const [depValues] = await dataMapper.query.readDepValues({ vertexId: depNodeId })
-    const depLabelValues = depValues?.label ?? depValues
-    const depType = vertexLabelToType(Array.isArray(depLabelValues) ? depLabelValues[0] : depLabelValues)
-    const depNameValues = depValues?.name ?? depValues
-    const depName = Array.isArray(depNameValues) ? depNameValues[0] : depNameValues
-    if (!depType || !depName) continue
-
-    const depComponentId = await resolveDependencyComponentId({ g, dataMapper, depNodeId, depType })
-    const importPathCacheKey = `${dependentComponentId}:${depComponentId}`
-    let aliasPath = []
-    if (depComponentId && dependentComponentId && depComponentId !== dependentComponentId) {
-      if (importPathCache.has(importPathCacheKey)) {
-        aliasPath = importPathCache.get(importPathCacheKey) ?? []
-      } else {
-        aliasPath = await findImportPathBetweenComponents({
-          g, dataMapper,
-          fromComponentId: dependentComponentId,
-          toComponentId: depComponentId,
-        }) ?? []
-        importPathCache.set(importPathCacheKey, aliasPath)
-      }
-    }
-
-    let result
-    if (stateResultOverrides?.has(stateEdgeInfo.stateEdgeId)) {
-      result = stateResultOverrides.get(stateEdgeInfo.stateEdgeId)
-    } else {
-      const [stateValues] = await dataMapper.query.readDependencyStateResult({ edgeId: stateEdgeInfo.stateEdgeId })
-      const resultValues = stateValues?.result ?? stateValues
-      result = normalizeResult(Array.isArray(resultValues) ? resultValues[0] : resultValues)
-    }
-    const path = [...aliasPath, depType, depName].join('.')
-    setNested(deps, path, result)
-  }
-
-  return deps
 }
 
 async function findReadyImportsForInstance({
@@ -370,7 +268,6 @@ async function findReadyImportsForInstance({
   instanceVertexId,
   stateEdgeCache,
   pathResolutionCache,
-  stateStatusOverrides,
 }) {
   const readyImports = []
   const importRefInstanceIds = await dataMapper.query.listImportRefInstanceIds({ vertexId: instanceVertexId })
@@ -407,7 +304,6 @@ async function findReadyImportsForInstance({
       waitFor,
       stateEdgeCache,
       pathResolutionCache,
-      stateStatusOverrides,
     })
     if (!ready) continue
 
@@ -420,103 +316,23 @@ async function findReadyImportsForInstance({
   return readyImports
 }
 
-async function findReadyGatesForInstance({
-  g, dataMapper,
-  instanceId,
+async function findGateInstanceIdsForInstance({
+  dataMapper,
   instanceVertexId,
-  stateEdgeCache,
-  pathResolutionCache,
-  stateStatusOverrides,
-  stateResultOverrides,
 }) {
-  const readyGates = []
-  const importPathCache = new Map()
-  const [dependentComponentId] = await dataMapper.query.findDependentComponentId({ vertexId: instanceVertexId })
-  const [componentValues] = dependentComponentId
-    ? await dataMapper.query.readComponentValues({ vertexId: dependentComponentId })
-    : []
-  const componentHashValues = componentValues?.hash ?? componentValues
-  const componentHash = Array.isArray(componentHashValues) ? componentHashValues[0] : componentHashValues
-  const gateRefInstanceIds = await dataMapper.query.listGateRefInstanceIds({ vertexId: instanceVertexId })
+  const gateInstanceIds = []
+  const gateInstanceVertexIds = await dataMapper.query.listGatedInstanceIds({ vertexId: instanceVertexId })
   const dispatched = new Set()
 
-  for (const gateRefInstanceId of gateRefInstanceIds ?? []) {
-    const [gateRefId] = await dataMapper.query.findGateRefIdForInstanceRef({ vertexId: gateRefInstanceId })
-    const [gateRefValues] = gateRefId
-      ? await dataMapper.query.readGateRefAlias({ vertexId: gateRefId })
-      : []
-    const aliasValues = gateRefValues?.alias ?? gateRefValues
-    const alias = Array.isArray(aliasValues) ? aliasValues[0] : aliasValues
-    if (!alias || !componentHash || !instanceId || dispatched.has(alias)) continue
-    const taskWaitForIds = gateRefId
-      ? await dataMapper.query.listGateTaskWaitForIds({ vertexId: gateRefId })
-      : []
-    const dataWaitForIds = gateRefId
-      ? await dataMapper.query.listGateDataWaitForIds({ vertexId: gateRefId })
-      : []
-    const depsTaskIds = gateRefId
-      ? await dataMapper.query.listDepsTaskIds({ vertexId: gateRefId })
-      : []
-    const depsDataIds = gateRefId
-      ? await dataMapper.query.listDepsDataIds({ vertexId: gateRefId })
-      : []
-    const waitFor = normalizeWaitForValues([
-      ...(taskWaitForIds ?? []),
-      ...(dataWaitForIds ?? []),
-    ])
-    const deps = normalizeWaitForValues([
-      ...(depsTaskIds ?? []),
-      ...(depsDataIds ?? []),
-    ])
-
-    const [gateInstanceVertexId] = await dataMapper.query.findGateInstanceVertexIdForRef({ vertexId: gateRefInstanceId })
-    if (!gateInstanceVertexId) continue
+  for (const gateInstanceVertexId of gateInstanceVertexIds ?? []) {
     const [instanceValues] = await dataMapper.query.readGateInstanceId({ vertexId: gateInstanceVertexId })
     const instanceIdValues = instanceValues?.instanceId ?? instanceValues
     const gateInstanceId = Array.isArray(instanceIdValues) ? instanceIdValues[0] : instanceIdValues
-    if (!gateInstanceId) continue
+    if (!gateInstanceId || dispatched.has(gateInstanceId)) continue
 
-    const readyWaitFor = await areWaitForsProvided({
-      g, dataMapper,
-      rootInstanceVertexId: instanceVertexId,
-      waitFor,
-      stateEdgeCache,
-      pathResolutionCache,
-      stateStatusOverrides,
-    })
-    if (!readyWaitFor) continue
-
-    const depsReady = await areWaitForsProvided({
-      g, dataMapper,
-      rootInstanceVertexId: instanceVertexId,
-      waitFor: deps,
-      stateEdgeCache,
-      pathResolutionCache,
-      stateStatusOverrides,
-    })
-    if (!depsReady) continue
-
-    const alreadyStarted = await hasInstanceStarted({ g, dataMapper, instanceVertexId: gateInstanceVertexId })
-    if (alreadyStarted) continue
-
-    const gateDeps = await buildGateDependencyPayload({
-      g, dataMapper,
-      rootInstanceVertexId: instanceVertexId,
-      dependentComponentId,
-      dependencyNodeIds: deps,
-      stateEdgeCache,
-      importPathCache,
-      stateResultOverrides,
-    })
-    dispatched.add(alias)
-    readyGates.push({
-      instanceId,
-      componentHash,
-      name: alias,
-      type: 'gate',
-      deps: gateDeps,
-    })
+    dispatched.add(gateInstanceId)
+    gateInstanceIds.push(gateInstanceId)
   }
 
-  return readyGates
+  return gateInstanceIds
 }

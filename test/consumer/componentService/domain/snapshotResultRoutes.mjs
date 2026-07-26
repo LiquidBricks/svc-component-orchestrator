@@ -7,9 +7,7 @@ import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nat
 import { path as dataSnapshotResultPath } from '../../../../core/domain/snapshot/data/result/index.js'
 import { path as gateSnapshotResultPath } from '../../../../core/domain/snapshot/gate/result/index.js'
 import { path as taskSnapshotResultPath } from '../../../../core/domain/snapshot/task/result/index.js'
-import { spec as dataResultComputedSpec } from '../../../../core/domain/edge/has_data_state/result_computed/index.js'
 import { spec as gateResultComputedSpec } from '../../../../core/domain/edge/has_gate_state/result_computed/index.js'
-import { spec as taskResultComputedSpec } from '../../../../core/domain/edge/has_task_state/result_computed/index.js'
 import { createRouteMessage, invokeRoute } from '../../../util/invokeRoute.js'
 
 const noop = () => {}
@@ -52,6 +50,13 @@ const injectResultsSubject = createSubject(
   .env('prod')
   .build()
 
+const startDependantsSubject = createSubject(
+  natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start_dependants.v1['*'],
+)
+  .forPublish()
+  .env('prod')
+  .build()
+
 const checkStateMachineCompletionSubject = createSubject(
   natsEvents['*'].component_service['*']['*'].cmd.componentInstance.check_state_machine_completion.v1['*'],
 )
@@ -67,22 +72,11 @@ async function assertDiagnosticRejects({ path, data }) {
   )
 }
 
-test('task/data result facts no longer publish injection commands directly', () => {
-  for (const spec of [dataResultComputedSpec, taskResultComputedSpec]) {
-    assert.equal(
-      Object.hasOwn(spec.context.emits, 'component_service.cmd.componentInstance.injectResults.v1'),
-      false,
-    )
-  }
-})
-
-test('result facts no longer publish completion-check commands directly', () => {
-  for (const spec of [dataResultComputedSpec, gateResultComputedSpec, taskResultComputedSpec]) {
-    assert.equal(
-      Object.hasOwn(spec.context.emits, 'component_service.cmd.componentInstance.check_state_machine_completion.v1'),
-      false,
-    )
-  }
+test('gate result fact does not publish completion-check commands directly', () => {
+  assert.equal(
+    Object.hasOwn(gateResultComputedSpec.context.emits, 'component_service.cmd.componentInstance.check_state_machine_completion.v1'),
+    false,
+  )
 })
 
 test('data/gate/task snapshot continuations are bound to delta context', () => {
@@ -92,7 +86,7 @@ test('data/gate/task snapshot continuations are bound to delta context', () => {
 })
 
 for (const type of ['data', 'task']) {
-  test(`${type} snapshot result publishes injection after validation, then ACKs`, async () => {
+  test(`${type} snapshot result publishes snapshot continuations in order, then ACKs`, async () => {
     const data = payload(type, type === 'data' ? null : { value: 42 })
     const order = []
     const message = createRouteMessage({ data, ack: () => order.push('ack') })
@@ -109,6 +103,7 @@ for (const type of ['data', 'task']) {
     })
 
     assert.equal(order.at(-1), 'ack')
+    assert.equal(order.length, 4)
     assert.deepEqual(order[0], {
       subject: injectResultsSubject,
       data: {
@@ -122,6 +117,14 @@ for (const type of ['data', 'task']) {
       },
     })
     assert.deepEqual(order[1], {
+      subject: startDependantsSubject,
+      data: {
+        instanceId: data.instanceId,
+        stateEdgeId: data.stateEdgeId,
+        type,
+      },
+    })
+    assert.deepEqual(order[2], {
       subject: checkStateMachineCompletionSubject,
       data: {
         instanceId: data.instanceId,
@@ -188,6 +191,29 @@ test('snapshot result does not ACK an injection command publish failure', async 
     }),
     (error) => error === failure,
   )
+  assert.equal(message.acked, false)
+})
+
+test('snapshot result does not ACK when start_dependants publish fails', async () => {
+  const data = payload('task')
+  const failure = new Error('publish failed')
+  const message = createRouteMessage({ data })
+  const subjects = []
+
+  await assert.rejects(
+    invokeRoute({ diagnostics: diagnostics(), dataMapper: {} }, {
+      path: taskSnapshotResultPath,
+      data,
+      message,
+      natsContext: {
+        publish: async (subject) => {
+          subjects.push(subject)
+          if (subject === startDependantsSubject) throw failure
+        },
+      },
+    }),
+  )
+  assert.deepEqual(subjects, [injectResultsSubject, startDependantsSubject])
   assert.equal(message.acked, false)
 })
 

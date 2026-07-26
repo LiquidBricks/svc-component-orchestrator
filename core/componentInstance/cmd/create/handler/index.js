@@ -5,9 +5,20 @@ import { componentGates } from '../loadData/componentGates.js'
 
 export async function handler({
   rootCtx: { g, dataMapper },
-  scope: { instanceId, componentId, imports, gates },
+  scope: { instanceId, componentId, componentHash, imports, gates },
 }) {
-  const { instanceVertexId, stateMachineId: rootStateMachineId } = await createComponentInstance({ g, dataMapper, componentId, instanceId })
+  const rootInstance = await createComponentInstance({
+    g,
+    dataMapper,
+    componentId,
+    componentHash,
+    instanceId,
+  })
+  const {
+    instanceVertexId,
+    stateMachineId: rootStateMachineId,
+  } = rootInstance
+  const createdInstances = [rootInstance]
 
   async function createImportInstances({ imports: importsToCreate, parentComponentId, parentInstanceVertexId }) {
     const created = []
@@ -20,12 +31,18 @@ export async function handler({
       importRefId,
     } of importsToCreate ?? []) {
       const importedInstanceId = ulid()
-      const { instanceVertexId: importedInstanceVertexId, stateMachineId: importedStateMachineId } = await createComponentInstance({
+      const importedInstance = await createComponentInstance({
         g,
         dataMapper,
         componentId: importedComponentId,
+        componentHash: importedComponentHash,
         instanceId: importedInstanceId,
       })
+      const {
+        instanceVertexId: importedInstanceVertexId,
+        stateMachineId: importedStateMachineId,
+      } = importedInstance
+      createdInstances.push(importedInstance)
 
       const { id: importInstanceRefId } = await dataMapper.vertex.importInstanceRef.create()
       await dataMapper.edge.uses_import.componentInstance_importInstanceRef.create({
@@ -96,12 +113,18 @@ export async function handler({
       gateRefId,
     } of gatesToCreate ?? []) {
       const gatedInstanceId = ulid()
-      const { instanceVertexId: gatedInstanceVertexId, stateMachineId: gatedStateMachineId } = await createComponentInstance({
+      const gatedInstance = await createComponentInstance({
         g,
         dataMapper,
         componentId: gatedComponentId,
+        componentHash: gatedComponentHash,
         instanceId: gatedInstanceId,
       })
+      const {
+        instanceVertexId: gatedInstanceVertexId,
+        stateMachineId: gatedStateMachineId,
+      } = gatedInstance
+      createdInstances.push(gatedInstance)
 
       const { id: gateInstanceRefId } = await dataMapper.vertex.gateInstanceRef.create()
       await dataMapper.edge.uses_gate.componentInstance_gateInstanceRef.create({
@@ -175,5 +198,5 @@ export async function handler({
     rootInstanceVertexId: instanceVertexId,
   })
 
-  return { importedInstances }
+  return { importedInstances, createdInstances }
 }

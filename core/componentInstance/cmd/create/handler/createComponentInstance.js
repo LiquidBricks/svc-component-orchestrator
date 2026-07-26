@@ -33,14 +33,15 @@ async function buildInitialState({ dataMapper, componentId }) {
   return { dataNodeIds, taskNodeIds, state }
 }
 
-export async function createComponentInstance({ g, dataMapper, componentId, instanceId }) {
+export async function createComponentInstance({
+  g,
+  dataMapper,
+  componentId,
+  componentHash,
+  instanceId,
+}) {
   const { dataNodeIds, taskNodeIds, state } = await buildInitialState({ dataMapper, componentId })
   const { id: instanceVertexId } = await dataMapper.vertex.componentInstance.create({ instanceId })
-  const { id: componentStateId } = await dataMapper.vertex.componentState.create({ state })
-  await dataMapper.edge.has_snapshot.componentInstance_componentState.create({
-    fromId: instanceVertexId,
-    toId: componentStateId,
-  })
   await dataMapper.edge.instance_of.componentInstance_component.create({ fromId: instanceVertexId, toId: componentId })
 
   const { id: stateMachineId } = await dataMapper.vertex.stateMachine.create()
@@ -56,5 +57,12 @@ export async function createComponentInstance({ g, dataMapper, componentId, inst
     await dataMapper.edge.has_task_state.stateMachine_task.create({ fromId: stateMachineId, toId: taskId })
   }
 
-  return { instanceVertexId, componentStateId, stateMachineId }
+  return {
+    instanceId,
+    instanceVertexId,
+    componentId,
+    componentHash: readProperty(componentHash, 'hash'),
+    stateMachineId,
+    state,
+  }
 }

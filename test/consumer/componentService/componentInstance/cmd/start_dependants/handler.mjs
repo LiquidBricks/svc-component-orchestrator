@@ -6,6 +6,7 @@ import { component as componentBuilder } from '@liquid-bricks/lib-component-buil
 import { handler } from '../../../../../../core/componentInstance/cmd/start_dependants/handler.js'
 import { componentImports } from '../../../../../../core/componentInstance/cmd/create/loadData/componentImports.js'
 import { componentGates } from '../../../../../../core/componentInstance/cmd/create/loadData/componentGates.js'
+import { usesGateInstances } from '../../../../../../core/componentInstance/cmd/start/loadData/usesGateInstances.js'
 import {
   withGraphContext,
   registerComponent,
@@ -59,7 +60,7 @@ test('handler returns starter list when no dependants are ready', async () => {
   })
 })
 
-test('handler returns gate compute requests and does not evaluate gate fnc on consumer', async () => {
+test('handler returns gated child instance IDs without evaluating gate readiness', async () => {
   await withGraphContext(async ({ diagnostics, dataMapper, g }) => {
     const gateAllowTarget = componentBuilder('GateAllowTarget').toJSON()
     const gateDenyTarget = componentBuilder('GateDenyTarget').toJSON()
@@ -88,6 +89,10 @@ test('handler returns gate compute requests and does not evaluate gate fnc on co
     })
 
     const [instanceVertexId] = await dataMapper.query.findInstanceVertexId({ instanceId })
+    const { usesGateInstances: gateInstances } = await usesGateInstances({
+      rootCtx: { g, dataMapper },
+      scope: { instanceVertexId },
+    })
 
     const [stateMachineId] = await dataMapper.query.readStateMachineId({ vertexId: instanceVertexId })
 
@@ -107,11 +112,11 @@ test('handler returns gate compute requests and does not evaluate gate fnc on co
 
     assert.equal(starters.length, 1)
     assert.equal(starters[0].instanceId, instanceId)
-    const gateRequests = starters[0].gateStartRequests ?? []
-    assert.equal(gateRequests.length, 2)
-    assert.deepEqual(gateRequests.map(({ name }) => name).sort(), ['allow', 'deny'])
-    assert.ok(gateRequests.every(({ type }) => type === 'gate'))
-    assert.ok(gateRequests.every(({ instanceId: requestInstanceId }) => requestInstanceId === instanceId))
-    assert.ok(gateRequests.every(({ componentHash }) => componentHash === component.hash))
+    const gateInstanceIds = starters[0].gateInstanceIds ?? []
+    assert.equal(gateInstanceIds.length, 2)
+    assert.deepEqual(
+      gateInstanceIds.sort(),
+      gateInstances.map(({ instanceId: gateInstanceId }) => gateInstanceId).sort(),
+    )
   })
 })

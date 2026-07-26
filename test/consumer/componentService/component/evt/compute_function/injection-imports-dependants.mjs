@@ -134,7 +134,6 @@ test('imported injection triggers dependant starts inside imported component', a
     assertDataStartDependantsPayload(childStartDependants[0].payload.data, {
       instanceId: childInstanceId,
       stateEdgeId: childTargetStateEdgeId,
-      result: injectedEvent.payload.data.result,
     })
 
     const dependantPublishes = []

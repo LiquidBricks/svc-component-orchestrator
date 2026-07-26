@@ -330,7 +330,6 @@ test('computeFunction stores state result and drives completion through command 
     assertDataStartDependantsPayload(startDependantsEvents[0].payload.data, {
       instanceId,
       stateEdgeId,
-      result: { count: 2 },
     })
 
     const checkEvents = published.filter(p => p.subject === checkStateMachineCompletionSubject)

@@ -6,7 +6,7 @@ export async function publishStartCommands({
   scope: { starters },
 }) {
 
-  for (const { dataStateIds, taskStateIds, importInstanceIds = [], gateStartRequests = [], instanceId } of starters) {
+  for (const { dataStateIds, taskStateIds, importInstanceIds = [], gateInstanceIds = [], instanceId } of starters) {
 
     const publishList = [
       {
@@ -44,34 +44,19 @@ export async function publishStartCommands({
       )
     }
 
-    const gateSubject = createBasicSubject(emits['gateway.cmd.component.compute_function.v1']).forPublish()
+    const gateSubject = createBasicSubject(emits['component_service.cmd.gate.start.v1']).forPublish()
       .env('prod')
 
-    const normalizedGates = (gateStartRequests ?? [])
-      .filter(Boolean)
-    const dispatched = new Set()
-    for (const gateRequest of normalizedGates) {
-      const {
-        instanceId: gateInstanceId,
-        componentHash,
-        name,
-        type = 'gate',
-        deps = {},
-      } = gateRequest
-      if (!gateInstanceId || !componentHash || !name) continue
-      const dispatchKey = `${gateInstanceId}:${name}`
-      if (dispatched.has(dispatchKey)) continue
-      dispatched.add(dispatchKey)
+    const childGateInstanceIds = [...new Set(gateInstanceIds ?? [])]
+    for (const gateInstanceId of childGateInstanceIds) {
+      if (!gateInstanceId || !instanceId) continue
 
       await natsContext.publish(
         gateSubject.build(),
         JSON.stringify({
           data: {
             instanceId: gateInstanceId,
-            componentHash,
-            name,
-            type,
-            deps,
+            parentInstanceId: instanceId,
           },
         }),
       )
