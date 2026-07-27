@@ -34,7 +34,6 @@ export const routes = [
   [component.evt.compute_function.gate.path, component.evt.compute_function.gate.spec],
   [component.evt.compute_function.task.path, component.evt.compute_function.task.spec],
   [componentInstance.cmd.injectResults.path, componentInstance.cmd.injectResults.spec],
-  [componentInstance.evt.startDone.path, componentInstance.evt.startDone.spec],
 ]
 
 export function createComponentServiceRouter({

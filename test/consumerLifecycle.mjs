@@ -18,6 +18,17 @@ test('consumer configuration uses snapshots instead of raw data/task result fact
   assert.equal(subjects.includes('*.domain.*.*.edge.has_task_state.result_computed.v1.*'), false)
 })
 
+test('consumer configuration subscribes only to routed component-service events', () => {
+  const { filter_subjects: subjects } = createConsumerConfig()
+
+  assert.ok(subjects.includes('*.component-service.*.*.evt.component.registerDone.v1.*'))
+  assert.ok(subjects.includes('*.component-service.*.function_result.evt.component.compute_function.v1.data'))
+  assert.ok(subjects.includes('*.component-service.*.function_result.evt.component.compute_function.v1.gate'))
+  assert.ok(subjects.includes('*.component-service.*.function_result.evt.component.compute_function.v1.task'))
+  assert.equal(subjects.includes('*.component-service.*.*.evt.>'), false)
+  assert.equal(subjects.includes('*.component-service.*.*.evt.componentInstance.startDone.v1.*'), false)
+})
+
 test('ensureConsumer preserves a durable whose filters are current', async () => {
   const config = createConsumerConfig()
   const info = { config }

@@ -12,7 +12,10 @@ export function createConsumerConfig() {
     deliver_policy: DeliverPolicy.All,
     filter_subjects: [
       createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd['>']).forSubscribe().build(),
-      createBasicSubject(natsEvents['*'].component_service['*']['*'].evt['>']).forSubscribe().build(),
+      createBasicSubject(natsEvents['*'].component_service['*']['*'].evt.component.registerDone.v1['*']).forSubscribe().build(),
+      createBasicSubject(natsEvents['*'].component_service['*'].function_result.evt.component.compute_function.v1.data).forSubscribe().build(),
+      createBasicSubject(natsEvents['*'].component_service['*'].function_result.evt.component.compute_function.v1.gate).forSubscribe().build(),
+      createBasicSubject(natsEvents['*'].component_service['*'].function_result.evt.component.compute_function.v1.task).forSubscribe().build(),
       createBasicSubject(natsEvents['*'].domain['*']['*'].edge.has_data_state.started.v1['*']).forSubscribe().build(),
       createBasicSubject(natsEvents['*'].domain['*']['*'].edge.has_task_state.started.v1['*']).forSubscribe().build(),
       createBasicSubject(natsEvents['*'].domain['*']['*'].edge.has_gate_state.result_computed.v1['*']).forSubscribe().build(),
