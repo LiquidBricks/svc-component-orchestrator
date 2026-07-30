@@ -1,4 +1,4 @@
-import { Errors } from '../errors.js'
+import { PRECONDITION_INVALID, PRECONDITION_REQUIRED } from '@liquid-bricks/lib-diagnostics/codes'
 
 // Decode middleware that extracts data from the message payload.
 // Accepts either:
@@ -10,7 +10,7 @@ export function decodeData(selector) {
     const { data } = message.json()
     diagnostics.require(
       data,
-      Errors.PRECONDITION_REQUIRED,
+      PRECONDITION_REQUIRED,
       'Data is required',
       { field: 'data', subject: message.subject }
     )
@@ -20,7 +20,7 @@ export function decodeData(selector) {
 
     diagnostics.require(
       isString || isArray,
-      Errors.PRECONDITION_INVALID,
+      PRECONDITION_INVALID,
       'decodeData requires a string key or array of keys',
       { selector }
     )
@@ -28,7 +28,7 @@ export function decodeData(selector) {
     if (isString) {
       diagnostics.require(
         selector.length > 0,
-        Errors.PRECONDITION_REQUIRED,
+        PRECONDITION_REQUIRED,
         'decodeData key cannot be empty',
         { field: 'selector' }
       )
@@ -39,13 +39,13 @@ export function decodeData(selector) {
     // Array of keys: pick only those keys from data
     diagnostics.require(
       selector.length > 0,
-      Errors.PRECONDITION_REQUIRED,
+      PRECONDITION_REQUIRED,
       'decodeData keys cannot be empty',
       { field: 'selector' }
     )
     diagnostics.require(
       selector.every(k => typeof k === 'string' && k.length > 0),
-      Errors.PRECONDITION_INVALID,
+      PRECONDITION_INVALID,
       'decodeData keys must be non-empty strings',
       { selector }
     )

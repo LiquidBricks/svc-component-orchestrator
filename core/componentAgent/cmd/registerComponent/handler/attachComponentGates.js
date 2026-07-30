@@ -1,5 +1,5 @@
 import { domain } from '@liquid-bricks/spec-domain/domain'
-import { Errors } from '../../../../../errors.js'
+import { PRECONDITION_INVALID, PRECONDITION_REQUIRED } from '@liquid-bricks/lib-diagnostics/codes'
 import { parseDependencyPath, resolveDependencyTargetId, validateAgentFnDependency } from './dependencyPath.js'
 
 function ensureArray(value) {
@@ -17,7 +17,7 @@ async function attachComponentGatesHandler({
 
   handlerDiagnostics.require(
     Array.isArray(gates),
-    Errors.PRECONDITION_INVALID,
+    PRECONDITION_INVALID,
     'gates must be an array',
     { field: 'gates', component: compName, hash },
   )
@@ -27,37 +27,37 @@ async function attachComponentGatesHandler({
 
     handlerDiagnostics.require(
       typeof gateName === 'string' && gateName.length,
-      Errors.PRECONDITION_REQUIRED,
+      PRECONDITION_REQUIRED,
       'gate name required',
       { field: 'gate.name', component: compName, hash },
     )
     handlerDiagnostics.require(
       typeof gateHash === 'string' && gateHash.length,
-      Errors.PRECONDITION_REQUIRED,
+      PRECONDITION_REQUIRED,
       'gate hash required',
       { field: 'gate.hash', component: compName, hash, gate: gateName },
     )
     handlerDiagnostics.require(
       typeof fnc === 'string' && fnc.length,
-      Errors.PRECONDITION_REQUIRED,
+      PRECONDITION_REQUIRED,
       'gate fnc required',
       { field: 'gate.fnc', component: compName, hash, gate: gateName },
     )
     handlerDiagnostics.require(
       waitFor === undefined || Array.isArray(waitFor),
-      Errors.PRECONDITION_INVALID,
+      PRECONDITION_INVALID,
       'gate waitFor must be an array',
       { field: 'gate.waitFor', component: compName, hash, gate: gateName },
     )
     handlerDiagnostics.require(
       deps === undefined || Array.isArray(deps),
-      Errors.PRECONDITION_INVALID,
+      PRECONDITION_INVALID,
       'gate deps must be an array',
       { field: 'gate.deps', component: compName, hash, gate: gateName },
     )
     handlerDiagnostics.require(
       inject === undefined || (inject && typeof inject === 'object' && !Array.isArray(inject)),
-      Errors.PRECONDITION_INVALID,
+      PRECONDITION_INVALID,
       'gate inject must be an object',
       { field: 'gate.inject', component: compName, hash, gate: gateName },
     )
@@ -66,7 +66,7 @@ async function attachComponentGatesHandler({
 
     handlerDiagnostics.require(
       gatedComponentId,
-      Errors.PRECONDITION_INVALID,
+      PRECONDITION_INVALID,
       `Gated component not found: ${gateName}#${gateHash}`,
       { component: compName, hash, gate: gateName, gateHash },
     )
@@ -87,7 +87,7 @@ async function attachComponentGatesHandler({
 
       handlerDiagnostics.require(
         targetType === 'task' || targetType === 'data',
-        Errors.PRECONDITION_INVALID,
+        PRECONDITION_INVALID,
         `gate waitFor only supports data/task for component(${compName})#${hash} gate:${gateName} dep[${trimmedDep}]`,
         { component: compName, hash, gate: gateName, dep: trimmedDep, type: targetType },
       )
@@ -139,7 +139,7 @@ async function attachComponentGatesHandler({
 
       handlerDiagnostics.require(
         targetType === 'task' || targetType === 'data',
-        Errors.PRECONDITION_INVALID,
+        PRECONDITION_INVALID,
         `gate deps only supports data/task for component(${compName})#${hash} gate:${gateName} dep[${trimmedDep}]`,
         { component: compName, hash, gate: gateName, dep: trimmedDep, type: targetType },
       )

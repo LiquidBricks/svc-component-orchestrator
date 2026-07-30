@@ -1,4 +1,4 @@
-import { Errors } from '../../../../../errors.js'
+import { PRECONDITION_INVALID, PRECONDITION_REQUIRED } from '@liquid-bricks/lib-diagnostics/codes'
 
 const SUPPORTED_DEPENDENCY_TYPES = ['data', 'task', 'deferred', 'lifecycle', 'agentFn']
 
@@ -8,7 +8,7 @@ export function parseDependencyPath({ handlerDiagnostics, dep, compName, hash, d
 
   handlerDiagnostics.require(
     parts.length >= 2,
-    Errors.PRECONDITION_REQUIRED,
+    PRECONDITION_REQUIRED,
     `Dependency path is required for component(${compName})#${hash} ${dependencyType}:${dependencyName} dep[${trimmedDep}]`,
     { component: compName, hash, dependencyType, dependencyName, dep: trimmedDep },
   )
@@ -19,37 +19,37 @@ export function parseDependencyPath({ handlerDiagnostics, dep, compName, hash, d
 
   handlerDiagnostics.require(
     SUPPORTED_DEPENDENCY_TYPES.includes(targetType),
-    Errors.PRECONDITION_INVALID,
+    PRECONDITION_INVALID,
     `Unknown dependency type:${targetType} for component(${compName})#${hash} ${dependencyType}:${dependencyName} dep[${trimmedDep}]`,
     { type: targetType, dep: trimmedDep, component: compName, hash },
   )
   handlerDiagnostics.require(
     targetName,
-    Errors.PRECONDITION_REQUIRED,
+    PRECONDITION_REQUIRED,
     `Dependency name is required for component(${compName})#${hash} ${dependencyType}:${dependencyName} dep[${trimmedDep}]`,
     { component: compName, hash, dependencyType, dependencyName },
   )
   handlerDiagnostics.require(
     targetType !== 'lifecycle' || targetName === 'done',
-    Errors.PRECONDITION_INVALID,
+    PRECONDITION_INVALID,
     `Lifecycle dependency only supports done for component(${compName})#${hash} ${dependencyType}:${dependencyName} dep[${trimmedDep}]`,
     { component: compName, hash, dependencyType, dependencyName, dep: trimmedDep, lifecycle: targetName },
   )
   handlerDiagnostics.require(
     targetType !== 'lifecycle' || importPath.length > 0,
-    Errors.PRECONDITION_INVALID,
+    PRECONDITION_INVALID,
     `Lifecycle dependency must reference an import for component(${compName})#${hash} ${dependencyType}:${dependencyName} dep[${trimmedDep}]`,
     { component: compName, hash, dependencyType, dependencyName, dep: trimmedDep },
   )
   handlerDiagnostics.require(
     targetType !== 'deferred' || importPath.length === 0,
-    Errors.PRECONDITION_INVALID,
+    PRECONDITION_INVALID,
     `Deferred dependency cannot reference imports for component(${compName})#${hash} ${dependencyType}:${dependencyName} dep[${trimmedDep}]`,
     { component: compName, hash, dependencyType, dependencyName, dep: trimmedDep },
   )
   handlerDiagnostics.require(
     targetType !== 'agentFn' || importPath.length === 0,
-    Errors.PRECONDITION_INVALID,
+    PRECONDITION_INVALID,
     `agentFn dependency cannot reference imports for component(${compName})#${hash} ${dependencyType}:${dependencyName} dep[${trimmedDep}]`,
     { component: compName, hash, dependencyType, dependencyName, dep: trimmedDep },
   )
@@ -76,7 +76,7 @@ export function validateAgentFnDependency({
   const match = list.find(({ name }) => name === targetName)
   handlerDiagnostics.require(
     match,
-    Errors.PRECONDITION_INVALID,
+    PRECONDITION_INVALID,
     `agentFn not found for component(${compName})#${hash} ${dependencyType}:${dependencyName} dep[${dep}]`,
     { dep, component: compName, hash, dependencyType, dependencyName, agentFn: targetName },
   )
@@ -106,14 +106,14 @@ async function resolveImportedComponent({
 
     handlerDiagnostics.require(
       importRefId || gateRefId,
-      Errors.PRECONDITION_INVALID,
+      PRECONDITION_INVALID,
       `Import not found for component(${compName})#${hash} ${dependencyType}:${dependencyName} ${pathType}[${pathValue}]`,
       { component: compName, hash, dependencyType, dependencyName, pathType, pathValue, alias },
     )
 
     handlerDiagnostics.require(
       nextComponentId,
-      Errors.PRECONDITION_INVALID,
+      PRECONDITION_INVALID,
       `Import target missing for component(${compName})#${hash} ${dependencyType}:${dependencyName} ${pathType}[${pathValue}]`,
       { component: compName, hash, dependencyType, dependencyName, pathType, pathValue, alias },
     )
@@ -141,7 +141,7 @@ export async function resolveDependencyTargetId({
   if (targetType === 'lifecycle') {
     handlerDiagnostics.require(
       g,
-      Errors.PRECONDITION_REQUIRED,
+      PRECONDITION_REQUIRED,
       `Graph context required for component(${compName})#${hash} ${dependencyType}:${dependencyName} dep[${dep}]`,
       { component: compName, hash, dependencyType, dependencyName, dep },
     )
@@ -167,7 +167,7 @@ export async function resolveDependencyTargetId({
     const match = dependencyList.get(localKey)
     handlerDiagnostics.require(
       match,
-      Errors.PRECONDITION_INVALID,
+      PRECONDITION_INVALID,
       `Dependency not found for component(${compName})#${hash} ${dependencyType}:${dependencyName} dep[${dep}]`,
       { dep, component: compName, hash, dependencyType, dependencyName },
     )
@@ -176,13 +176,13 @@ export async function resolveDependencyTargetId({
 
   handlerDiagnostics.require(
     g,
-    Errors.PRECONDITION_REQUIRED,
+    PRECONDITION_REQUIRED,
     `Graph context required for component(${compName})#${hash} ${dependencyType}:${dependencyName} dep[${dep}]`,
     { component: compName, hash, dependencyType, dependencyName, dep },
   )
   handlerDiagnostics.require(
     targetType !== 'deferred',
-    Errors.PRECONDITION_INVALID,
+    PRECONDITION_INVALID,
     `Unknown dependency type:${targetType} for component(${compName})#${hash} ${dependencyType}:${dependencyName} dep[${dep}]`,
     { type: targetType, dep, component: compName, hash },
   )
@@ -206,7 +206,7 @@ export async function resolveDependencyTargetId({
 
   handlerDiagnostics.require(
     targetNodeId,
-    Errors.PRECONDITION_INVALID,
+    PRECONDITION_INVALID,
     `Dependency not found for component(${compName})#${hash} ${dependencyType}:${dependencyName} dep[${dep}]`,
     { dep, component: compName, hash, dependencyType, dependencyName, importPath, targetType, targetName },
   )

@@ -1,6 +1,6 @@
 import { create as createSubject } from '@liquid-bricks/lib-nats-subject/create/basic'
 import { domain } from '@liquid-bricks/spec-domain/domain'
-import { Errors } from '../../../../errors.js'
+import { PRECONDITION_INVALID, PRECONDITION_REQUIRED } from '@liquid-bricks/lib-diagnostics/codes'
 
 function ids(entries = []) {
   return Array.from(new Set(
@@ -40,7 +40,7 @@ export async function publishStartedFact({
   for (const field of ['instanceId', 'instanceVertexId', 'stateMachineId', 'state', 'updatedAt']) {
     handlerDiagnostics.require(
       typeof payload[field] === 'string' && payload[field].length > 0,
-      Errors.PRECONDITION_REQUIRED,
+      PRECONDITION_REQUIRED,
       `${field} required before publishing stateMachine started`,
       { field },
     )
@@ -48,7 +48,7 @@ export async function publishStartedFact({
   for (const field of ['dataStateIds', 'taskStateIds', 'importInstanceIds', 'gateInstanceIds']) {
     handlerDiagnostics.require(
       payload[field].every((id) => typeof id === 'string' && id.length > 0),
-      Errors.PRECONDITION_INVALID,
+      PRECONDITION_INVALID,
       `${field} must contain string ids before publishing stateMachine started`,
       { field },
     )

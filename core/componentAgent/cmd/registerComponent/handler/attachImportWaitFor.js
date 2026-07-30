@@ -1,6 +1,6 @@
 import { domain } from '@liquid-bricks/spec-domain/domain'
 import { parseDependencyPath, resolveDependencyTargetId } from './dependencyPath.js'
-import { Errors } from '../../../../../errors.js'
+import { PRECONDITION_INVALID } from '@liquid-bricks/lib-diagnostics/codes'
 import { LIFECYCLE_WAIT_FOR_PROPERTY } from '../../../../componentInstance/cmd/dependencyUtils.js'
 
 export async function attachImportWaitFor({
@@ -52,7 +52,7 @@ export async function attachImportWaitFor({
       if (targetId) {
         handlerDiagnostics.require(
           targetType === 'task' || targetType === 'data',
-          Errors.PRECONDITION_INVALID,
+          PRECONDITION_INVALID,
           `import waitFor only supports data/task for component(${compName})#${hash} import:${importName} dep[${trimmedDep}]`,
           { component: compName, hash, importName, dep: trimmedDep, type: targetType },
         )
@@ -65,7 +65,7 @@ export async function attachImportWaitFor({
 
     handlerDiagnostics.require(
       importRefId,
-      Errors.PRECONDITION_INVALID,
+      PRECONDITION_INVALID,
       `Import ref missing for component(${compName})#${hash} import:${importName}`,
       { component: compName, hash, importName },
     )

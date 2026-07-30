@@ -1,4 +1,4 @@
-import { Errors } from '../../../../errors.js'
+import { PRECONDITION_INVALID, PRECONDITION_REQUIRED } from '@liquid-bricks/lib-diagnostics/codes'
 import { isIsoDateTime } from '../../../domain/_helper/isIsoDateTime.js'
 
 export function validatePayload({ scope }) {
@@ -13,49 +13,49 @@ export function validatePayload({ scope }) {
   } = scope
   handlerDiagnostics.require(
     typeof instanceId === 'string' && instanceId.length,
-    Errors.PRECONDITION_REQUIRED,
+    PRECONDITION_REQUIRED,
     'instanceId required for injectResults',
     { field: 'instanceId' },
   )
   handlerDiagnostics.require(
     typeof instanceVertexId === 'string' && instanceVertexId.length,
-    Errors.PRECONDITION_REQUIRED,
+    PRECONDITION_REQUIRED,
     'instanceVertexId required for injectResults',
     { field: 'instanceVertexId' },
   )
   handlerDiagnostics.require(
     typeof stateMachineId === 'string' && stateMachineId.length,
-    Errors.PRECONDITION_REQUIRED,
+    PRECONDITION_REQUIRED,
     'stateMachineId required for injectResults',
     { field: 'stateMachineId' },
   )
   handlerDiagnostics.require(
     typeof stateEdgeId === 'string' && stateEdgeId.length,
-    Errors.PRECONDITION_REQUIRED,
+    PRECONDITION_REQUIRED,
     'stateEdgeId required for injectResults',
     { field: 'stateEdgeId' },
   )
   handlerDiagnostics.require(
     type === 'data' || type === 'task',
-    Errors.PRECONDITION_INVALID,
+    PRECONDITION_INVALID,
     'type must be data or task for injectResults',
     { field: 'type', type },
   )
   handlerDiagnostics.require(
     Object.prototype.hasOwnProperty.call(scope, 'result'),
-    Errors.PRECONDITION_REQUIRED,
+    PRECONDITION_REQUIRED,
     'result required for injectResults',
     { field: 'result' },
   )
   handlerDiagnostics.require(
     typeof updatedAt === 'string' && updatedAt.length,
-    Errors.PRECONDITION_REQUIRED,
+    PRECONDITION_REQUIRED,
     'updatedAt required for injectResults',
     { field: 'updatedAt' },
   )
   handlerDiagnostics.require(
     isIsoDateTime(updatedAt),
-    Errors.PRECONDITION_INVALID,
+    PRECONDITION_INVALID,
     'updatedAt must be an ISO date-time for injectResults',
     { field: 'updatedAt' },
   )

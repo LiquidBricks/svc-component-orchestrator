@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { diagnostics as createDiagnostics } from '@liquid-bricks/lib-diagnostics'
 import { create as createSubject } from '@liquid-bricks/lib-nats-subject/create/basic'
 
-import { Errors } from '../../../../../../errors.js'
+import { COMPONENT_INSTANCE_COMPLETION_PROJECTION_TIMEOUT } from '@liquid-bricks/lib-diagnostics/codes'
 import { createComponentServiceRouter } from '../../../../../../router.js'
 import { path } from '../../../../../../core/componentInstance/cmd/check_state_machine_completion/index.js'
 import {
@@ -34,7 +34,7 @@ test('projection timeout NAK backoff grows and remains capped', () => {
 test('completion projection timeout is NAKed without ACK or term', () => {
   const calls = []
   const result = retryProjectionTimeout({
-    error: { code: Errors.COMPONENT_INSTANCE_COMPLETION_PROJECTION_TIMEOUT },
+    error: { code: COMPONENT_INSTANCE_COMPLETION_PROJECTION_TIMEOUT },
     message: {
       info: { deliveryCount: 3 },
       nak: (delayMs) => calls.push(['nak', delayMs]),

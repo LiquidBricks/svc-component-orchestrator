@@ -1,4 +1,4 @@
-import { Errors } from '../../../../../errors.js'
+import { PRECONDITION_INVALID } from '@liquid-bricks/lib-diagnostics/codes'
 
 export async function findStateEdge({
   scope: { handlerDiagnostics, instanceVertexId, stateMachineId, name, instanceId },
@@ -10,7 +10,7 @@ export async function findStateEdge({
   })
   handlerDiagnostics.require(
     gateInstanceRefId,
-    Errors.PRECONDITION_INVALID,
+    PRECONDITION_INVALID,
     `gate ${name} not associated with instance ${instanceId}`,
     { instanceId, name },
   )
@@ -21,7 +21,7 @@ export async function findStateEdge({
   })
   handlerDiagnostics.require(
     stateEdgeId,
-    Errors.PRECONDITION_INVALID,
+    PRECONDITION_INVALID,
     `gate state ${name} not associated with instance ${instanceId}`,
     { instanceId, name, gateInstanceRefId },
   )

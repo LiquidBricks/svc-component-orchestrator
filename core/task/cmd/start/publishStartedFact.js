@@ -1,6 +1,6 @@
 import { create as createSubject } from '@liquid-bricks/lib-nats-subject/create/basic'
 import { domain } from '@liquid-bricks/spec-domain/domain'
-import { Errors } from '../../../../errors.js'
+import { PRECONDITION_INVALID, PRECONDITION_REQUIRED } from '@liquid-bricks/lib-diagnostics/codes'
 
 function first(value) {
   return Array.isArray(value) ? value[0] : value
@@ -68,14 +68,14 @@ export async function publishStartedFact({
   ]) {
     handlerDiagnostics.require(
       typeof payload[field] === 'string' && payload[field].length > 0,
-      Errors.PRECONDITION_REQUIRED,
+      PRECONDITION_REQUIRED,
       `${field} required before publishing task started`,
       { field },
     )
   }
   handlerDiagnostics.require(
     payload.deps && typeof payload.deps === 'object' && !Array.isArray(payload.deps),
-    Errors.PRECONDITION_INVALID,
+    PRECONDITION_INVALID,
     'deps must be an object before publishing task started',
     { field: 'deps' },
   )

@@ -1,4 +1,4 @@
-import { Errors } from '../../../../errors.js'
+import { COMPONENT_INSTANCE_COMPLETION_PROJECTION_TIMEOUT } from '@liquid-bricks/lib-diagnostics/codes'
 
 export const PROJECTION_RETRY_DELAYS_MS = Object.freeze([1_000, 2_000, 5_000, 10_000, 30_000])
 
@@ -16,7 +16,7 @@ export function projectionRetryDelayMs(deliveryCount) {
 }
 
 export function retryProjectionTimeout({ error, message }) {
-  if (error?.code !== Errors.COMPONENT_INSTANCE_COMPLETION_PROJECTION_TIMEOUT) throw error
+  if (error?.code !== COMPONENT_INSTANCE_COMPLETION_PROJECTION_TIMEOUT) throw error
   if (typeof message?.nak !== 'function') throw error
 
   const projectionDeliveryCount = deliveryCountFor(message)

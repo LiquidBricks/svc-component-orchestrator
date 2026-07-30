@@ -1,4 +1,4 @@
-import { Errors } from '../../../../../errors.js'
+import { PRECONDITION_REQUIRED } from '@liquid-bricks/lib-diagnostics/codes'
 import { validateResultPayload } from '../../_shared/validateResultPayload.js'
 
 export function validatePayload(args) {
@@ -7,7 +7,7 @@ export function validatePayload(args) {
 
   handlerDiagnostics.require(
     typeof gateInstanceRefId === 'string' && gateInstanceRefId.length > 0,
-    Errors.PRECONDITION_REQUIRED,
+    PRECONDITION_REQUIRED,
     'gateInstanceRefId required for gate snapshot result',
     { field: 'gateInstanceRefId', type: 'gate' },
   )

@@ -1,4 +1,4 @@
-import { Errors } from '../../../../../errors.js'
+import { PRECONDITION_INVALID } from '@liquid-bricks/lib-diagnostics/codes'
 import { parseDependencyPath, resolveDependencyTargetId, validateAgentFnDependency } from './dependencyPath.js'
 
 export async function linkDataTaskDependencies({
@@ -49,7 +49,7 @@ export async function linkDataTaskDependencies({
       if (targetType === 'agentFn') {
         handlerDiagnostics.require(
           edgeKind === 'dependency',
-          Errors.PRECONDITION_INVALID,
+          PRECONDITION_INVALID,
           `agentFn only supports deps for component(${compName})#${hash} ${dependencyType}:${dependencyName} dep[${trimmedDep}]`,
           { component: compName, hash, dependencyType, dependencyName, dep: trimmedDep },
         )
@@ -84,7 +84,7 @@ export async function linkDataTaskDependencies({
       const createEdge = mapping[targetType]
       handlerDiagnostics.require(
         typeof createEdge === 'function',
-        Errors.PRECONDITION_INVALID,
+        PRECONDITION_INVALID,
         `Unsupported ${edgeKind} target ${targetType} for ${dependencyType}`,
         { dependencyType, targetType, dependencyName },
       )
@@ -99,7 +99,7 @@ export async function linkDataTaskDependencies({
     if (waitFor?.length) {
       handlerDiagnostics.require(
         edgeCreators.waitFor?.[dependencyType],
-        Errors.PRECONDITION_INVALID,
+        PRECONDITION_INVALID,
         `Unsupported waitFor for ${dependencyType}`,
         { dependencyType, dependencyName },
       )

@@ -1,6 +1,6 @@
 import { s } from '@liquid-bricks/lib-nats-subject/router'
 
-import { Errors } from '../../../../errors.js'
+import { PRECONDITION_REQUIRED } from '@liquid-bricks/lib-diagnostics/codes'
 import { domain } from '@liquid-bricks/spec-domain/domain'
 
 export async function republishIfImportsMissing({
@@ -18,13 +18,13 @@ export async function republishIfImportsMissing({
 
     handlerDiagnostics.require(
       typeof importName === 'string' && importName.length,
-      Errors.PRECONDITION_REQUIRED,
+      PRECONDITION_REQUIRED,
       'import name required',
       { field: 'import.name', component: compName, hash },
     )
     handlerDiagnostics.require(
       typeof importHash === 'string' && importHash.length,
-      Errors.PRECONDITION_REQUIRED,
+      PRECONDITION_REQUIRED,
       'import hash required',
       { field: 'import.hash', component: compName, hash, importName },
     )

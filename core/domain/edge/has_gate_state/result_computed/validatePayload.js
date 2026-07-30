@@ -1,4 +1,4 @@
-import { Errors } from '../../../../../errors.js'
+import { PRECONDITION_REQUIRED } from '@liquid-bricks/lib-diagnostics/codes'
 
 export function validatePayload({
   scope: {
@@ -15,37 +15,37 @@ export function validatePayload({
 }) {
   handlerDiagnostics.require(
     typeof instanceId === 'string' && instanceId.length,
-    Errors.PRECONDITION_REQUIRED,
+    PRECONDITION_REQUIRED,
     'instanceId required for has_gate_state result_computed',
     { field: 'instanceId' },
   )
   handlerDiagnostics.require(
     typeof instanceVertexId === 'string' && instanceVertexId.length,
-    Errors.PRECONDITION_REQUIRED,
+    PRECONDITION_REQUIRED,
     'instanceVertexId required for has_gate_state result_computed',
     { field: 'instanceVertexId' },
   )
   handlerDiagnostics.require(
     typeof stateMachineId === 'string' && stateMachineId.length,
-    Errors.PRECONDITION_REQUIRED,
+    PRECONDITION_REQUIRED,
     'stateMachineId required for has_gate_state result_computed',
     { field: 'stateMachineId' },
   )
   handlerDiagnostics.require(
     typeof stateEdgeId === 'string' && stateEdgeId.length,
-    Errors.PRECONDITION_REQUIRED,
+    PRECONDITION_REQUIRED,
     'stateEdgeId required for has_gate_state result_computed',
     { field: 'stateEdgeId' },
   )
   handlerDiagnostics.require(
     typeof gateInstanceRefId === 'string' && gateInstanceRefId.length,
-    Errors.PRECONDITION_REQUIRED,
+    PRECONDITION_REQUIRED,
     'gateInstanceRefId required for has_gate_state result_computed',
     { field: 'gateInstanceRefId' },
   )
   handlerDiagnostics.require(
     typeof name === 'string' && name.length,
-    Errors.PRECONDITION_REQUIRED,
+    PRECONDITION_REQUIRED,
     'name required for has_gate_state result_computed',
     { field: 'name' },
   )

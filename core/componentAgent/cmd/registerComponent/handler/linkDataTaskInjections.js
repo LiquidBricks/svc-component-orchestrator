@@ -1,4 +1,4 @@
-import { Errors } from '../../../../../errors.js'
+import { PRECONDITION_INVALID, PRECONDITION_REQUIRED } from '@liquid-bricks/lib-diagnostics/codes'
 
 function parseInjectionPath({ handlerDiagnostics, injection, compName, hash, dependencyType, dependencyName }) {
   const trimmedInjection = String(injection ?? '').trim()
@@ -6,7 +6,7 @@ function parseInjectionPath({ handlerDiagnostics, injection, compName, hash, dep
 
   handlerDiagnostics.require(
     parts.length >= 2,
-    Errors.PRECONDITION_REQUIRED,
+    PRECONDITION_REQUIRED,
     `Injection path is required for component(${compName})#${hash} ${dependencyType}:${dependencyName} inject[${trimmedInjection}]`,
     { component: compName, hash, dependencyType, dependencyName, inject: trimmedInjection },
   )
@@ -16,13 +16,13 @@ function parseInjectionPath({ handlerDiagnostics, injection, compName, hash, dep
 
   handlerDiagnostics.require(
     ['data', 'task'].includes(targetType),
-    Errors.PRECONDITION_INVALID,
+    PRECONDITION_INVALID,
     `Unknown injection type:${targetType} for component(${compName})#${hash} ${dependencyType}:${dependencyName} inject[${trimmedInjection}]`,
     { type: targetType, inject: trimmedInjection, component: compName, hash, dependencyType, dependencyName },
   )
   handlerDiagnostics.require(
     targetName,
-    Errors.PRECONDITION_REQUIRED,
+    PRECONDITION_REQUIRED,
     `Injection name is required for component(${compName})#${hash} ${dependencyType}:${dependencyName} inject[${trimmedInjection}]`,
     { component: compName, hash, dependencyType, dependencyName, inject: trimmedInjection },
   )
@@ -47,14 +47,14 @@ async function resolveImportedComponent({ g, dataMapper, handlerDiagnostics, sta
 
     handlerDiagnostics.require(
       importRefId || gateRefId,
-      Errors.PRECONDITION_INVALID,
+      PRECONDITION_INVALID,
       `Import not found for component(${compName})#${hash} ${dependencyType}:${dependencyName} ${pathType}[${pathValue}]`,
       { component: compName, hash, dependencyType, dependencyName, pathType, pathValue, alias },
     )
 
     handlerDiagnostics.require(
       nextComponentId,
-      Errors.PRECONDITION_INVALID,
+      PRECONDITION_INVALID,
       `Import target missing for component(${compName})#${hash} ${dependencyType}:${dependencyName} ${pathType}[${pathValue}]`,
       { component: compName, hash, dependencyType, dependencyName, pathType, pathValue, alias },
     )
@@ -84,7 +84,7 @@ async function resolveInjectionTargetId({
     const match = dependencyList.get(localKey)
     handlerDiagnostics.require(
       match,
-      Errors.PRECONDITION_INVALID,
+      PRECONDITION_INVALID,
       `Injection target not found for component(${compName})#${hash} ${dependencyType}:${dependencyName} inject[${inject}]`,
       { inject, component: compName, hash, dependencyType, dependencyName },
     )
@@ -93,7 +93,7 @@ async function resolveInjectionTargetId({
 
   handlerDiagnostics.require(
     g,
-    Errors.PRECONDITION_REQUIRED,
+    PRECONDITION_REQUIRED,
     `Graph context required for component(${compName})#${hash} ${dependencyType}:${dependencyName} inject[${inject}]`,
     { component: compName, hash, dependencyType, dependencyName, inject },
   )
@@ -117,7 +117,7 @@ async function resolveInjectionTargetId({
 
   handlerDiagnostics.require(
     targetNodeId,
-    Errors.PRECONDITION_INVALID,
+    PRECONDITION_INVALID,
     `Injection target not found for component(${compName})#${hash} ${dependencyType}:${dependencyName} inject[${inject}]`,
     { inject, component: compName, hash, dependencyType, dependencyName, importPath, targetType, targetName },
   )

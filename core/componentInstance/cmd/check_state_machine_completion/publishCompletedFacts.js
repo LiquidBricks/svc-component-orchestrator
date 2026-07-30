@@ -1,5 +1,5 @@
 import { create as createSubject } from '@liquid-bricks/lib-nats-subject/create/basic'
-import { Errors } from '../../../../errors.js'
+import { PRECONDITION_REQUIRED } from '@liquid-bricks/lib-diagnostics/codes'
 
 export async function publishCompletedFacts({
   scope: { completedStateMachines = [], handlerDiagnostics },
@@ -15,7 +15,7 @@ export async function publishCompletedFacts({
     for (const [field, value] of Object.entries({ instanceId, stateMachineId })) {
       handlerDiagnostics.require(
         typeof value === 'string' && value.length > 0,
-        Errors.PRECONDITION_REQUIRED,
+        PRECONDITION_REQUIRED,
         `${field} required before publishing stateMachine completed`,
         { field },
       )

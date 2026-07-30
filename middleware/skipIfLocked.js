@@ -1,7 +1,7 @@
 import { JetStreamApiCodes, JetStreamApiError } from '@nats-io/jetstream'
 import { s } from '@liquid-bricks/lib-nats-subject/router'
 
-import { Errors } from '../errors.js'
+import { PRECONDITION_INVALID, PRECONDITION_REQUIRED } from '@liquid-bricks/lib-diagnostics/codes'
 
 const ROUTE_LOCK_BUCKET = 'component-service-route-locks'
 const ROUTE_LOCK_TTL_MS = 60_000
@@ -21,19 +21,19 @@ function encodeLockToken(value) {
 function validateLockKeys(lockKeys, diagnostics) {
   diagnostics.require(
     Array.isArray(lockKeys),
-    Errors.PRECONDITION_INVALID,
+    PRECONDITION_INVALID,
     'skipIfLocked requires an array of scope keys',
     { lockKeys }
   )
   diagnostics.require(
     lockKeys.length > 0,
-    Errors.PRECONDITION_REQUIRED,
+    PRECONDITION_REQUIRED,
     'skipIfLocked requires at least one scope key',
     { lockKeys }
   )
   diagnostics.require(
     lockKeys.every(key => typeof key === 'string' && key.length > 0),
-    Errors.PRECONDITION_INVALID,
+    PRECONDITION_INVALID,
     'skipIfLocked keys must be non-empty strings',
     { lockKeys }
   )
@@ -120,19 +120,19 @@ export function skipIfLocked(lockKeys) {
 
     diagnostics.require(
       values && Object.keys(values).length > 0,
-      Errors.PRECONDITION_REQUIRED,
+      PRECONDITION_REQUIRED,
       'skipIfLocked requires matched route values',
       { values, info }
     )
     diagnostics.require(
       natsContext && typeof natsContext.Kvm === 'function',
-      Errors.PRECONDITION_REQUIRED,
+      PRECONDITION_REQUIRED,
       'skipIfLocked requires natsContext.Kvm',
       { values }
     )
     diagnostics.require(
       abortCtl && typeof abortCtl.abort === 'function',
-      Errors.PRECONDITION_REQUIRED,
+      PRECONDITION_REQUIRED,
       'skipIfLocked requires an abort controller',
       { values }
     )
@@ -140,7 +140,7 @@ export function skipIfLocked(lockKeys) {
     for (const key of normalizedLockKeys) {
       diagnostics.require(
         Object.prototype.hasOwnProperty.call(scope, key),
-        Errors.PRECONDITION_REQUIRED,
+        PRECONDITION_REQUIRED,
         `skipIfLocked scope key "${key}" is required`,
         { key, values }
       )

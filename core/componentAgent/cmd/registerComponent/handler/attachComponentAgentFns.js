@@ -1,4 +1,4 @@
-import { Errors } from '../../../../../errors.js'
+import { PRECONDITION_INVALID, PRECONDITION_REQUIRED } from '@liquid-bricks/lib-diagnostics/codes'
 
 async function createAgentFnVertex({ dataMapper, agentFn }) {
   return dataMapper.vertex.agentFn.create(agentFn)
@@ -18,7 +18,7 @@ export async function attachComponentAgentFns({
 
   handlerDiagnostics.require(
     Array.isArray(agentFns),
-    Errors.PRECONDITION_INVALID,
+    PRECONDITION_INVALID,
     'agentFns must be an array',
     { field: 'agentFns', component: compName, hash: compHash },
   )
@@ -29,25 +29,25 @@ export async function attachComponentAgentFns({
 
     handlerDiagnostics.require(
       typeof agentFnName === 'string' && agentFnName.length,
-      Errors.PRECONDITION_REQUIRED,
+      PRECONDITION_REQUIRED,
       'agentFn name required',
       { field: 'agentFn.name', component: compName, hash: compHash },
     )
     handlerDiagnostics.require(
       typeof portAddr === 'string' && portAddr.length,
-      Errors.PRECONDITION_REQUIRED,
+      PRECONDITION_REQUIRED,
       'agentFn portAddr required',
       { field: 'agentFn.portAddr', component: compName, hash: compHash, agentFn: agentFnName },
     )
     handlerDiagnostics.require(
       agentFnHash === undefined || (typeof agentFnHash === 'string' && agentFnHash.length),
-      Errors.PRECONDITION_INVALID,
+      PRECONDITION_INVALID,
       'agentFn hash must be a non-empty string',
       { field: 'agentFn.hash', component: compName, hash: compHash, agentFn: agentFnName },
     )
     handlerDiagnostics.require(
       !uniqueAgentFnNames.has(agentFnName),
-      Errors.PRECONDITION_INVALID,
+      PRECONDITION_INVALID,
       `Duplicate agentFn name: ${agentFnName}`,
       { component: compName, hash: compHash, agentFn: agentFnName },
     )

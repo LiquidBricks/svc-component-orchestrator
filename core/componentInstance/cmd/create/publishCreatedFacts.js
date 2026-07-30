@@ -1,5 +1,5 @@
 import { create as createSubject } from '@liquid-bricks/lib-nats-subject/create/basic'
-import { Errors } from '../../../../errors.js'
+import { PRECONDITION_INVALID, PRECONDITION_REQUIRED } from '@liquid-bricks/lib-diagnostics/codes'
 
 function isInitialState(value) {
   return value != null
@@ -18,7 +18,7 @@ export async function publishCreatedFacts({
 }) {
   handlerDiagnostics.require(
     Array.isArray(createdInstances) && createdInstances.length > 0,
-    Errors.PRECONDITION_REQUIRED,
+    PRECONDITION_REQUIRED,
     'createdInstances required before publishing componentInstance created',
     { field: 'createdInstances' },
   )
@@ -51,14 +51,14 @@ export async function publishCreatedFacts({
     ]) {
       handlerDiagnostics.require(
         typeof fact[field] === 'string' && fact[field].length > 0,
-        Errors.PRECONDITION_REQUIRED,
+        PRECONDITION_REQUIRED,
         `${field} required before publishing componentInstance created`,
         { field },
       )
     }
     handlerDiagnostics.require(
       isInitialState(fact.state),
-      Errors.PRECONDITION_INVALID,
+      PRECONDITION_INVALID,
       'state must be an object containing only null initial values before publishing componentInstance created',
       { field: 'state' },
     )

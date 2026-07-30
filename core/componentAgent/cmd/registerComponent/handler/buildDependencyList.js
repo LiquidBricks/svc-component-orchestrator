@@ -1,40 +1,40 @@
-import { Errors } from '../../../../../errors.js'
+import { PRECONDITION_INVALID, PRECONDITION_REQUIRED } from '@liquid-bricks/lib-diagnostics/codes'
 
 function validateTaskPayload(diagnostics, task) {
   const { name, fnc, codeRef, deps, waitFor, inject } = task
   diagnostics.require(
     typeof name === 'string' && name.length,
-    Errors.PRECONDITION_REQUIRED,
+    PRECONDITION_REQUIRED,
     'task name required',
     { field: 'task.name' },
   )
   diagnostics.require(
     typeof fnc === 'string' && fnc.length,
-    Errors.PRECONDITION_REQUIRED,
+    PRECONDITION_REQUIRED,
     'task fnc required',
     { field: 'task.fnc' },
   )
   diagnostics.require(
     typeof codeRef === 'object',
-    Errors.PRECONDITION_INVALID,
+    PRECONDITION_INVALID,
     'task codeRef required',
     { field: 'task.codeRef' },
   )
   diagnostics.require(
     Array.isArray(deps),
-    Errors.PRECONDITION_INVALID,
+    PRECONDITION_INVALID,
     'task deps must be an array',
     { field: 'task.deps' },
   )
   diagnostics.require(
     waitFor === undefined || Array.isArray(waitFor),
-    Errors.PRECONDITION_INVALID,
+    PRECONDITION_INVALID,
     'task waitFor must be an array',
     { field: 'task.waitFor' },
   )
   diagnostics.require(
     inject === undefined || Array.isArray(inject),
-    Errors.PRECONDITION_INVALID,
+    PRECONDITION_INVALID,
     'task inject must be an array',
     { field: 'task.inject' },
   )
@@ -44,31 +44,31 @@ function validateDataPayload(diagnostics, dataItem) {
   const { name, codeRef, deps, waitFor, inject } = dataItem
   diagnostics.require(
     typeof name === 'string' && name.length,
-    Errors.PRECONDITION_REQUIRED,
+    PRECONDITION_REQUIRED,
     'data name required',
     { field: 'data.name' },
   )
   diagnostics.require(
     Array.isArray(deps),
-    Errors.PRECONDITION_INVALID,
+    PRECONDITION_INVALID,
     'data deps must be an array',
     { field: 'data.deps' },
   )
   diagnostics.require(
     waitFor === undefined || Array.isArray(waitFor),
-    Errors.PRECONDITION_INVALID,
+    PRECONDITION_INVALID,
     'data waitFor must be an array',
     { field: 'data.waitFor' },
   )
   diagnostics.require(
     typeof codeRef === 'object',
-    Errors.PRECONDITION_INVALID,
+    PRECONDITION_INVALID,
     'task codeRef required',
     { field: 'data.codeRef' },
   )
   diagnostics.require(
     inject === undefined || Array.isArray(inject),
-    Errors.PRECONDITION_INVALID,
+    PRECONDITION_INVALID,
     'data inject must be an array',
     { field: 'data.inject' },
   )

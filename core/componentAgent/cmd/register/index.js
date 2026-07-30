@@ -1,5 +1,5 @@
 import { ackMessage, decodeData } from '../../../../middleware/index.js'
-import { Errors } from '../../../../errors.js'
+import { PRECONDITION_REQUIRED } from '@liquid-bricks/lib-diagnostics/codes'
 import { create as createSubject } from '@liquid-bricks/lib-nats-subject/create/basic'
 import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
 
@@ -23,7 +23,7 @@ export const spec = {
 function validatePayload({ scope: { agentID }, rootCtx: { diagnostics } }) {
   diagnostics.require(
     typeof agentID === 'string' && agentID.length,
-    Errors.PRECONDITION_REQUIRED,
+    PRECONDITION_REQUIRED,
     'agentID is required',
     { field: 'agentID' },
   )

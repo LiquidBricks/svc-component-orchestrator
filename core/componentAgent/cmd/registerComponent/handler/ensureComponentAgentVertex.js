@@ -1,4 +1,4 @@
-import { Errors } from '../../../../../errors.js'
+import { PRECONDITION_REQUIRED } from '@liquid-bricks/lib-diagnostics/codes'
 
 export async function ensureComponentAgentVertex({
   rootCtx: { g, dataMapper },
@@ -6,7 +6,7 @@ export async function ensureComponentAgentVertex({
 }) {
   handlerDiagnostics.require(
     typeof agentID === 'string' && agentID.length,
-    Errors.PRECONDITION_REQUIRED,
+    PRECONDITION_REQUIRED,
     'agentID is required',
     { field: 'agentID' },
   )

@@ -6,7 +6,7 @@ import { diagnostics as makeDiagnostics } from '@liquid-bricks/lib-diagnostics'
 import { waitForTriggerProjection } from '../../../../../../core/componentInstance/cmd/check_state_machine_completion/waitForTriggerProjection.js'
 import { validatePayload } from '../../../../../../core/componentInstance/cmd/check_state_machine_completion/validatePayload.js'
 import { spec } from '../../../../../../core/componentInstance/cmd/check_state_machine_completion/index.js'
-import { Errors } from '../../../../../../errors.js'
+import { COMPONENT_INSTANCE_COMPLETION_PROJECTION_TIMEOUT } from '@liquid-bricks/lib-diagnostics/codes'
 
 const noop = () => {}
 
@@ -120,7 +120,7 @@ test('raises a specific DiagnosticError when the projection does not become read
     }),
     error => {
       assert.ok(error instanceof diagnostics.DiagnosticError)
-      assert.equal(error.code, Errors.COMPONENT_INSTANCE_COMPLETION_PROJECTION_TIMEOUT)
+      assert.equal(error.code, COMPONENT_INSTANCE_COMPLETION_PROJECTION_TIMEOUT)
       assert.equal(error.type, 'Precondition')
       assert.equal(error.meta.stateEdgeId, 'state-edge-timeout')
       assert.equal(error.meta.expected, 'provided')

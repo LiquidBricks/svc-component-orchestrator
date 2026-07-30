@@ -1,4 +1,4 @@
-import { Errors } from '../../../../errors.js'
+import { COMPONENT_INSTANCE_COMPLETION_PROJECTION_TIMEOUT } from '@liquid-bricks/lib-diagnostics/codes'
 
 const DEFAULT_TIMEOUT_MS = 5_000
 const DEFAULT_INTERVAL_MS = 25
@@ -80,7 +80,7 @@ export async function waitForTriggerProjection({
 
   scope.handlerDiagnostics.require(
     false,
-    Errors.COMPONENT_INSTANCE_COMPLETION_PROJECTION_TIMEOUT,
+    COMPONENT_INSTANCE_COMPLETION_PROJECTION_TIMEOUT,
     'Timed out waiting for the completion trigger projection',
     {
       type: scope.type,

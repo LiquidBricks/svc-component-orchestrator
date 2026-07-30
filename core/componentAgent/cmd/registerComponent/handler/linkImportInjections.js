@@ -1,4 +1,4 @@
-import { Errors } from '../../../../../errors.js'
+import { PRECONDITION_INVALID, PRECONDITION_REQUIRED } from '@liquid-bricks/lib-diagnostics/codes'
 
 function parseImportInjectionPath({ handlerDiagnostics, path, compName, hash, importName, role, refType = 'import' }) {
   const trimmedPath = String(path ?? '').trim()
@@ -6,7 +6,7 @@ function parseImportInjectionPath({ handlerDiagnostics, path, compName, hash, im
 
   handlerDiagnostics.require(
     parts.length >= 2,
-    Errors.PRECONDITION_REQUIRED,
+    PRECONDITION_REQUIRED,
     `Injection ${role} path is required for component(${compName})#${hash} ${refType}:${importName} ${role}[${trimmedPath}]`,
     { component: compName, hash, importName, role, path: trimmedPath, refType },
   )
@@ -17,13 +17,13 @@ function parseImportInjectionPath({ handlerDiagnostics, path, compName, hash, im
 
   handlerDiagnostics.require(
     ['data', 'task'].includes(type),
-    Errors.PRECONDITION_INVALID,
+    PRECONDITION_INVALID,
     `Unknown injection type:${type} for component(${compName})#${hash} ${refType}:${importName} ${role}[${trimmedPath}]`,
     { type, path: trimmedPath, component: compName, hash, importName, role, refType },
   )
   handlerDiagnostics.require(
     name,
-    Errors.PRECONDITION_REQUIRED,
+    PRECONDITION_REQUIRED,
     `Injection name is required for component(${compName})#${hash} ${refType}:${importName} ${role}[${trimmedPath}]`,
     { component: compName, hash, importName, role, path: trimmedPath, refType },
   )
@@ -48,14 +48,14 @@ async function resolveImportedComponent({ g, dataMapper, handlerDiagnostics, sta
 
     handlerDiagnostics.require(
       importRefId || gateRefId,
-      Errors.PRECONDITION_INVALID,
+      PRECONDITION_INVALID,
       `${refType === 'gate' ? 'Gate' : 'Import'} not found for component(${compName})#${hash} ${refType}:${importName} ${pathType}[${pathValue}]`,
       { component: compName, hash, importName, pathType, pathValue, alias, refType },
     )
 
     handlerDiagnostics.require(
       nextComponentId,
-      Errors.PRECONDITION_INVALID,
+      PRECONDITION_INVALID,
       `${refType === 'gate' ? 'Gate' : 'Import'} target missing for component(${compName})#${hash} ${refType}:${importName} ${pathType}[${pathValue}]`,
       { component: compName, hash, importName, pathType, pathValue, alias, refType },
     )
@@ -86,7 +86,7 @@ async function resolveInjectionNodeId({
     const match = dependencyList.get(localKey)
     handlerDiagnostics.require(
       match,
-      Errors.PRECONDITION_INVALID,
+      PRECONDITION_INVALID,
       `Injection ${pathType} not found for component(${compName})#${hash} ${refType}:${importName} ${pathType}[${pathValue}]`,
       { component: compName, hash, importName, pathType, pathValue, refType },
     )
@@ -95,7 +95,7 @@ async function resolveInjectionNodeId({
 
   handlerDiagnostics.require(
     g,
-    Errors.PRECONDITION_REQUIRED,
+    PRECONDITION_REQUIRED,
     `Graph context required for component(${compName})#${hash} ${refType}:${importName} ${pathType}[${pathValue}]`,
     { component: compName, hash, importName, pathType, pathValue, refType },
   )
@@ -119,7 +119,7 @@ async function resolveInjectionNodeId({
 
   handlerDiagnostics.require(
     nodeId,
-    Errors.PRECONDITION_INVALID,
+    PRECONDITION_INVALID,
     `Injection ${pathType} not found for component(${compName})#${hash} ${refType}:${importName} ${pathType}[${pathValue}]`,
     { component: compName, hash, importName, pathType, pathValue, importPath, type, name, refType },
   )
@@ -179,7 +179,7 @@ export async function linkImportInjections({
 
     handlerDiagnostics.require(
       inject && typeof inject === 'object' && !Array.isArray(inject),
-      Errors.PRECONDITION_INVALID,
+      PRECONDITION_INVALID,
       `${refType} inject must be an object for component(${compName})#${hash} ${refType}:${importName}`,
       { component: compName, hash, importName, refType },
     )
@@ -187,7 +187,7 @@ export async function linkImportInjections({
     for (const [sourcePath, targets] of Object.entries(inject)) {
       handlerDiagnostics.require(
         Array.isArray(targets),
-        Errors.PRECONDITION_INVALID,
+        PRECONDITION_INVALID,
         `${refType} inject targets must be an array for component(${compName})#${hash} ${refType}:${importName} source[${sourcePath}]`,
         { component: compName, hash, importName, source: sourcePath, refType },
       )

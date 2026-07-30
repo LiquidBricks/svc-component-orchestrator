@@ -1,4 +1,4 @@
-import { Errors } from '../../../../../errors.js'
+import { PRECONDITION_INVALID } from '@liquid-bricks/lib-diagnostics/codes'
 
 export async function providedStateEdge({ scope: { handlerDiagnostics, stateMachineId, stateEdgeId, instanceId, type }, rootCtx: { g, dataMapper } }) {
   const [providedNodeId] = type === 'task'
@@ -7,7 +7,7 @@ export async function providedStateEdge({ scope: { handlerDiagnostics, stateMach
 
   handlerDiagnostics.require(
     providedNodeId,
-    Errors.PRECONDITION_INVALID,
+    PRECONDITION_INVALID,
     `${type} state edge ${stateEdgeId} not associated with instance ${instanceId}`,
     { instanceId, stateEdgeId, type }
   )

@@ -1,5 +1,5 @@
 import router from "@liquid-bricks/lib-nats-subject/router";
-import { Errors } from "./errors.js";
+import { ROUTER_HANDLER_ERROR, ROUTER_UNKNOWN_SUBJECT, TIMER_GENERIC_OPERATION } from '@liquid-bricks/lib-diagnostics/codes';
 import * as component from './core/component/index.js'
 import * as componentAgent from './core/componentAgent/index.js'
 import * as componentInstance from './core/componentInstance/index.js'
@@ -58,7 +58,7 @@ export function createComponentServiceRouter({
     .before(({ rootCtx: { diagnostics }, scope, message }) => {
       // diagnostics.trace('event received', { subject: message.subject, message: message.json() })
 
-      const timer = diagnostics.timer('GENERIC_OPERATION', { subject: message.subject })
+      const timer = diagnostics.timer('GENERIC_OPERATION', { subject: message.subject }, { code: TIMER_GENERIC_OPERATION })
       return { timer }
     })
     .after(({ rootCtx: { diagnostics }, scope: { timer }, message }) => {
@@ -79,7 +79,7 @@ export function createComponentServiceRouter({
       handler: async ({ message, rootCtx: { diagnostics } }) => {
         diagnostics.invariant(
           message.term(`No handler for subject: ${message.subject}`) ?? false,
-          Errors.ROUTER_UNKNOWN_SUBJECT,
+          ROUTER_UNKNOWN_SUBJECT,
           `No handler for subject: ${message.subject}`,
           { subject: message.subject, message: message?.json?.() }
         )
@@ -90,7 +90,7 @@ export function createComponentServiceRouter({
         return //we already have an error diagnosed, dont throw another one.
       }
       throw diagnostics.error(
-        Errors.ROUTER_HANDLER_ERROR,
+        ROUTER_HANDLER_ERROR,
         'component service router error',
         { error, rest },
       )

@@ -91,7 +91,6 @@ export async function Consumer({ streamName, natsContext, g, diagnostics: d }) {
 //     m.working()
 //   }
 // })
-// diagnostics.invariant(good, Errors.ROUTER_HANDLER_ERROR, 'uh oh', { err, message: m.json(), subject: m.subject })
 
 
 async function waitOnFunction(_) {

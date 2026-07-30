@@ -1,4 +1,4 @@
-import { Errors } from '../../../../../errors.js'
+import { PRECONDITION_INVALID } from '@liquid-bricks/lib-diagnostics/codes'
 import { domain } from '@liquid-bricks/spec-domain/domain'
 
 export async function component({ rootCtx: { g, dataMapper }, scope: { handlerDiagnostics, componentHash } }) {
@@ -6,7 +6,7 @@ export async function component({ rootCtx: { g, dataMapper }, scope: { handlerDi
 
   handlerDiagnostics.require(
     componentId,
-    Errors.PRECONDITION_INVALID,
+    PRECONDITION_INVALID,
     `component not found for componentHash ${componentHash}`,
     { field: 'componentHash', componentHash }
   )

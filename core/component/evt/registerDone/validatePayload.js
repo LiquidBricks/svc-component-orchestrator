@@ -1,9 +1,9 @@
-import { Errors } from '../../../../errors.js'
+import { PRECONDITION_REQUIRED } from '@liquid-bricks/lib-diagnostics/codes'
 
 export function validatePayload({ scope: { handlerDiagnostics, hash } }) {
   handlerDiagnostics.require(
     hash,
-    Errors.PRECONDITION_REQUIRED,
+    PRECONDITION_REQUIRED,
     'Component hash is required',
     { field: 'hash' }
   )

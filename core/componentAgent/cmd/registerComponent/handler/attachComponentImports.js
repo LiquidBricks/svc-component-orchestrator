@@ -1,4 +1,4 @@
-import { Errors } from '../../../../../errors.js'
+import { PRECONDITION_INVALID, PRECONDITION_REQUIRED } from '@liquid-bricks/lib-diagnostics/codes'
 import { domain } from '@liquid-bricks/spec-domain/domain'
 
 export async function attachComponentImports({
@@ -14,25 +14,25 @@ export async function attachComponentImports({
 
     handlerDiagnostics.require(
       typeof importName === 'string' && importName.length,
-      Errors.PRECONDITION_REQUIRED,
+      PRECONDITION_REQUIRED,
       'import name required',
       { field: 'import.name', component: compName, hash },
     )
     handlerDiagnostics.require(
       typeof importHash === 'string' && importHash.length,
-      Errors.PRECONDITION_REQUIRED,
+      PRECONDITION_REQUIRED,
       'import hash required',
       { field: 'import.hash', component: compName, hash, importName },
     )
     handlerDiagnostics.require(
       !uniqueImportNamesSet.has(importName),
-      Errors.PRECONDITION_INVALID,
+      PRECONDITION_INVALID,
       `Duplicate import name: ${importName}`,
       { component: compName, hash, importName },
     )
     handlerDiagnostics.require(
       waitFor === undefined || Array.isArray(waitFor),
-      Errors.PRECONDITION_INVALID,
+      PRECONDITION_INVALID,
       'import waitFor must be an array',
       { field: 'import.waitFor', component: compName, hash, importName },
     )
@@ -42,7 +42,7 @@ export async function attachComponentImports({
 
     handlerDiagnostics.require(
       importedComponentId,
-      Errors.PRECONDITION_INVALID,
+      PRECONDITION_INVALID,
       `Imported component not found: ${importName}#${importHash}`,
       { component: compName, hash, importName, importHash },
     )

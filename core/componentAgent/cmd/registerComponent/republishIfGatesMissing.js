@@ -1,6 +1,6 @@
 import { s } from '@liquid-bricks/lib-nats-subject/router'
 
-import { Errors } from '../../../../errors.js'
+import { PRECONDITION_REQUIRED } from '@liquid-bricks/lib-diagnostics/codes'
 import { domain } from '@liquid-bricks/spec-domain/domain'
 
 export async function republishIfGatesMissing({
@@ -18,13 +18,13 @@ export async function republishIfGatesMissing({
 
     handlerDiagnostics.require(
       typeof gateName === 'string' && gateName.length,
-      Errors.PRECONDITION_REQUIRED,
+      PRECONDITION_REQUIRED,
       'gate name required',
       { field: 'gate.name', component: compName, hash },
     )
     handlerDiagnostics.require(
       typeof gateHash === 'string' && gateHash.length,
-      Errors.PRECONDITION_REQUIRED,
+      PRECONDITION_REQUIRED,
       'gate hash required',
       { field: 'gate.hash', component: compName, hash, gate: gateName },
     )
