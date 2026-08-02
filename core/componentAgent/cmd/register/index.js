@@ -1,5 +1,6 @@
 import { ackMessage, decodeData } from '../../../../middleware/index.js'
-import { PRECONDITION_REQUIRED } from '@liquid-bricks/lib-diagnostics/codes'
+import { registerComponentAgent } from './handler.js'
+import { validatePayload } from './validatePayload.js'
 import { create as createSubject } from '@liquid-bricks/lib-nats-subject/create/basic'
 import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
 
@@ -18,25 +19,4 @@ export const spec = {
   post: [
     ackMessage,
   ],
-}
-
-function validatePayload({ scope: { agentID }, rootCtx: { diagnostics } }) {
-  diagnostics.require(
-    typeof agentID === 'string' && agentID.length,
-    PRECONDITION_REQUIRED,
-    'agentID is required',
-    { field: 'agentID' },
-  )
-}
-
-async function registerComponentAgent({ scope: { agentID }, rootCtx: { g, dataMapper } }) {
-
-  const [existingComponentAgentVID] = await dataMapper.query.findComponentAgentVertexId({ agentID })
-
-  if (existingComponentAgentVID) {
-    return { componentAgentVID: existingComponentAgentVID, componentAgentAlreadyRegistered: true }
-  }
-
-  const { id: componentAgentVID } = await dataMapper.vertex.componentAgent.create({ agentID })
-  return { componentAgentVID, componentAgentAlreadyRegistered: false }
 }
