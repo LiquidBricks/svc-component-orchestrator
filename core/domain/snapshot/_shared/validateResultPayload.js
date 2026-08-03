@@ -18,6 +18,8 @@ export function validateResultPayload({ scope }, { type }) {
     handlerDiagnostics,
     delta,
     name,
+    status,
+    stateEdgeStatus,
     updatedAt,
   } = scope
 
@@ -48,17 +50,50 @@ export function validateResultPayload({ scope }, { type }) {
     `delta required for ${type} snapshot result`,
     { field: 'delta', type },
   )
+  handlerDiagnostics.require(
+    status !== undefined,
+    PRECONDITION_REQUIRED,
+    `status required for ${type} snapshot result`,
+    { field: 'status', type },
+  )
+  handlerDiagnostics.require(
+    stateEdgeStatus !== undefined,
+    PRECONDITION_REQUIRED,
+    `stateEdgeStatus required for ${type} snapshot result`,
+    { field: 'stateEdgeStatus', type },
+  )
+  handlerDiagnostics.require(
+    status === 'provided' && stateEdgeStatus === 'provided',
+    PRECONDITION_INVALID,
+    `status and stateEdgeStatus must be provided for ${type} snapshot result`,
+    { field: 'status', status, stateEdgeStatus, type },
+  )
 
   const deltaKey = `${type}.${name}`
+  const stateDeltaKey = `${deltaKey}.state`
   handlerDiagnostics.require(
     hasOwn(delta, deltaKey),
     PRECONDITION_REQUIRED,
     `${deltaKey} required in ${type} snapshot delta`,
     { field: 'delta', deltaKey, type },
   )
+  handlerDiagnostics.require(
+    hasOwn(delta, stateDeltaKey) && delta[stateDeltaKey] === 'provided',
+    PRECONDITION_INVALID,
+    `${stateDeltaKey} must be provided for ${type} snapshot result`,
+    { field: 'delta', stateDeltaKey, type },
+  )
+  handlerDiagnostics.require(
+    !hasOwn(scope, 'error'),
+    PRECONDITION_INVALID,
+    `error must be absent for ${type} snapshot result`,
+    { field: 'error', error: scope.error, type },
+  )
 
   return {
     type,
     result: delta[deltaKey],
+    status: 'provided',
+    stateEdgeStatus: 'provided',
   }
 }

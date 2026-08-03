@@ -2,6 +2,7 @@ import { domain } from '@liquid-bricks/spec-domain/domain'
 
 const DATA_PROVIDED_STATUS = domain.edge.has_data_state.stateMachine_data.constants.Status.PROVIDED
 const TASK_PROVIDED_STATUS = domain.edge.has_task_state.stateMachine_task.constants.Status.PROVIDED
+const GATE_PROVIDED_STATUS = domain.edge.has_gate_state.stateMachine_gateInstanceRef.constants.Status.PROVIDED
 
 function pickFirst(values) {
   return Array.isArray(values) ? values[0] : values
@@ -80,6 +81,13 @@ async function isGateFinished({
   stateStatusOverrides,
   gateResultOverrides,
 }) {
+  let gateStatus = stateStatusOverrides.get(gateStateEdgeId)
+  if (gateStatus === undefined) {
+    const [statusValues] = await dataMapper.query.readStateEdgeStatus({ edgeId: gateStateEdgeId })
+    gateStatus = valueFor(statusValues, 'status')
+  }
+  if (gateStatus !== GATE_PROVIDED_STATUS) return false
+
   let rawResult = gateResultOverrides.get(gateStateEdgeId)
   if (rawResult === undefined) {
     const [resultValues] = await dataMapper.query.readResultValues({ edgeId: gateStateEdgeId })

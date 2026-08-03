@@ -13,7 +13,6 @@ async function publishResultComputedFact({
     result,
     stateMachineId,
     stateEdgeId,
-    stateEdgeStatus,
   },
   rootCtx: { natsContext },
   routeCtx: { emits },
@@ -37,14 +36,20 @@ async function publishResultComputedFact({
         name,
         result,
         resultValue,
-        status: stateEdgeStatus,
-        stateEdgeStatus,
+        status: 'provided',
+        stateEdgeStatus: 'provided',
         updatedAt,
       },
     }),
   )
 
-  return { instanceId, stateEdgeId, status: stateEdgeStatus, updatedAt }
+  return {
+    instanceId,
+    stateEdgeId,
+    status: 'provided',
+    stateEdgeStatus: 'provided',
+    updatedAt,
+  }
 }
 
 
@@ -60,7 +65,7 @@ export const emits = {
 export const spec = {
   context: { emits },
   decode: [
-    decodeData(['instanceId', 'name', 'result']),
+    decodeData(['instanceId', 'name', 'result', 'status', 'stateEdgeStatus', 'error']),
   ],
   pre: [
     validatePayload,

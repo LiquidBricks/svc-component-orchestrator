@@ -97,6 +97,7 @@ test('imported injection triggers dependant starts inside imported component', a
             type: 'data',
             name: 'rootData',
             result: { injected: 'child' },
+            status: 'provided',
           }
         }),
       },
@@ -211,6 +212,7 @@ test('computeFunction triggers parent dependant starts across imports', async ()
             type: 'data',
             name: 'childTarget',
             result: { triggered: 'parent' },
+            status: 'provided',
           }
         }),
       },

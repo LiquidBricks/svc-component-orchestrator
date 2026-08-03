@@ -127,6 +127,7 @@ test('computeFunction publishes injected events across imports using import inje
           type: 'task',
           name: 'targetTask',
           result: resultPayload,
+          status: 'provided',
         }
       }),
     }
@@ -143,8 +144,8 @@ test('computeFunction publishes injected events across imports using import inje
     const targetTaskInjectedEvents = targetTaskInjectedPublishes.filter(p => computeFunctionSubjects.has(p.subject)).map(p => p.payload.data)
     const sortedTaskInjected = targetTaskInjectedEvents.sort((a, b) => a.name.localeCompare(b.name))
     assert.deepEqual(sortedTaskInjected, [
-      { instanceId: providerInstanceId, stateId: providerDataStateEdgeId, name: 'providerData', type: 'data', result: resultPayload },
-      { instanceId: rootInstanceId, stateId: rootDataStateEdgeId, name: 'rootData', type: 'data', result: resultPayload },
+      { instanceId: providerInstanceId, stateId: providerDataStateEdgeId, name: 'providerData', type: 'data', result: resultPayload, status: 'provided' },
+      { instanceId: rootInstanceId, stateId: rootDataStateEdgeId, name: 'rootData', type: 'data', result: resultPayload, status: 'provided' },
     ])
 
     published.length = 0
@@ -158,6 +159,7 @@ test('computeFunction publishes injected events across imports using import inje
           type: 'data',
           name: 'targetData',
           result: resultPayload,
+          status: 'provided',
         }
       }),
     }
@@ -173,7 +175,7 @@ test('computeFunction publishes injected events across imports using import inje
     const targetDataInjectedPublishes = await runInjectResultsCommands({ rootCtx, events: published })
     const dataInjectedEvents = targetDataInjectedPublishes.filter(p => computeFunctionSubjects.has(p.subject)).map(p => p.payload.data)
     assert.deepEqual(dataInjectedEvents, [
-      { instanceId: providerInstanceId, stateId: providerTaskStateEdgeId, name: 'providerTask', type: 'task', result: resultPayload },
+      { instanceId: providerInstanceId, stateId: providerTaskStateEdgeId, name: 'providerTask', type: 'task', result: resultPayload, status: 'provided' },
     ])
   })
 })
@@ -356,6 +358,7 @@ test('computeFunction publishes injected computeFunction to imported component i
           type: 'data',
           name: 'rootData',
           result: resultPayload,
+          status: 'provided',
         }
       }),
     }
@@ -396,6 +399,7 @@ test('computeFunction publishes injected computeFunction to imported component i
       name: 'childData',
       type: 'data',
       result: resultPayload,
+      status: 'provided',
     })
   })
 })
@@ -457,6 +461,7 @@ test('computeFunction skips unreachable injected targets in a different instance
             type: 'data',
             name: 'id',
             result: { context: 'standalone-provider' },
+            status: 'provided',
           }
         }),
       },

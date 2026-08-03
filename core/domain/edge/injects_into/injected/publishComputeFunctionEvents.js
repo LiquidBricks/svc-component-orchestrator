@@ -43,6 +43,7 @@ export async function publishComputeFunctionEvents({
           name: target.name,
           type: target.type,
           result,
+          status: 'provided',
         },
       }),
     )

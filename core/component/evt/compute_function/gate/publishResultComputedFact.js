@@ -33,10 +33,19 @@ export async function publishResultComputedFact({
         name,
         result,
         resultValue,
+        status: 'provided',
+        stateEdgeStatus: 'provided',
         updatedAt,
       },
     }),
   )
 
-  return { instanceId, stateEdgeId, gateInstanceRefId, updatedAt }
+  return {
+    instanceId,
+    stateEdgeId,
+    gateInstanceRefId,
+    status: 'provided',
+    stateEdgeStatus: 'provided',
+    updatedAt,
+  }
 }

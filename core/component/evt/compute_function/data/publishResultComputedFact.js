@@ -8,7 +8,6 @@ export async function publishResultComputedFact({
     result,
     stateMachineId,
     stateEdgeId,
-    stateEdgeStatus,
   },
   rootCtx: { natsContext },
   routeCtx: { emits },
@@ -32,12 +31,18 @@ export async function publishResultComputedFact({
         name,
         result,
         resultValue,
-        status: stateEdgeStatus,
-        stateEdgeStatus,
+        status: 'provided',
+        stateEdgeStatus: 'provided',
         updatedAt,
       },
     }),
   )
 
-  return { instanceId, stateEdgeId, status: stateEdgeStatus, updatedAt }
+  return {
+    instanceId,
+    stateEdgeId,
+    status: 'provided',
+    stateEdgeStatus: 'provided',
+    updatedAt,
+  }
 }

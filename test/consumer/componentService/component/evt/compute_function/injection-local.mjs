@@ -66,6 +66,7 @@ test('computeFunction publishes injected computeFunction events for injection ta
           type: 'data',
           name: 'dataSource',
           result: resultPayload,
+          status: 'provided',
         }
       }),
     }
@@ -120,8 +121,8 @@ test('computeFunction publishes injected computeFunction events for injection ta
 
     assert.equal(injectedPayloads.length, 2)
     assert.deepEqual(injectedPayloads, [
-      { instanceId, stateId: dataTargetStateEdgeId, name: 'dataTarget', type: 'data', result: resultPayload },
-      { instanceId, stateId: taskTargetStateEdgeId, name: 'taskB', type: 'task', result: resultPayload },
+      { instanceId, stateId: dataTargetStateEdgeId, name: 'dataTarget', type: 'data', result: resultPayload, status: 'provided' },
+      { instanceId, stateId: taskTargetStateEdgeId, name: 'taskB', type: 'task', result: resultPayload, status: 'provided' },
     ])
   })
 })
@@ -172,6 +173,7 @@ test('injected result triggers dependant data and task start commands', async ()
           type: 'data',
           name: 'dataSource',
           result: { injected: true },
+          status: 'provided',
         }
       }),
     }

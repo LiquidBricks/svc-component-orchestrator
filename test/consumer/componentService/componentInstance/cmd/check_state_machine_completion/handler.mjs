@@ -6,6 +6,8 @@ import { domain } from '@liquid-bricks/spec-domain/domain'
 import { handler } from '../../../../../../core/componentInstance/cmd/check_state_machine_completion/handler.js'
 
 const DATA_PROVIDED = domain.edge.has_data_state.stateMachine_data.constants.Status.PROVIDED
+const GATE_PROVIDED = domain.edge.has_gate_state.stateMachine_gateInstanceRef.constants.Status.PROVIDED
+const GATE_ERROR = domain.edge.has_gate_state.stateMachine_gateInstanceRef.constants.Status.ERROR
 
 function values(key, value) {
   return [{ [key]: [value] }]
@@ -115,6 +117,7 @@ test('uses the in-flight passing gate result while traversing the gated instance
       instanceVertexId: 'instance-root',
       stateMachineId: 'state-machine-root',
       stateEdgeId: 'gate-edge-in-flight',
+      stateEdgeStatus: GATE_PROVIDED,
       gateInstanceRefId: 'gate-ref-in-flight',
       resultValue: 'true',
       type: 'gate',
@@ -127,4 +130,35 @@ test('uses the in-flight passing gate result while traversing the gated instance
     ],
   })
   assert.deepEqual(traversedStateMachines, ['state-machine-root', 'state-machine-gate'])
+})
+
+test('a gate with error status remains unfinished even when it has a stored result', async () => {
+  const query = {
+    listTaskStateEdgeIds: async () => [],
+    listDataStateEdgeIds: async () => [],
+    listImportInstanceVertexIds: async () => [],
+    listGateStateEdgeIds: async () => ['gate-edge-error'],
+    readStateEdgeStatus: async ({ edgeId }) => {
+      assert.equal(edgeId, 'gate-edge-error')
+      return values('status', GATE_ERROR)
+    },
+    readResultValues: async () => {
+      assert.fail('a failed gate result must not be evaluated as completion')
+    },
+    readStateMachineState: async () => values('state', 'running'),
+    listImportParentInstanceVertexIds: async () => [],
+    listGateParentInstanceVertexIds: async () => [],
+  }
+
+  const result = await handler({
+    rootCtx: { dataMapper: { query } },
+    scope: {
+      instanceId: 'instance-root-id',
+      instanceVertexId: 'instance-root',
+      stateMachineId: 'state-machine-root',
+      type: 'data',
+    },
+  })
+
+  assert.deepEqual(result, { completedStateMachines: [] })
 })

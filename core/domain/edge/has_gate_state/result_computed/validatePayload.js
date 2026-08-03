@@ -1,7 +1,10 @@
-import { PRECONDITION_REQUIRED } from '@liquid-bricks/lib-diagnostics/codes'
+import { PRECONDITION_INVALID, PRECONDITION_REQUIRED } from '@liquid-bricks/lib-diagnostics/codes'
+import { isIsoDateTime } from '../../../_helper/isIsoDateTime.js'
 
-export function validatePayload({
-  scope: {
+const hasOwn = (value, key) => Object.prototype.hasOwnProperty.call(value, key)
+
+export function validatePayload({ scope }) {
+  const {
     handlerDiagnostics,
     instanceId,
     instanceVertexId,
@@ -11,8 +14,11 @@ export function validatePayload({
     name,
     result,
     resultValue,
-  },
-}) {
+    status,
+    stateEdgeStatus,
+    error,
+    updatedAt,
+  } = scope
   handlerDiagnostics.require(
     typeof instanceId === 'string' && instanceId.length,
     PRECONDITION_REQUIRED,
@@ -49,13 +55,61 @@ export function validatePayload({
     'name required for has_gate_state result_computed',
     { field: 'name' },
   )
-
-  const normalizedResultValue = typeof resultValue === 'string'
-    ? resultValue
-    : (result != null ? JSON.stringify(result) : '')
+  handlerDiagnostics.require(
+    scope.type === 'gate',
+    PRECONDITION_INVALID,
+    'type must be gate for has_gate_state result_computed',
+    { field: 'type', type: scope.type },
+  )
+  handlerDiagnostics.require(
+    status !== undefined,
+    PRECONDITION_REQUIRED,
+    'status required for has_gate_state result_computed',
+    { field: 'status' },
+  )
+  handlerDiagnostics.require(
+    stateEdgeStatus !== undefined,
+    PRECONDITION_REQUIRED,
+    'stateEdgeStatus required for has_gate_state result_computed',
+    { field: 'stateEdgeStatus' },
+  )
+  handlerDiagnostics.require(
+    status === 'provided' && stateEdgeStatus === 'provided',
+    PRECONDITION_INVALID,
+    'status and stateEdgeStatus must be provided for has_gate_state result_computed',
+    { field: 'status', status, stateEdgeStatus },
+  )
+  handlerDiagnostics.require(
+    hasOwn(scope, 'result'),
+    PRECONDITION_REQUIRED,
+    'result required for has_gate_state result_computed',
+    { field: 'result', status },
+  )
+  handlerDiagnostics.require(
+    resultValue === undefined || typeof resultValue === 'string',
+    PRECONDITION_INVALID,
+    'resultValue must be a string for has_gate_state result_computed',
+    { field: 'resultValue', resultValue },
+  )
+  handlerDiagnostics.require(
+    !hasOwn(scope, 'error'),
+    PRECONDITION_INVALID,
+    'error must be absent for has_gate_state result_computed',
+    { field: 'error', error },
+  )
+  handlerDiagnostics.require(
+    isIsoDateTime(updatedAt),
+    PRECONDITION_INVALID,
+    'updatedAt must be an ISO date-time for has_gate_state result_computed',
+    { field: 'updatedAt', updatedAt },
+  )
 
   return {
-    resultValue: normalizedResultValue,
+    resultValue: typeof resultValue === 'string'
+      ? resultValue
+      : (result != null ? JSON.stringify(result) : ''),
+    status: 'provided',
+    stateEdgeStatus: 'provided',
     type: 'gate',
   }
 }

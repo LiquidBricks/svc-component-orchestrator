@@ -77,6 +77,7 @@ test('stateMachine state switches to complete once all states are provided', asy
             type: 'data',
             name: 'inputData',
             result: { provided: 'data' },
+            status: 'provided',
           }
         }),
       },
@@ -101,6 +102,7 @@ test('stateMachine state switches to complete once all states are provided', asy
             type: 'task',
             name: 'finalTask',
             result: { provided: 'task' },
+            status: 'provided',
           }
         }),
       },
@@ -167,6 +169,7 @@ test('componentInstance completes when only imports exist and imports finish', a
             type: 'task',
             name: 'done',
             result: { provided: 'child-result' },
+            status: 'provided',
           }
         }),
       },
@@ -260,6 +263,7 @@ test('componentInstance completes after false gates settle and true gates comple
             type: 'gate',
             name: 'passedGate',
             result: true,
+            status: 'provided',
           }
         }),
       },
@@ -292,6 +296,7 @@ test('componentInstance completes after false gates settle and true gates comple
             type: 'task',
             name: 'done',
             result: { ok: true },
+            status: 'provided',
           }
         }),
       },
@@ -326,6 +331,7 @@ test('componentInstance completes after false gates settle and true gates comple
             type: 'gate',
             name: 'blockedGate',
             result: false,
+            status: 'provided',
           }
         }),
       },

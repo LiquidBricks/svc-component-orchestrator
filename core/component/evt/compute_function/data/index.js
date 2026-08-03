@@ -18,7 +18,7 @@ export const emits = {
 export const spec = {
   context: { emits },
   decode: [
-    decodeData(['instanceId', 'name', 'result']),
+    decodeData(['instanceId', 'name', 'result', 'status', 'stateEdgeStatus', 'error']),
   ],
   pre: [
     validatePayload,

@@ -73,6 +73,7 @@ test('computeFunction data route publishes result_computed domain fact only', as
           type: 'data',
           name: component.data[0].name,
           result: resultPayload,
+          status: 'provided',
         }
       }),
     }
@@ -154,6 +155,7 @@ test('computeFunction task route publishes result_computed domain fact only', as
           type: 'task',
           name: taskName,
           result: resultPayload,
+          status: 'provided',
         }
       }),
     }
@@ -230,6 +232,7 @@ test('computeFunction gate route publishes result_computed domain fact only', as
           type: 'gate',
           name: 'setup',
           result: resultPayload,
+          status: 'provided',
         }
       }),
     }
@@ -261,6 +264,8 @@ test('computeFunction gate route publishes result_computed domain fact only', as
       name: 'setup',
       result: resultPayload,
       resultValue: JSON.stringify(resultPayload),
+      status: 'provided',
+      stateEdgeStatus: 'provided',
       updatedAt: '<updatedAt>',
     })
 
@@ -301,6 +306,7 @@ test('computeFunction stores state result and drives completion through command 
           type: 'data',
           name: component.data[0].name,
           result: { count: 2 },
+          status: 'provided',
         }
       }),
     }
@@ -360,13 +366,23 @@ test('computeFunction stores state result and drives completion through command 
   })
 })
 
-test('validatePayload accepts payloads without a type field', () => {
+test('validatePayload accepts provided payloads without a type field', () => {
   const diagnostics = makeDiagnosticsInstance()
-  const handlerDiagnostics = createHandlerDiagnostics(diagnostics, { instanceId: 'i-1', name: 'x', result: null })
-  assert.doesNotThrow(() => validatePayload({
-    scope: { handlerDiagnostics, instanceId: 'i-1', name: 'x', result: null },
+  const handlerDiagnostics = createHandlerDiagnostics(diagnostics, {
+    instanceId: 'i-1',
+    name: 'x',
+    result: null,
+    status: 'provided',
+  })
+  const validated = validatePayload({
+    scope: { handlerDiagnostics, instanceId: 'i-1', name: 'x', result: null, status: 'provided' },
     rootCtx: { diagnostics },
-  }))
+  })
+  assert.deepEqual(validated, {
+    result: null,
+    status: 'provided',
+    stateEdgeStatus: 'provided',
+  })
 })
 
 test('validatePayload rejects a missing name', () => {
@@ -378,11 +394,30 @@ test('validatePayload rejects a missing name', () => {
   )
 })
 
-test('validatePayload rejects a missing native result', () => {
+test('validatePayload rejects a provided payload missing its native result', () => {
   const diagnostics = makeDiagnosticsInstance()
-  const handlerDiagnostics = createHandlerDiagnostics(diagnostics, { instanceId: 'i-1', name: 'x' })
+  const handlerDiagnostics = createHandlerDiagnostics(diagnostics, { instanceId: 'i-1', name: 'x', status: 'provided' })
   assert.throws(
-    () => validatePayload({ scope: { handlerDiagnostics, instanceId: 'i-1', name: 'x' }, rootCtx: { diagnostics } }),
+    () => validatePayload({ scope: { handlerDiagnostics, instanceId: 'i-1', name: 'x', status: 'provided' }, rootCtx: { diagnostics } }),
     diagnostics.DiagnosticError,
   )
 })
+
+for (const invalid of [
+  { result: 1 },
+  { status: 'running', result: 1 },
+  { status: 'provided', stateEdgeStatus: 'error', result: null },
+  { status: 'provided', result: null, error: { name: 'Error', message: 'failed' } },
+  { status: 'error', result: null, error: { name: 'Error', message: 'failed' } },
+]) {
+  test(`validatePayload rejects non-success payload fields: ${JSON.stringify(invalid)}`, () => {
+    const diagnostics = makeDiagnosticsInstance()
+    const scope = { instanceId: 'i-1', name: 'x', ...invalid }
+    const handlerDiagnostics = createHandlerDiagnostics(diagnostics, scope)
+
+    assert.throws(
+      () => validatePayload({ scope: { handlerDiagnostics, ...scope } }),
+      diagnostics.DiagnosticError,
+    )
+  })
+}

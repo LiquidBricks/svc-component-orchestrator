@@ -177,6 +177,7 @@ test('injects_into injected reaction resolves targets, publishes, then ACKs', as
       name: 'targetData',
       type: 'data',
       result: injectedPayload.result,
+      status: 'provided',
     },
   })
 })

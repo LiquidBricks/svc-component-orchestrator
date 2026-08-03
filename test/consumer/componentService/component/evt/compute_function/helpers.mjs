@@ -8,8 +8,8 @@ import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nat
 
 import { createComponentServiceRouter } from '../../../../../../router.js'
 import { path as registerPath } from '../../../../../../core/componentAgent/cmd/registerComponent/index.js'
-import { DATA_STATE_EDGE_LABEL, DATA_STATE_EDGE_STATUS } from '../../../../../../core/component/evt/compute_function/data/constants.js'
-import { TASK_STATE_EDGE_LABEL, TASK_STATE_EDGE_STATUS } from '../../../../../../core/component/evt/compute_function/task/constants.js'
+import { DATA_STATE_EDGE_LABEL } from '../../../../../../core/component/evt/compute_function/data/constants.js'
+import { TASK_STATE_EDGE_LABEL } from '../../../../../../core/component/evt/compute_function/task/constants.js'
 
 import { validatePayload } from '../../../../../../core/component/evt/compute_function/_helper/validatePayload.js'
 import { componentImports } from '../../../../../../core/componentInstance/cmd/create/loadData/componentImports.js'
@@ -19,7 +19,10 @@ import { serviceConfiguration } from '../../../../../provider/serviceConfigurati
 import { invokeRoute, runHookGroup } from '../../../../../util/invokeRoute.js'
 
 const STATE_EDGE_LABEL_BY_TYPE = Object.freeze({ data: DATA_STATE_EDGE_LABEL, task: TASK_STATE_EDGE_LABEL })
-const STATE_EDGE_STATUS_BY_TYPE = Object.freeze({ data: DATA_STATE_EDGE_STATUS, task: TASK_STATE_EDGE_STATUS })
+const STATE_EDGE_STATUS_BY_TYPE = Object.freeze({
+  data: domain.edge.has_data_state.stateMachine_data.constants.Status.PROVIDED,
+  task: domain.edge.has_task_state.stateMachine_task.constants.Status.PROVIDED,
+})
 
 const { NATS_IP_ADDRESS } = serviceConfiguration()
 assert.ok(NATS_IP_ADDRESS, 'NATS_IP_ADDRESS missing; set in .env or .env.local')
@@ -59,11 +62,19 @@ const createInstanceSpec = getCreateInstanceSpec()
 const startInstanceSpec = getStartInstanceSpec()
 const computeFunctionSpecs = getComputeFunctionSpecs()
 const computeFunctionSpec = Symbol('computeFunctionSpec')
+const computeFunctionFailedSpecs = getComputeFunctionFailedSpecs()
+const computeFunctionFailedSpec = Symbol('computeFunctionFailedSpec')
 const gateResultComputedSpec = getGateResultComputedSpec()
+const gateComputationFailedSpec = getGateComputationFailedSpec()
 const snapshotResultSpecByType = Object.freeze({
   data: getSnapshotResultSpec('data'),
   gate: getSnapshotResultSpec('gate'),
   task: getSnapshotResultSpec('task'),
+})
+const snapshotComputationFailedSpecByType = Object.freeze({
+  data: getSnapshotComputationFailedSpec('data'),
+  gate: getSnapshotComputationFailedSpec('gate'),
+  task: getSnapshotComputationFailedSpec('task'),
 })
 const injectResultsSpec = getInjectResultsSpec()
 const injectedSpec = getInjectedSpec()
@@ -124,6 +135,27 @@ function getComputeFunctionSpecs() {
   return Object.fromEntries(routes.map(({ values, config }) => [values.id, config]))
 }
 
+function getComputeFunctionFailedSpecs() {
+  const router = createComponentServiceRouter({
+    natsContext: {},
+    g: {},
+    diagnostics: makeDiagnosticsInstance(),
+    dataMapper: {},
+  })
+  const routes = router.routes.filter(({ values }) =>
+    values.context === 'function_result'
+    && values.channel === 'evt'
+    && values.entity === 'component'
+    && values.action === 'compute_function_failed'
+  )
+  assert.deepEqual(
+    routes.map(({ values }) => values.id).sort(),
+    ['data', 'gate', 'task'],
+    'computeFunctionFailed routes missing',
+  )
+  return Object.fromEntries(routes.map(({ values, config }) => [values.id, config]))
+}
+
 function getGateResultComputedSpec() {
   const router = createComponentServiceRouter({
     natsContext: {},
@@ -141,6 +173,23 @@ function getGateResultComputedSpec() {
   return route.config
 }
 
+function getGateComputationFailedSpec() {
+  const router = createComponentServiceRouter({
+    natsContext: {},
+    g: {},
+    diagnostics: makeDiagnosticsInstance(),
+    dataMapper: {},
+  })
+  const route = router.routes.find(({ values }) =>
+    values.ns === 'domain'
+    && values.channel === 'edge'
+    && values.entity === 'has_gate_state'
+    && values.action === 'computation_failed'
+  )
+  assert.ok(route, 'has_gate_state computation_failed domain route not found')
+  return route.config
+}
+
 function getSnapshotResultSpec(type) {
   const router = createComponentServiceRouter({
     natsContext: {},
@@ -155,6 +204,23 @@ function getSnapshotResultSpec(type) {
     && values.action === 'result'
   )
   assert.ok(route, `${type} snapshot result domain route not found`)
+  return route.config
+}
+
+function getSnapshotComputationFailedSpec(type) {
+  const router = createComponentServiceRouter({
+    natsContext: {},
+    g: {},
+    diagnostics: makeDiagnosticsInstance(),
+    dataMapper: {},
+  })
+  const route = router.routes.find(({ values }) =>
+    values.ns === 'domain'
+    && values.channel === 'snapshot'
+    && values.entity === type
+    && values.action === 'computation_failed'
+  )
+  assert.ok(route, `${type} snapshot computation_failed domain route not found`)
   return route.config
 }
 
@@ -329,6 +395,21 @@ export const computeFunctionTaskSubject = createBasicSubject(natsEvents['*'].com
   .env('prod')
   .build()
 
+export const computeFunctionFailedDataSubject = createBasicSubject(natsEvents['*'].component_service['*'].function_result.evt.component.compute_function_failed.v1.data)
+  .forPublish()
+  .env('prod')
+  .build()
+
+export const computeFunctionFailedGateSubject = createBasicSubject(natsEvents['*'].component_service['*'].function_result.evt.component.compute_function_failed.v1.gate)
+  .forPublish()
+  .env('prod')
+  .build()
+
+export const computeFunctionFailedTaskSubject = createBasicSubject(natsEvents['*'].component_service['*'].function_result.evt.component.compute_function_failed.v1.task)
+  .forPublish()
+  .env('prod')
+  .build()
+
 export const injectResultsSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.injectResults.v1['*'])
   .forPublish()
   .env('prod')
@@ -420,6 +501,21 @@ const gateResultComputedSubject = createBasicSubject(natsEvents['*'].domain['*']
   .env('prod')
   .build()
 
+const dataComputationFailedSubject = createBasicSubject(natsEvents['*'].domain['*']['*'].edge.has_data_state.computation_failed.v1['*'])
+  .forPublish()
+  .env('prod')
+  .build()
+
+const taskComputationFailedSubject = createBasicSubject(natsEvents['*'].domain['*']['*'].edge.has_task_state.computation_failed.v1['*'])
+  .forPublish()
+  .env('prod')
+  .build()
+
+const gateComputationFailedSubject = createBasicSubject(natsEvents['*'].domain['*']['*'].edge.has_gate_state.computation_failed.v1['*'])
+  .forPublish()
+  .env('prod')
+  .build()
+
 const snapshotResultSubjectByType = Object.freeze({
   data: createBasicSubject(natsEvents['*'].domain['*']['*'].snapshot.data.result.v1['*'])
     .forPublish()
@@ -435,10 +531,31 @@ const snapshotResultSubjectByType = Object.freeze({
     .build(),
 })
 
+const snapshotComputationFailedSubjectByType = Object.freeze({
+  data: createBasicSubject(natsEvents['*'].domain['*']['*'].snapshot.data.computation_failed.v1['*'])
+    .forPublish()
+    .set({ env: 'prod', context: 'delta' })
+    .build(),
+  gate: createBasicSubject(natsEvents['*'].domain['*']['*'].snapshot.gate.computation_failed.v1['*'])
+    .forPublish()
+    .set({ env: 'prod', context: 'delta' })
+    .build(),
+  task: createBasicSubject(natsEvents['*'].domain['*']['*'].snapshot.task.computation_failed.v1['*'])
+    .forPublish()
+    .set({ env: 'prod', context: 'delta' })
+    .build(),
+})
+
 const resultComputedSubjectByType = Object.freeze({
   data: dataResultComputedSubject,
   task: taskResultComputedSubject,
   gate: gateResultComputedSubject,
+})
+
+const computationFailedSubjectByType = Object.freeze({
+  data: dataComputationFailedSubject,
+  task: taskComputationFailedSubject,
+  gate: gateComputationFailedSubject,
 })
 
 function isResultComputedFact(event) {
@@ -453,17 +570,31 @@ function isResultComputedFact(event) {
     && event?.payload?.data?.stateEdgeId
 }
 
+function isComputationFailedFact(event) {
+  const type = event?.payload?.data?.type
+  if (type === 'gate') {
+    return event?.subject === computationFailedSubjectByType.gate
+      && event?.payload?.data?.stateEdgeId
+      && event?.payload?.data?.gateInstanceRefId
+  }
+
+  return event?.subject === computationFailedSubjectByType[type]
+    && event?.payload?.data?.stateEdgeId
+}
+
 async function projectResultComputedFact({ rootCtx, payload }) {
   const fact = payload?.data ?? {}
-  const result = typeof fact.resultValue === 'string'
-    ? fact.resultValue
-    : (fact.result != null ? JSON.stringify(fact.result) : '')
+  const update = {
+    edgeId: fact.stateEdgeId,
+    result: typeof fact.resultValue === 'string'
+      ? fact.resultValue
+      : (fact.result != null ? JSON.stringify(fact.result) : ''),
+    status: 'provided',
+    updatedAt: fact.updatedAt,
+  }
+
   if (fact.type === 'gate') {
-    await rootCtx.dataMapper.edge.has_gate_state.stateMachine_gateInstanceRef.setResultAndUpdatedAt({
-      edgeId: fact.stateEdgeId,
-      result,
-      updatedAt: fact.updatedAt,
-    })
+    await rootCtx.dataMapper.edge.has_gate_state.stateMachine_gateInstanceRef.updateResultStatusUpdatedAt(update)
     return
   }
 
@@ -471,12 +602,27 @@ async function projectResultComputedFact({ rootCtx, payload }) {
     ? rootCtx.dataMapper.edge.has_task_state.stateMachine_task
     : rootCtx.dataMapper.edge.has_data_state.stateMachine_data
 
-  await stateEdge.updateResultStatusUpdatedAt({
+  await stateEdge.updateResultStatusUpdatedAt(update)
+}
+
+async function projectComputationFailedFact({ rootCtx, payload }) {
+  const fact = payload?.data ?? {}
+  const update = {
     edgeId: fact.stateEdgeId,
-    result,
-    status: fact.stateEdgeStatus ?? fact.status,
+    status: 'error',
     updatedAt: fact.updatedAt,
-  })
+  }
+
+  if (fact.type === 'gate') {
+    await rootCtx.dataMapper.edge.has_gate_state.stateMachine_gateInstanceRef.updateStatusUpdatedAt(update)
+    return
+  }
+
+  const stateEdge = fact.type === 'task'
+    ? rootCtx.dataMapper.edge.has_task_state.stateMachine_task
+    : rootCtx.dataMapper.edge.has_data_state.stateMachine_data
+
+  await stateEdge.updateStatusUpdatedAt(update)
 }
 
 async function projectStateMachineCompletedFact({ rootCtx, payload }) {
@@ -540,7 +686,6 @@ async function processResultComputedFacts({ rootCtx, facts }) {
 
     const resultData = fact.payload.data
     const snapshotSpec = snapshotResultSpecByType[resultData.type]
-
     const snapshotPayload = {
       data: {
         instanceId: resultData.instanceId,
@@ -553,7 +698,10 @@ async function processResultComputedFacts({ rootCtx, facts }) {
         name: resultData.name,
         delta: {
           [`${resultData.type}.${resultData.name}`]: resultData.result,
+          [`${resultData.type}.${resultData.name}.state`]: 'provided',
         },
+        status: 'provided',
+        stateEdgeStatus: 'provided',
         updatedAt: resultData.updatedAt,
       },
     }
@@ -563,6 +711,56 @@ async function processResultComputedFacts({ rootCtx, facts }) {
       rootCtx,
       message: {
         subject: snapshotResultSubjectByType[resultData.type],
+        ack: () => { },
+        json: () => snapshotPayload,
+      },
+      processDomainFacts: false,
+    })
+  }
+}
+
+async function processComputationFailedFacts({ rootCtx, facts }) {
+  for (const fact of facts.filter(isComputationFailedFact)) {
+    await projectComputationFailedFact({ rootCtx, payload: fact.payload })
+    if (fact.payload.data.type === 'gate') {
+      await runSpec({
+        spec: gateComputationFailedSpec,
+        rootCtx,
+        message: {
+          subject: fact.subject,
+          ack: () => { },
+          json: () => fact.payload,
+        },
+        processDomainFacts: false,
+      })
+    }
+
+    const failureData = fact.payload.data
+    const snapshotPayload = {
+      data: {
+        instanceId: failureData.instanceId,
+        instanceVertexId: failureData.instanceVertexId,
+        componentStateId: `component-state:${failureData.instanceVertexId}`,
+        stateMachineId: failureData.stateMachineId,
+        stateEdgeId: failureData.stateEdgeId,
+        gateInstanceRefId: failureData.gateInstanceRefId,
+        type: failureData.type,
+        name: failureData.name,
+        delta: {
+          [`${failureData.type}.${failureData.name}.state`]: 'error',
+        },
+        status: 'error',
+        stateEdgeStatus: 'error',
+        error: failureData.error,
+        updatedAt: failureData.updatedAt,
+      },
+    }
+
+    await runSpec({
+      spec: snapshotComputationFailedSpecByType[failureData.type],
+      rootCtx,
+      message: {
+        subject: snapshotComputationFailedSubjectByType[failureData.type],
         ack: () => { },
         json: () => snapshotPayload,
       },
@@ -598,12 +796,22 @@ export async function runSpec({ spec, rootCtx, message, initialScope = {}, proce
     spec = computeFunctionSpecs[resultType]
     assert.ok(spec, 'computeFunction route missing for type ' + resultType)
   }
+  if (spec === computeFunctionFailedSpec) {
+    resultType = messagePayload?.data?.type
+    spec = computeFunctionFailedSpecs[resultType]
+    assert.ok(spec, 'computeFunctionFailed route missing for type ' + resultType)
+  }
   const shouldProcessResultComputedFacts = processDomainFacts
     && requestedSpec === computeFunctionSpec
     && ['data', 'task', 'gate'].includes(resultType)
+  const shouldProcessComputationFailedFacts = processDomainFacts
+    && requestedSpec === computeFunctionFailedSpec
+    && ['data', 'task', 'gate'].includes(resultType)
   const shouldProcessStartedFacts = processDomainFacts
     && requestedSpec === startInstanceSpec
-  const processEmittedFacts = shouldProcessResultComputedFacts || shouldProcessStartedFacts
+  const processEmittedFacts = shouldProcessResultComputedFacts
+    || shouldProcessComputationFailedFacts
+    || shouldProcessStartedFacts
   const publishedDuringRoute = []
   const activeRootCtx = processEmittedFacts && rootCtx?.natsContext?.publish
     ? {
@@ -647,6 +855,9 @@ export async function runSpec({ spec, rootCtx, message, initialScope = {}, proce
   if (shouldProcessResultComputedFacts) {
     await processResultComputedFacts({ rootCtx, facts: publishedDuringRoute })
   }
+  if (shouldProcessComputationFailedFacts) {
+    await processComputationFailedFacts({ rootCtx, facts: publishedDuringRoute })
+  }
   if (shouldProcessStartedFacts) {
     await processStateMachineStartedFacts({ rootCtx, facts: publishedDuringRoute })
   }
@@ -663,6 +874,7 @@ export {
   createInstanceSpec,
   startInstanceSpec,
   computeFunctionSpec,
+  computeFunctionFailedSpec,
   injectResultsSpec,
   checkStateMachineCompletionSpec,
   startDependantsSpec,
@@ -670,4 +882,7 @@ export {
   dataResultComputedSubject,
   taskResultComputedSubject,
   gateResultComputedSubject,
+  dataComputationFailedSubject,
+  taskComputationFailedSubject,
+  gateComputationFailedSubject,
 }
