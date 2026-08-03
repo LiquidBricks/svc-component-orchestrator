@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { diagnostics as createDiagnostics } from '@liquid-bricks/lib-diagnostics'
+import { ROUTER_HANDLER_ERROR } from '@liquid-bricks/lib-diagnostics/codes'
 import { create as createBasicSubject } from '@liquid-bricks/lib-nats-subject/create/basic'
 import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
 
@@ -197,15 +198,20 @@ test('injects_into injected reaction does not ACK a routing failure', async () =
     },
   }
   const message = createRouteMessage({ data: injectedPayload, ack: () => { acked = true } })
+  const routeDiagnostics = diagnostics()
 
   await assert.rejects(
-    invokeRoute({ diagnostics: diagnostics(), dataMapper }, {
+    invokeRoute({ diagnostics: routeDiagnostics, dataMapper }, {
       path: injectedPath,
       data: injectedPayload,
       message,
       natsContext: { publish: async () => {} },
     }),
-    (error) => error === failure,
+    (error) => (
+      error instanceof routeDiagnostics.DiagnosticError
+      && error.code === ROUTER_HANDLER_ERROR
+      && error.meta?.error === failure
+    ),
   )
   assert.equal(acked, false)
 })

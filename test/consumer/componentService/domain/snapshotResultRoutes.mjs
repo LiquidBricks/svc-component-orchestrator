@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { diagnostics as createDiagnostics } from '@liquid-bricks/lib-diagnostics'
+import { ROUTER_HANDLER_ERROR } from '@liquid-bricks/lib-diagnostics/codes'
 import { create as createSubject } from '@liquid-bricks/lib-nats-subject/create/basic'
 import { events as natsEvents } from '@liquid-bricks/lib-nats-subject/events/nats'
 
@@ -353,15 +354,20 @@ test('snapshot result does not ACK an injection command publish failure', async 
   const data = resultPayload('task')
   const failure = new Error('publish failed')
   const message = createRouteMessage({ data })
+  const routeDiagnostics = diagnostics()
 
   await assert.rejects(
-    invokeRoute({ diagnostics: diagnostics(), dataMapper: {} }, {
+    invokeRoute({ diagnostics: routeDiagnostics, dataMapper: {} }, {
       path: taskSnapshotResultPath,
       data,
       message,
       natsContext: { publish: async () => { throw failure } },
     }),
-    (error) => error === failure,
+    (error) => (
+      error instanceof routeDiagnostics.DiagnosticError
+      && error.code === ROUTER_HANDLER_ERROR
+      && error.meta?.error === failure
+    ),
   )
   assert.equal(message.acked, false)
 })
@@ -393,15 +399,20 @@ test('gate snapshot result does not ACK a completion-check publish failure', asy
   const data = resultPayload('gate')
   const failure = new Error('publish failed')
   const message = createRouteMessage({ data })
+  const routeDiagnostics = diagnostics()
 
   await assert.rejects(
-    invokeRoute({ diagnostics: diagnostics(), dataMapper: {} }, {
+    invokeRoute({ diagnostics: routeDiagnostics, dataMapper: {} }, {
       path: gateSnapshotResultPath,
       data,
       message,
       natsContext: { publish: async () => { throw failure } },
     }),
-    (error) => error === failure,
+    (error) => (
+      error instanceof routeDiagnostics.DiagnosticError
+      && error.code === ROUTER_HANDLER_ERROR
+      && error.meta?.error === failure
+    ),
   )
   assert.equal(message.acked, false)
 })

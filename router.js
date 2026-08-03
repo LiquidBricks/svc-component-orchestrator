@@ -93,9 +93,7 @@ export function createComponentServiceRouter({
       }
     })
     .error(({ error, rootCtx: { diagnostics } }, ...rest) => {
-      if (error instanceof diagnostics.DiagnosticError) {
-        return //we already have an error diagnosed, dont throw another one.
-      }
+      if (error instanceof diagnostics.DiagnosticError) throw error
       throw diagnostics.error(
         ROUTER_HANDLER_ERROR,
         'component service router error',

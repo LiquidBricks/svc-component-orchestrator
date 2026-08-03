@@ -10,7 +10,7 @@
   },
   "private": true,
   "scripts": {
-    "test": "clear && node test/run.js"
+    "test": "node test/run.js"
   },
   "dependencies": {
     "@liquid-bricks/lib-component-builder": "github:LiquidBricks/lib-component-builder#4e431a069411de120d4dd3af2e2727dba2ff16a0",
