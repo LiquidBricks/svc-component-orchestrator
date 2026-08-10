@@ -11,6 +11,17 @@ function ids(entries = []) {
   ))
 }
 
+function providedStateEntries(entries = []) {
+  const normalized = entries.map((entry) => ({
+    stateEdgeId: entry?.stateEdgeId,
+    type: entry?.type,
+  }))
+
+  return Array.from(new Map(
+    normalized.map((entry) => [`${entry.type}:${entry.stateEdgeId}`, entry]),
+  ).values())
+}
+
 export async function publishStartedFact({
   scope: {
     instanceId,
@@ -20,6 +31,7 @@ export async function publishStartedFact({
     taskStateIds = [],
     usesImportInstances = [],
     usesGateInstances = [],
+    providedStates = [],
     handlerDiagnostics,
   },
   rootCtx: { natsContext },
@@ -34,6 +46,7 @@ export async function publishStartedFact({
     taskStateIds: Array.from(new Set(taskStateIds.filter(Boolean).map(String))),
     importInstanceIds: ids(usesImportInstances),
     gateInstanceIds: ids(usesGateInstances),
+    providedStates: providedStateEntries(providedStates),
     updatedAt: new Date().toISOString(),
   }
 
@@ -53,6 +66,17 @@ export async function publishStartedFact({
       { field },
     )
   }
+
+  handlerDiagnostics.require(
+    payload.providedStates.every(({ stateEdgeId, type }) =>
+      typeof stateEdgeId === 'string'
+      && stateEdgeId.length > 0
+      && ['data', 'task'].includes(type)
+    ),
+    PRECONDITION_INVALID,
+    'providedStates must contain data or task state edge ids before publishing stateMachine started',
+    { field: 'providedStates' },
+  )
 
   await natsContext.publish(
     createSubject(emits['domain.vertex.stateMachine.started.v1']).forPublish().env('prod').build(),

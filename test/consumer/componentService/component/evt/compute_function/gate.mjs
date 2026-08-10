@@ -15,10 +15,13 @@ import {
   loadImports,
   getComponentId,
   getStateMachineId,
+  getStateEdgeId,
   getImportedInstance,
   pickFirst,
   runSpec,
   runInjectResultsCommands,
+  startInstanceSpec,
+  startDependantsSpec,
   computeFunctionSpec,
   domain,
 } from './helpers.mjs'
@@ -96,24 +99,28 @@ test('computeFunction with gate=true publishes start for gated instance', async 
   })
 })
 
-test('computeFunction does not publish start_dependants for unstarted gated instances', async () => {
+test('gated instance start releases dependants whose injections were provided before start', async () => {
   await withGraphContext(async ({ diagnostics, dataMapper, g }) => {
-    const targetComponent = componentBuilder('GateInjectUnstartedTarget')
-      .data('value', { deps: () => { } })
+    const targetComponent = componentBuilder('GateInjectBeforeStartTarget')
+      .data('id', { deps: () => { } })
+      .data('podFlags', {
+        deps: ({ data }) => data.id,
+        fnc: function podFlags() { },
+      })
       .toJSON()
-    const rootComponent = componentBuilder('GateInjectUnstartedRoot')
-      .data('simpleCompFalseValue', { deps: () => { }, fnc: () => 'abc-false-gate' })
-      .gate('simpleCompFalseGate', {
+    const rootComponent = componentBuilder('GateInjectBeforeStartRoot')
+      .data('podId', { deps: () => { }, fnc: () => 'control-plane-id' })
+      .gate('create', {
         hash: targetComponent.hash,
-        fnc: () => false,
-        inject: _ => [_.simpleCompFalseGate.data.value(_.data.simpleCompFalseValue)],
+        fnc: () => true,
+        inject: _ => [_.create.data.id(_.data.podId)],
       })
       .toJSON()
 
     await registerComponent(targetComponent, { diagnostics, dataMapper, g })
     await registerComponent(rootComponent, { diagnostics, dataMapper, g })
 
-    const rootInstanceId = 'instance-gate-inject-unstarted'
+    const rootInstanceId = 'instance-gate-inject-before-start'
     const rootComponentId = await getComponentId({ g, dataMapper, diagnostics, componentHash: rootComponent.hash })
     const imports = await loadImports({ g, dataMapper, componentId: rootComponentId })
     const gates = await loadGates({ g, dataMapper, componentId: rootComponentId })
@@ -123,16 +130,41 @@ test('computeFunction does not publish start_dependants for unstarted gated inst
     )
 
     const { instanceVertexId: rootInstanceVertexId } = await getStateMachineId({ g, dataMapper, instanceId: rootInstanceId })
-    const gatedInstanceId = await getGateInstanceId({ g, dataMapper, rootInstanceVertexId, alias: 'simpleCompFalseGate' })
+    const gatedInstanceId = await getGateInstanceId({ g, dataMapper, rootInstanceVertexId, alias: 'create' })
     assert.ok(gatedInstanceId, 'gated instance id missing')
 
-    const { instanceVertexId: gatedInstanceVertexId } = await getStateMachineId({ g, dataMapper, instanceId: gatedInstanceId })
+    const {
+      instanceVertexId: gatedInstanceVertexId,
+      stateMachineId: gatedStateMachineId,
+    } = await getStateMachineId({ g, dataMapper, instanceId: gatedInstanceId })
+    const idStateEdgeId = await getStateEdgeId({
+      g,
+      dataMapper,
+      stateMachineId: gatedStateMachineId,
+      type: 'data',
+      name: 'id',
+    })
+    const podFlagsStateEdgeId = await getStateEdgeId({
+      g,
+      dataMapper,
+      stateMachineId: gatedStateMachineId,
+      type: 'data',
+      name: 'podFlags',
+    })
+    assert.ok(idStateEdgeId, 'id state edge missing')
+    assert.ok(podFlagsStateEdgeId, 'podFlags state edge missing')
     const gatedInstanceStarted = await hasInstanceStarted({ g, dataMapper, instanceVertexId: gatedInstanceVertexId })
     assert.equal(gatedInstanceStarted, false)
 
     const computeFunctionSubject = computeFunctionDataSubject
 
     const startDependantsSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start_dependants.v1['*']).forPublish()
+      .env('prod')
+      .build()
+    const startInstanceSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start.v1['*']).forPublish()
+      .env('prod')
+      .build()
+    const startDataSubject = createBasicSubject(natsEvents['*'].component_service['*']['*'].cmd.data.start.v1['*']).forPublish()
       .env('prod')
       .build()
 
@@ -153,8 +185,8 @@ test('computeFunction does not publish start_dependants for unstarted gated inst
           data: {
             instanceId: rootInstanceId,
             type: 'data',
-            name: 'simpleCompFalseValue',
-            result: 'abc-false-gate',
+            name: 'podId',
+            result: 'control-plane-id',
             status: 'provided',
           },
         }),
@@ -169,7 +201,7 @@ test('computeFunction does not publish start_dependants for unstarted gated inst
       subject === computeFunctionSubject
       && payload?.data?.instanceId === gatedInstanceId
       && payload?.data?.type === 'data'
-      && payload?.data?.name === 'value'
+      && payload?.data?.name === 'id'
     )
     assert.ok(injectedGateEvent, 'expected injected computeFunction event for gated instance')
 
@@ -191,6 +223,103 @@ test('computeFunction does not publish start_dependants for unstarted gated inst
 
     const startDependantsEvents = secondRunPublished.filter(({ subject }) => subject === startDependantsSubject)
     assert.equal(startDependantsEvents.length, 0)
+
+    const gatePublishes = []
+    await runSpec({
+      spec: computeFunctionSpec,
+      rootCtx: {
+        diagnostics,
+        g,
+        dataMapper,
+        natsContext: { publish: async (subject, payload) => gatePublishes.push({ subject, payload: JSON.parse(payload) }) },
+      },
+      message: {
+        subject: computeFunctionGateSubject,
+        ack: () => { },
+        json: () => ({
+          data: {
+            instanceId: rootInstanceId,
+            type: 'gate',
+            name: 'create',
+            result: true,
+            status: 'provided',
+          },
+        }),
+      },
+    })
+
+    const gatedStartEvent = gatePublishes.find(({ subject, payload }) =>
+      subject === startInstanceSubject
+      && payload?.data?.instanceId === gatedInstanceId
+    )
+    assert.ok(gatedStartEvent, 'expected gated instance start after gate passed')
+
+    const startedPublishes = []
+    await runSpec({
+      spec: startInstanceSpec,
+      rootCtx: {
+        diagnostics,
+        g,
+        dataMapper,
+        natsContext: { publish: async (subject, payload) => startedPublishes.push({ subject, payload: JSON.parse(payload) }) },
+      },
+      message: {
+        subject: startInstanceSubject,
+        ack: () => { },
+        json: () => gatedStartEvent.payload,
+      },
+    })
+
+    const initialStateStarts = startedPublishes.filter(({ subject, payload }) =>
+      subject === startDataSubject
+      && payload?.data?.instanceId === gatedInstanceId
+    )
+    assert.deepEqual(
+      initialStateStarts.map(({ payload }) => payload.data.stateId),
+      [idStateEdgeId],
+      'instance start should only dispatch the dependency-free id state',
+    )
+
+    const replayEvents = startedPublishes.filter(({ subject, payload }) =>
+      subject === startDependantsSubject
+      && payload?.data?.instanceId === gatedInstanceId
+    )
+    assert.equal(
+      replayEvents.length,
+      1,
+      'starting an instance with a pre-provided state should replay start_dependants',
+    )
+    assert.deepEqual(replayEvents[0].payload.data, {
+      instanceId: gatedInstanceId,
+      stateEdgeId: idStateEdgeId,
+      type: 'data',
+    })
+
+    const dependantPublishes = []
+    await runSpec({
+      spec: startDependantsSpec,
+      rootCtx: {
+        diagnostics,
+        g,
+        dataMapper,
+        natsContext: { publish: async (subject, payload) => dependantPublishes.push({ subject, payload: JSON.parse(payload) }) },
+      },
+      message: {
+        subject: startDependantsSubject,
+        ack: () => { },
+        json: () => replayEvents[0].payload,
+      },
+    })
+
+    const podFlagsStarts = dependantPublishes.filter(({ subject, payload }) =>
+      subject === startDataSubject
+      && payload?.data?.instanceId === gatedInstanceId
+      && payload?.data?.stateId === podFlagsStateEdgeId
+    )
+    assert.deepEqual(podFlagsStarts.map(({ payload }) => payload.data), [{
+      instanceId: gatedInstanceId,
+      stateId: podFlagsStateEdgeId,
+    }])
   })
 })
 

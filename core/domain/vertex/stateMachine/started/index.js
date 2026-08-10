@@ -17,6 +17,8 @@ export const emits = {
     natsEvents['*'].component_service['*']['*'].cmd.import.start.v1['*'],
   'component_service.cmd.gate.start.v1':
     natsEvents['*'].component_service['*']['*'].cmd.gate.start.v1['*'],
+  'component_service.cmd.componentInstance.start_dependants.v1':
+    natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start_dependants.v1['*'],
   'component_service.evt.componentInstance.startDone.v1':
     natsEvents['*'].component_service['*']['*'].evt.componentInstance.startDone.v1['*'],
 }
@@ -33,6 +35,7 @@ export const spec = {
       'taskStateIds',
       'importInstanceIds',
       'gateInstanceIds',
+      'providedStates',
       'updatedAt',
     ]),
   ],

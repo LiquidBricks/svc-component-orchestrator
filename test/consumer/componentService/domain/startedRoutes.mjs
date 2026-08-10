@@ -47,6 +47,7 @@ const stateMachinePayload = {
   taskStateIds: ['task-edge-1'],
   importInstanceIds: ['import-instance-1'],
   gateInstanceIds: ['gate-instance-1'],
+  providedStates: [{ stateEdgeId: 'data-edge-1', type: 'data' }],
   updatedAt: '2026-07-15T12:00:00.000Z',
 }
 
@@ -116,6 +117,21 @@ test('stateMachine started reaction maps child ids, publishes fanout, then ACKs'
 
 test('stateMachine started reaction does not ACK a fanout failure', async () => {
   await assertPublishFailureIsNotAcked({ path: stateMachineStartedPath, data: stateMachinePayload })
+})
+
+test('stateMachine started reaction rejects malformed provided states', async () => {
+  const routeDiagnostics = diagnostics()
+  await assert.rejects(
+    invokeRoute({ diagnostics: routeDiagnostics, dataMapper: {} }, {
+      path: stateMachineStartedPath,
+      data: {
+        ...stateMachinePayload,
+        providedStates: [{ stateEdgeId: 'data-edge-1', type: 'gate' }],
+      },
+      natsContext: { publish: async () => {} },
+    }),
+    routeDiagnostics.DiagnosticError,
+  )
 })
 
 test('injects_into injected reaction resolves targets, publishes, then ACKs', async () => {

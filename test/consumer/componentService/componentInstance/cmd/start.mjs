@@ -12,8 +12,10 @@ import { path as registerPath } from '../../../../../core/componentAgent/cmd/reg
 import { dataMapper as createDataMapper, domain } from '@liquid-bricks/spec-domain/domain'
 import { spec as stateMachineStartedSpec } from '../../../../../core/domain/vertex/stateMachine/started/index.js'
 import { findDependencyFreeStates } from '../../../../../core/componentInstance/cmd/start/findDependencyFreeStates.js'
+import { findProvidedStates } from '../../../../../core/componentInstance/cmd/start/findProvidedStates.js'
 import { publishEvents as publishStartInstanceEvents }
   from '../../../../../core/domain/vertex/stateMachine/started/publishEvents/index.js'
+import { startProvidedStateDependants } from '../../../../../core/domain/vertex/stateMachine/started/publishEvents/startProvidedStateDependants.js'
 import { doesInstanceExist } from '../../../../../core/componentInstance/cmd/start/doesInstanceExist.js'
 import { getStateMachine } from '../../../../../core/componentInstance/cmd/start/getStateMachine.js'
 import { usesImportInstances } from '../../../../../core/componentInstance/cmd/start/loadData/usesImportInstances.js'
@@ -179,6 +181,7 @@ test('handler publishes a deterministic stateMachine started fact', async () => 
     taskStateIds: ['task-state-1'],
     usesImportInstances: [{ instanceId: 'import-1' }],
     usesGateInstances: [{ instanceId: 'gate-1' }],
+    providedStates: [{ stateEdgeId: 'data-state-1', type: 'data' }],
   })
 
   const subject = createBasicSubject(
@@ -195,6 +198,7 @@ test('handler publishes a deterministic stateMachine started fact', async () => 
     taskStateIds: ['task-state-1'],
     importInstanceIds: ['import-1'],
     gateInstanceIds: ['gate-1'],
+    providedStates: [{ stateEdgeId: 'data-state-1', type: 'data' }],
     updatedAt: published[0].payload.data.updatedAt,
   })
   assert.ok(!Number.isNaN(Date.parse(published[0].payload.data.updatedAt)))
@@ -225,6 +229,67 @@ test('findDependencyFreeStates returns only nodes without dependencies', async (
     assert.deepEqual(dataNames.sort(), ['inputData'])
     assert.deepEqual(taskNames.sort(), ['taskIndependent'])
   })
+})
+
+test('findProvidedStates packages every provided data and task state', async () => {
+  const statusByStateEdgeId = new Map([
+    ['data-waiting', 'waiting'],
+    ['data-provided-with-deps', 'provided'],
+    ['task-provided', 'provided'],
+  ])
+  const dataMapper = {
+    query: {
+      listDataStateEdgeIds: async () => ['data-waiting', 'data-provided-with-deps'],
+      listTaskStateEdgeIds: async () => ['task-provided'],
+      readStateEdgeStatus: async ({ edgeId }) => [{ status: statusByStateEdgeId.get(edgeId) }],
+    },
+  }
+
+  const result = await findProvidedStates({
+    rootCtx: { dataMapper },
+    scope: { stateMachineId: 'machine-1' },
+  })
+
+  assert.deepEqual(result, {
+    providedStates: [
+      { stateEdgeId: 'data-provided-with-deps', type: 'data' },
+      { stateEdgeId: 'task-provided', type: 'task' },
+    ],
+  })
+})
+
+test('startProvidedStateDependants publishes replay commands for packaged states', async () => {
+  const published = []
+  await startProvidedStateDependants({
+    rootCtx: {
+      natsContext: {
+        publish: async (subject, payload) => published.push({ subject, payload: JSON.parse(payload) }),
+      },
+    },
+    routeCtx: stateMachineStartedSpec.context,
+    scope: {
+      instanceId: 'instance-1',
+      providedStates: [
+        { stateEdgeId: 'data-provided', type: 'data' },
+        { stateEdgeId: 'task-provided', type: 'task' },
+        { stateEdgeId: 'data-provided', type: 'data' },
+      ],
+    },
+  })
+
+  const expectedSubject = createBasicSubject(
+    natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start_dependants.v1['*'],
+  ).forPublish().env('prod').build()
+  assert.deepEqual(published, [
+    {
+      subject: expectedSubject,
+      payload: { data: { instanceId: 'instance-1', stateEdgeId: 'data-provided', type: 'data' } },
+    },
+    {
+      subject: expectedSubject,
+      payload: { data: { instanceId: 'instance-1', stateEdgeId: 'task-provided', type: 'task' } },
+    },
+  ])
 })
 
 test('doesInstanceExist validates presence and usesImportInstances returns import ids', async () => {

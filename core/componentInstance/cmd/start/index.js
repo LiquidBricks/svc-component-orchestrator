@@ -1,5 +1,6 @@
 import { ackMessage, decodeData } from '../../../../middleware/index.js'
 import { findDependencyFreeStates } from './findDependencyFreeStates.js'
+import { findProvidedStates } from './findProvidedStates.js'
 import { getStateMachine } from './getStateMachine.js'
 import { publishStartedFact } from './publishStartedFact.js'
 import { doesInstanceExist } from './doesInstanceExist.js'
@@ -26,6 +27,7 @@ export const spec = {
     ...loadData,
     getStateMachine,
     findDependencyFreeStates,
+    findProvidedStates,
   ],
   handler: publishStartedFact,
   post: [

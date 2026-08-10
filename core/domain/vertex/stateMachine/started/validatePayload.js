@@ -2,6 +2,7 @@ import { PRECONDITION_INVALID, PRECONDITION_REQUIRED } from '@liquid-bricks/lib-
 
 export function validatePayload({ scope }) {
   const { handlerDiagnostics } = scope
+  const providedStates = scope.providedStates ?? []
   for (const field of ['instanceId', 'instanceVertexId', 'stateMachineId', 'state', 'updatedAt']) {
     handlerDiagnostics.require(
       typeof scope[field] === 'string' && scope[field].length > 0,
@@ -19,6 +20,19 @@ export function validatePayload({ scope }) {
     )
   }
   handlerDiagnostics.require(
+    Array.isArray(providedStates) && providedStates.every((state) =>
+      state
+      && typeof state === 'object'
+      && !Array.isArray(state)
+      && typeof state.stateEdgeId === 'string'
+      && state.stateEdgeId.length > 0
+      && ['data', 'task'].includes(state.type)
+    ),
+    PRECONDITION_INVALID,
+    'providedStates must be an array of data or task state edge ids for stateMachine started',
+    { field: 'providedStates' },
+  )
+  handlerDiagnostics.require(
     scope.state === 'running',
     PRECONDITION_INVALID,
     'state must be running for stateMachine started',
@@ -28,5 +42,6 @@ export function validatePayload({ scope }) {
   return {
     usesImportInstances: scope.importInstanceIds,
     usesGateInstances: scope.gateInstanceIds,
+    providedStates,
   }
 }
