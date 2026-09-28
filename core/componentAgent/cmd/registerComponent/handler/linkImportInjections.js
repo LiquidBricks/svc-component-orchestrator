@@ -1,4 +1,5 @@
 import { PRECONDITION_INVALID, PRECONDITION_REQUIRED } from '@liquid-bricks/lib-diagnostics/codes'
+import { isRouterKey } from '@liquid-bricks/lib-component-builder/component/builder/router'
 
 function parseImportInjectionPath({ handlerDiagnostics, path, compName, hash, importName, role, refType = 'import' }) {
   const trimmedPath = String(path ?? '').trim()
@@ -128,13 +129,14 @@ async function resolveInjectionNodeId({
 }
 
 function createEdgeFactory({ dataMapper, ownerComponentId }) {
-  return async function createEdge({ fromType, toType, fromId, toId, sourceImportPath = [], targetImportPath = [] }) {
+  return async function createEdge({ fromType, toType, fromId, toId, sourceImportPath = [], targetImportPath = [], selectionAlias }) {
     const payload = {
       fromId,
       toId,
       ownerComponentId,
       sourceAliasPath: JSON.stringify(sourceImportPath),
       targetAliasPath: JSON.stringify(targetImportPath),
+      ...(selectionAlias !== undefined ? { selectionAlias } : {}),
     }
 
     if (fromType === 'task') {
@@ -191,6 +193,12 @@ export async function linkImportInjections({
         `${refType} inject targets must be an array for component(${compName})#${hash} ${refType}:${importName} source[${sourcePath}]`,
         { component: compName, hash, importName, source: sourcePath, refType },
       )
+      for (const path of [sourcePath, ...targets]) {
+        handlerDiagnostics.require(
+          !path.split('.').some(part => isRouterKey(part) && !(refItem.router !== undefined && part === importName)),
+          PRECONDITION_INVALID, 'Router internals are private', { path },
+        )
+      }
 
       const { importPath: sourceImportPath, type: sourceType, name: sourceName, trimmedPath: trimmedSourcePath } =
         parseImportInjectionPath({
@@ -247,7 +255,8 @@ export async function linkImportInjections({
           refType,
         })
 
-        const edgeKey = `${sourceId}:${sourceImportPath.join('.')}:${targetId}:${targetImportPath.join('.')}`
+        const selectionAlias = refItem.router !== undefined ? importName : undefined
+        const edgeKey = `${sourceId}:${sourceImportPath.join('.')}:${targetId}:${targetImportPath.join('.')}:${selectionAlias ?? ''}`
         if (createdEdges.has(edgeKey)) continue
         createdEdges.add(edgeKey)
 
@@ -258,6 +267,7 @@ export async function linkImportInjections({
           toId: targetId,
           sourceImportPath,
           targetImportPath,
+          selectionAlias,
         })
       }
     }

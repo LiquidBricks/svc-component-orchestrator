@@ -9,6 +9,12 @@ function handler() {}
 export { path }
 
 export const emits = {
+  'domain.vertex.componentInstance.created.v1':
+    natsEvents['*'].domain['*']['*'].vertex.componentInstance.created.v1['*'],
+  'component_service.function_result.evt.component.compute_function.v1.data':
+    natsEvents['*'].component_service['*'].function_result.evt.component.compute_function.v1.data,
+  'component_service.function_result.evt.component.compute_function.v1.task':
+    natsEvents['*'].component_service['*'].function_result.evt.component.compute_function.v1.task,
   'component_service.cmd.componentInstance.start.v1':
     natsEvents['*'].component_service['*']['*'].cmd.componentInstance.start.v1['*'],
 }

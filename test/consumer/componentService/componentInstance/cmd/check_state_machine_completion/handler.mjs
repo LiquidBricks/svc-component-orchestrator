@@ -17,6 +17,7 @@ test('uses the in-flight state status and traverses parent instances once', asyn
   const statusReads = []
   const parentStateMachineReads = []
   const query = {
+    readStateEdgeTargetName: async () => [],
     listTaskStateEdgeIds: async () => [],
     listDataStateEdgeIds: async ({ vertexId }) => {
       if (vertexId === 'state-machine-child') return ['edge-in-flight']
@@ -73,6 +74,7 @@ test('uses the in-flight state status and traverses parent instances once', asyn
 test('uses the in-flight passing gate result while traversing the gated instance', async () => {
   const traversedStateMachines = []
   const query = {
+    readStateEdgeTargetName: async () => [],
     listTaskStateEdgeIds: async () => [],
     listDataStateEdgeIds: async ({ vertexId }) => {
       traversedStateMachines.push(vertexId)
@@ -129,11 +131,12 @@ test('uses the in-flight passing gate result while traversing the gated instance
       { instanceId: 'instance-root-id', stateMachineId: 'state-machine-root' },
     ],
   })
-  assert.deepEqual(traversedStateMachines, ['state-machine-root', 'state-machine-gate'])
+  assert.deepEqual(traversedStateMachines, ['state-machine-root', 'state-machine-root', 'state-machine-gate'])
 })
 
 test('a gate with error status remains unfinished even when it has a stored result', async () => {
   const query = {
+    readStateEdgeTargetName: async () => [],
     listTaskStateEdgeIds: async () => [],
     listDataStateEdgeIds: async () => [],
     listImportInstanceVertexIds: async () => [],

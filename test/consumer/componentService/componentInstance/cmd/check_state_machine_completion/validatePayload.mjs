@@ -146,3 +146,9 @@ for (const { name, scope } of [
     assert.throws(validation.run, validation.diagnostics.DiagnosticError)
   })
 }
+
+test('accepts a component start check without a task or gate trigger', () => {
+  const validation = invoke({ instanceId: 'instance-1', instanceVertexId: 'vertex-1',
+    stateMachineId: 'state-machine-1', type: 'component' })
+  assert.doesNotThrow(validation.run)
+})

@@ -9,6 +9,8 @@ function handler() {}
 export { path }
 
 export const emits = {
+  'component_service.cmd.componentInstance.check_state_machine_completion.v1':
+    natsEvents['*'].component_service['*']['*'].cmd.componentInstance.check_state_machine_completion.v1['*'],
   'component_service.cmd.data.start.v1':
     natsEvents['*'].component_service['*']['*'].cmd.data.start.v1['*'],
   'component_service.cmd.task.start.v1':

@@ -1,11 +1,15 @@
 import { create as createSubject } from '@liquid-bricks/lib-nats-subject/create/basic'
 import { PRECONDITION_REQUIRED } from '@liquid-bricks/lib-diagnostics/codes'
+import { publishResultComputedFact } from '../../../component/evt/compute_function/data/publishResultComputedFact.js'
 
 export async function publishCompletedFacts({
-  scope: { completedStateMachines = [], handlerDiagnostics },
+  scope: { completedStateMachines = [], completedRouters = [], handlerDiagnostics },
   rootCtx: { natsContext },
   routeCtx: { emits },
 }) {
+  for (const scope of completedRouters) {
+    await publishResultComputedFact({ scope, rootCtx: { natsContext }, routeCtx: { emits } })
+  }
   const subject = createSubject(emits['domain.vertex.stateMachine.completed.v1'])
     .forPublish()
     .env('prod')

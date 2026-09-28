@@ -200,11 +200,34 @@ async function collectCompletedStateMachines({
   stateStatusOverrides,
   gateResultOverrides,
   completedStateMachines,
+  completedRouters,
 }) {
   if (!instanceVertexId || !stateMachineId) return
   const visitKey = `${instanceVertexId}:${stateMachineId}`
   if (visited.has(visitKey)) return
   visited.add(visitKey)
+
+  const dataStateIds = await dataMapper.query.listDataStateEdgeIds({ vertexId: stateMachineId })
+  for (const stateEdgeId of dataStateIds ?? []) {
+    const [node] = await dataMapper.query.readStateEdgeTargetName({ edgeId: stateEdgeId })
+    const router = valueFor(node, 'router')
+    if (router === undefined) continue
+    const [state] = await dataMapper.query.readStateEdgeStatus({ edgeId: stateEdgeId })
+    if (valueFor(state, 'status') === DATA_PROVIDED_STATUS) continue
+    let finished = true
+    for (const gateStateEdgeId of await dataMapper.query.listGateStateEdgeIds({ vertexId: stateMachineId }) ?? []) {
+      const [refId] = await dataMapper.query.findEdgeTargetNodeId({ edgeId: gateStateEdgeId })
+      const [definitionId] = await dataMapper.query.findGateRefIdForInstanceRef({ vertexId: refId })
+      const [definition] = await dataMapper.query.readGateRefAliasAndFunction({ vertexId: definitionId })
+      if (valueFor(definition, 'router') !== router) continue
+      if (!await isGateFinished({ dataMapper, gateStateEdgeId, cache: finishedCache, stateStatusOverrides, gateResultOverrides })) {
+        finished = false
+        break
+      }
+    }
+    if (finished) completedRouters.push({ instanceId, instanceVertexId, stateMachineId, stateEdgeId,
+      name: valueFor(node, 'name'), result: true })
+  }
 
   const finished = await isInstanceFinished({
     dataMapper,
@@ -230,6 +253,7 @@ async function collectCompletedStateMachines({
       stateStatusOverrides,
       gateResultOverrides,
       completedStateMachines,
+      completedRouters,
     })
   }
 }
@@ -263,6 +287,7 @@ export async function handler({
   }
 
   const completedStateMachines = []
+  const completedRouters = []
   await collectCompletedStateMachines({
     dataMapper,
     instanceVertexId,
@@ -273,7 +298,8 @@ export async function handler({
     stateStatusOverrides,
     gateResultOverrides,
     completedStateMachines,
+    completedRouters,
   })
 
-  return { completedStateMachines }
+  return { completedStateMachines, ...(completedRouters.length ? { completedRouters } : {}) }
 }

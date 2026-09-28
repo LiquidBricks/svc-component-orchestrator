@@ -71,7 +71,7 @@ async function attachComponentGatesHandler({
       { component: compName, hash, gate: gateName, gateHash },
     )
 
-    const { id: gateRefId } = await dataMapper.vertex.gateRef.create({ alias: gateName, fnc, codeRef })
+    const { id: gateRefId } = await dataMapper.vertex.gateRef.create({ alias: gateName, fnc, codeRef, ...(gateItem.router !== undefined ? { router: gateItem.router } : {}) })
     await dataMapper.edge.has_gate.component_gateRef.create({ fromId: componentVID, toId: gateRefId })
     await dataMapper.edge.gate_of.gateRef_component.create({ fromId: gateRefId, toId: gatedComponentId })
 

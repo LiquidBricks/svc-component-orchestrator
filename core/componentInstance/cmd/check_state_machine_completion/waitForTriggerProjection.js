@@ -22,6 +22,10 @@ function expectedGateResult({ result, resultValue }) {
 }
 
 async function readTriggerProjection({ dataMapper, scope }) {
+  if (scope.type === 'component') {
+    const [state] = await dataMapper.query.readStateMachineState({ vertexId: scope.stateMachineId })
+    return ['running', 'complete'].includes(valueFor(state, 'state')) ? 'started' : undefined
+  }
   if (scope.type === 'gate') {
     const [resultValues] = await dataMapper.query.readResultValues({
       edgeId: scope.stateEdgeId,
@@ -36,6 +40,7 @@ async function readTriggerProjection({ dataMapper, scope }) {
 }
 
 function expectedTriggerProjection(scope) {
+  if (scope.type === 'component') return 'started'
   return scope.type === 'gate'
     ? expectedGateResult(scope)
     : (scope.stateEdgeStatus ?? scope.status)

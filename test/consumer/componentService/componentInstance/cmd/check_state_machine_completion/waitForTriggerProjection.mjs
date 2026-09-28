@@ -132,3 +132,16 @@ test('raises a specific DiagnosticError when the projection does not become read
 
   assert.equal(reads, 1)
 })
+
+test('component checks wait for the started projection and also accept already complete instances', async () => {
+  const scope = { type: 'component', stateMachineId: 'state-machine-1' }
+  const { diagnostics, handlerDiagnostics } = makeHandlerDiagnostics(scope)
+  for (const state of ['running', 'complete', 'created']) {
+    const run = () => waitForTriggerProjection({ scope: { ...scope, handlerDiagnostics }, rootCtx: {
+      projectionReadinessTimeoutMs: 0,
+      dataMapper: { query: { readStateMachineState: async () => values('state', state) } },
+    } })
+    if (state === 'created') await assert.rejects(run, diagnostics.DiagnosticError)
+    else await run()
+  }
+})

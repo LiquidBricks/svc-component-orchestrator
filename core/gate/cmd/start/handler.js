@@ -1,3 +1,4 @@
+import { routerDependencyPath } from '@liquid-bricks/lib-component-builder/component/builder/router'
 import { create as createBasicSubject } from '@liquid-bricks/lib-nats-subject/create/basic'
 import { domain } from '@liquid-bricks/spec-domain/domain'
 import {
@@ -115,7 +116,7 @@ async function buildGateDependencyPayload({
     const [stateValues] = await dataMapper.query.readDependencyStateResult({ edgeId: stateEdgeInfo.stateEdgeId })
     const resultValues = stateValues?.result ?? stateValues
     const result = normalizeResult(Array.isArray(resultValues) ? resultValues[0] : resultValues)
-    const path = [...aliasPath, depType, depName].join('.')
+    const path = [...aliasPath, ...routerDependencyPath(depType, depName)].join('.')
     setNested(deps, path, result)
   }
 
@@ -176,6 +177,8 @@ async function loadGateRefsForParent({
     const [gateRefValues] = gateRefId
       ? await dataMapper.query.readGateRefAliasAndName({ vertexId: gateRefId })
       : []
+    // Router predicates are evaluated through their reference token, never through a selected child.
+    if (gateRefValues?.router !== undefined) continue
     const aliasValues = gateRefValues?.alias ?? gateRefValues
     const alias = pickFirst(aliasValues)
     const nameValues = gateRefValues?.name ?? gateRefValues
@@ -208,6 +211,35 @@ export async function handler({
   scope: { instanceId, parentInstanceId },
 }) {
   if (!instanceId || !g) return
+
+  // For router routes the start token is the predicate reference, not a child instance.
+  if (parentInstanceId) {
+    const [routeRefId] = await dataMapper.query.findGateRefIdForInstanceRef({ vertexId: instanceId })
+    if (routeRefId) {
+      const [definition] = await dataMapper.query.readGateRefAliasAndFunction({ vertexId: routeRefId })
+      if (definition?.router !== undefined) {
+        const [parentId] = await dataMapper.query.findInstanceVertexId({ instanceId: parentInstanceId })
+        const [stateMachineId] = await dataMapper.query.readStateMachineId({ vertexId: parentId })
+        const [edgeId] = await dataMapper.query.findGateStateEdgeIdForTargetNode({ vertexId: stateMachineId, id: instanceId })
+        const [state] = await dataMapper.query.readStateEdgeStatus({ edgeId })
+        if (pickFirst(state?.status) !== 'waiting') return
+        const deps = [...await dataMapper.query.listDepsTaskIds({ vertexId: routeRefId }),
+          ...await dataMapper.query.listDepsDataIds({ vertexId: routeRefId })]
+        const waitFor = [...await dataMapper.query.listGateTaskWaitForIds({ vertexId: routeRefId }),
+          ...await dataMapper.query.listGateDataWaitForIds({ vertexId: routeRefId })]
+        const stateEdgeCache = new Map()
+        if (!await areRequirementsProvided({ g, dataMapper, rootInstanceVertexId: parentId,
+          requirements: [...deps, ...waitFor], stateEdgeCache, pathResolutionCache: new Map() })) return
+        const context = await getParentContext({ g, dataMapper, parentInstanceVertexId: parentId })
+        const values = await buildGateDependencyPayload({ g, dataMapper, rootInstanceVertexId: parentId,
+          dependentComponentId: context.dependentComponentId, dependencyNodeIds: deps,
+          stateEdgeCache, importPathCache: new Map() })
+        await publishGateComputeRequest({ natsContext, instanceId: parentInstanceId, emits,
+          componentHash: context.componentHash, name: pickFirst(definition.alias), deps: values })
+        return
+      }
+    }
+  }
 
   const gateInstanceVertexId = await resolveInstanceVertexId({ g, dataMapper, instanceId })
   if (!gateInstanceVertexId) return

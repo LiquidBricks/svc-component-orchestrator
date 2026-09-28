@@ -46,6 +46,7 @@ export async function componentGates({ rootCtx: { g, dataMapper }, scope: { comp
       waitFor,
       deps,
       gateRefId,
+      ...(edgeValues?.router !== undefined ? { router: Array.isArray(edgeValues.router) ? edgeValues.router[0] : edgeValues.router } : {}),
     })
   }
 

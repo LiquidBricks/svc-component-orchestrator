@@ -1,4 +1,5 @@
 import { deserializeRegistration } from '@liquid-bricks/lib-component-builder'
+import { expandRouters } from '@liquid-bricks/lib-component-builder/component/builder/router'
 import { PRECONDITION_INVALID, PRECONDITION_REQUIRED } from '@liquid-bricks/lib-diagnostics/codes'
 
 export function validatePayload(args) {
@@ -13,7 +14,7 @@ export function validatePayload(args) {
 
   try {
     const parsedComponent = deserializeRegistration(component)
-    return { component: parsedComponent }
+    return { component: expandRouters(parsedComponent) }
   } catch (error) {
     handlerDiagnostics.require(
       false,

@@ -14,6 +14,8 @@ export const path = createSubject(
   .toObject()
 
 export const emits = {
+  'domain.edge.has_data_state.result_computed.v1':
+    natsEvents['*'].domain['*']['*'].edge.has_data_state.result_computed.v1['*'],
   'domain.vertex.stateMachine.completed.v1':
     natsEvents['*'].domain['*']['*'].vertex.stateMachine.completed.v1['*'],
 }

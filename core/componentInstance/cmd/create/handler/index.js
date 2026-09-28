@@ -111,7 +111,16 @@ export async function handler({
       componentId: gatedComponentId,
       componentHash: gatedComponentHash,
       gateRefId,
+      router,
     } of gatesToCreate ?? []) {
+      // Router predicates have state immediately; their component trees are created only on true.
+      if (router !== undefined) {
+        const { id: gateInstanceRefId } = await dataMapper.vertex.gateInstanceRef.create()
+        await dataMapper.edge.uses_gate.componentInstance_gateInstanceRef.create({ fromId: parentInstanceVertexId, toId: gateInstanceRefId })
+        await dataMapper.edge.has_gate_state.stateMachine_gateInstanceRef.create({ fromId: parentStateMachineId, toId: gateInstanceRefId })
+        await dataMapper.edge.uses_gate.gateInstanceRef_gateRef.create({ fromId: gateInstanceRefId, toId: gateRefId })
+        continue
+      }
       const gatedInstanceId = ulid()
       const gatedInstance = await createComponentInstance({
         g,

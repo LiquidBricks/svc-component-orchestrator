@@ -1,3 +1,4 @@
+import { routerDependencyPath } from '@liquid-bricks/lib-component-builder/component/builder/router'
 import { findImportPathBetweenComponents, findStateEdgeForNodeInInstanceTree, normalizeResult, setNested, vertexLabelToType } from '../../../../componentInstance/cmd/dependencyUtils.js'
 
 
@@ -55,7 +56,7 @@ export async function dependencyResults({ rootCtx: { g, dataMapper }, scope: { c
     const [stateValues] = await dataMapper.query.readDependencyStateResult({ edgeId: stateEdgeInfo.stateEdgeId })
     const resultValues = stateValues?.result ?? stateValues
     const result = normalizeResult(Array.isArray(resultValues) ? resultValues[0] : resultValues)
-    const path = [...aliasPath, depLabel, depName].join('.')
+    const path = [...aliasPath, ...routerDependencyPath(depLabel, depName)].join('.')
     setNested(deps, path, result)
   }
 

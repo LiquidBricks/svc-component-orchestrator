@@ -1,10 +1,16 @@
 import { PRECONDITION_INVALID, PRECONDITION_REQUIRED } from '@liquid-bricks/lib-diagnostics/codes'
+import { isRouterKey, routerDoneKey } from '@liquid-bricks/lib-component-builder/component/builder/router'
 
 const SUPPORTED_DEPENDENCY_TYPES = ['data', 'task', 'deferred', 'lifecycle', 'agentFn']
 
 export function parseDependencyPath({ handlerDiagnostics, dep, compName, hash, dependencyType, dependencyName }) {
   const trimmedDep = String(dep ?? '').trim()
   const parts = trimmedDep.split('.').filter(Boolean)
+  handlerDiagnostics.require(!parts.some(isRouterKey), PRECONDITION_INVALID,
+    'Router internals are private; depend on router.<name>.lifecycleDone', { dep: trimmedDep })
+  if (parts.at(-3) === 'router' && parts.at(-1) === 'lifecycleDone') {
+    return { trimmedDep, importPath: parts.slice(0, -3), targetType: 'data', targetName: routerDoneKey(parts.at(-2)) }
+  }
 
   handlerDiagnostics.require(
     parts.length >= 2,

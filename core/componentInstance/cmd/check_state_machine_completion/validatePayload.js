@@ -1,6 +1,6 @@
 import { PRECONDITION_INVALID, PRECONDITION_REQUIRED } from '@liquid-bricks/lib-diagnostics/codes'
 
-const TYPES = new Set(['data', 'task', 'gate'])
+const TYPES = new Set(['data', 'task', 'gate', 'component'])
 
 export function validatePayload({
   scope: {
@@ -29,10 +29,11 @@ export function validatePayload({
   handlerDiagnostics.require(
     TYPES.has(type),
     PRECONDITION_INVALID,
-    'type must be data, task, or gate for check_state_machine_completion',
+    'type must be data, task, gate, or component for check_state_machine_completion',
     { field: 'type', type },
   )
 
+  if (type === 'component') return
   if (type === 'data' || type === 'task') {
     handlerDiagnostics.require(
       typeof stateEdgeId === 'string' && stateEdgeId.length,

@@ -44,7 +44,11 @@ export async function usesGateInstances({ rootCtx: { g, dataMapper }, scope: { i
     ])
 
     const [gateInstanceVertexId] = await dataMapper.query.findGateInstanceVertexIdForRef({ vertexId: gateRefInstanceId })
-    if (!gateInstanceVertexId) continue
+    if (!gateInstanceVertexId) {
+      const [definition] = await dataMapper.query.readGateRefAliasAndFunction({ vertexId: gateRefId })
+      if (definition?.router !== undefined) gates.push({ instanceId: gateRefInstanceId, alias, waitFor, deps })
+      continue
+    }
     const [instanceValues] = await dataMapper.query.readGateInstanceId({ vertexId: gateInstanceVertexId })
     const instanceIdValues = instanceValues?.instanceId ?? instanceValues
     const gateInstanceId = Array.isArray(instanceIdValues) ? instanceIdValues[0] : instanceIdValues

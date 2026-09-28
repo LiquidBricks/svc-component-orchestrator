@@ -334,5 +334,13 @@ async function findGateInstanceIdsForInstance({
     gateInstanceIds.push(gateInstanceId)
   }
 
+  const refs = await dataMapper.query.listGateRefInstanceIds({ vertexId: instanceVertexId })
+  for (const refId of refs ?? []) {
+    const [childId] = await dataMapper.query.findGateInstanceVertexIdForRef({ vertexId: refId })
+    if (childId) continue
+    const [definitionId] = await dataMapper.query.findGateRefIdForInstanceRef({ vertexId: refId })
+    const [definition] = await dataMapper.query.readGateRefAliasAndFunction({ vertexId: definitionId })
+    if (definition?.router !== undefined) gateInstanceIds.push(refId)
+  }
   return gateInstanceIds
 }
